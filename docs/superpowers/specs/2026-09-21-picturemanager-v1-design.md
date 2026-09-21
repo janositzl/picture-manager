@@ -11,8 +11,14 @@ read the brief alongside this doc.
 Backend/DB/imaging/deployment stack is exactly as the brief's table. Frontend additions on top of
 React + TypeScript + Vite + MUI:
 
-- **Tailwind CSS** for utility styling, used alongside MUI (MUI for components, Tailwind for layout/spacing
-  utility classes). Tailwind's `preflight` base-reset is disabled so it doesn't fight MUI's CssBaseline.
+- **Tailwind CSS** for utility styling, used alongside MUI. Tailwind's `preflight` base-reset is disabled
+  so it doesn't fight MUI's `CssBaseline`. Division of labor: **Tailwind utility classes style non-MUI
+  layout only** (wrapper `div`s, page structure); **MUI's own `sx` prop styles MUI components**. This isn't
+  a preference — MUI/Emotion injects unlayered CSS, which always wins the cascade over anything Tailwind
+  puts inside a `@layer` regardless of specificity, so a Tailwind class on an MUI component (e.g.
+  `<Typography className="mb-4">`) silently does nothing. Revisit with `<StyledEngineProvider
+  enableCssLayer>` + an explicit `@layer theme, mui, utilities;` order once Playwright (phase 8) can verify
+  rendered output in a real browser.
 - **ESLint + Prettier**, configured together (`eslint-config-prettier` to disable stylistic ESLint rules
   Prettier owns), TypeScript-aware (`typescript-eslint`).
 - **Environment variable support** via Vite's `import.meta.env` / `.env` files (`.env`, `.env.development`,

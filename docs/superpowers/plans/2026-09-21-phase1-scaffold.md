@@ -15,7 +15,7 @@ plumbing: config → DI → logging → DB connectivity → health endpoint, and
 
 **Tech Stack:** .NET 10 (SDK 10.0.302, `net10.0` TFM), ASP.NET Core minimal APIs, EF Core 10 + Npgsql,
 Serilog (console + rolling file), AspNetCore.HealthChecks.NpgSql, xUnit + FluentAssertions + NSubstitute,
-React 18 + TypeScript + Vite, MUI, Tailwind CSS v4, ESLint + Prettier, Docker Compose (Postgres only in
+React 19 + TypeScript + Vite, MUI, Tailwind CSS v4, ESLint + Prettier, Docker Compose (Postgres only in
 this phase).
 
 **Spec:** [`docs/superpowers/specs/2026-09-21-picturemanager-v1-design.md`](../specs/2026-09-21-picturemanager-v1-design.md)
@@ -524,12 +524,18 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "PictureManager.Api terminated unexpectedly");
+    Environment.ExitCode = 1;
 }
 finally
 {
     Log.CloseAndFlush();
 }
 ```
+
+(Amended post-final-review: the original block here didn't set a non-zero exit code on fatal startup
+failure, so a missing connection string would log Fatal and still exit 0 — invisible to Docker
+`restart: unless-stopped`, compose healthchecks, and CI, all of which key off exit codes. Fixed with
+`Environment.ExitCode = 1;` in the catch.)
 
 - [ ] **Step 3: Replace `appsettings.json`**
 
@@ -856,7 +862,7 @@ function App() {
         <Typography variant="h4" gutterBottom>
           PictureManager
         </Typography>
-        <Typography variant="body2" className="mb-4">
+        <Typography variant="body2" sx={{ mb: 4 }}>
           API base URL: {env.apiBaseUrl}
         </Typography>
         <Button variant="contained">Scaffold OK</Button>
@@ -867,6 +873,17 @@ function App() {
 
 export default App
 ```
+
+(Amended post-final-review: the original block used a Tailwind `className="mb-4"` on the MUI
+`Typography` — that silently does nothing, because MUI/Emotion injects unlayered CSS, which always wins
+the cascade over anything Tailwind puts in a `@layer`, regardless of specificity. The smoke test claimed
+to prove "MUI + Tailwind + env vars wire together" while actually demonstrating the opposite for MUI
+components. Fixed by adopting the policy: Tailwind utility classes style non-MUI layout (the wrapping
+`<div className="p-8">` still works — no MUI style competes with it), MUI's own `sx` prop styles MUI
+components. This is now the project convention; see the design spec's frontend section. Revisit with
+`<StyledEngineProvider enableCssLayer>` + an explicit `@layer theme, mui, utilities;` order once Playwright
+(phase 8) can verify rendered output in a real browser — not attempted here since nothing in this pipeline
+can confirm cascade-layer behavior visually.)
 
 - [ ] **Step 7: Verify build and lint**
 
