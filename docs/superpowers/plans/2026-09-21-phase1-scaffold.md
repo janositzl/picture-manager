@@ -43,7 +43,8 @@ this phase).
 ## Task 1: Solution and project scaffolding
 
 **Files:**
-- Create: `PictureManager.sln`
+- Create: `PictureManager.slnx` (SDK 10.0.302's `dotnet new sln` defaults to the new XML solution format —
+  accept `.slnx`, not classic `.sln`; there's no legacy-tooling constraint on a brand-new project)
 - Create: `src/PictureManager.Model/PictureManager.Model.csproj`
 - Create: `src/PictureManager.Application/PictureManager.Application.csproj`
 - Create: `src/PictureManager.Infrastructure/PictureManager.Infrastructure.csproj`
