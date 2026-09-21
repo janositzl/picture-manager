@@ -74,10 +74,18 @@ re-approval, per your direction to proceed continuously.
    bind-mount), EF Core + Npgsql wired to `PictureManagerDb`, web/ Vite+React+TS+MUI+Tailwind+ESLint+
    Prettier scaffold with env var support.
 2. **Data model & persistence** — entities, EF configurations, migrations, seeded placeholder `AppUser`,
-   repository interfaces + impls, xUnit coverage.
+   repository interfaces + impls, xUnit coverage. **No live database in this phase**: migrations are
+   generated (`dotnet ef migrations add`) and reviewed, but not applied against a running Postgres — the
+   `db` container from phase 1 stays stopped throughout. Repository tests use EF Core's InMemory provider
+   for query-logic coverage; the `RawMetadata jsonb` column and any other Postgres-specific behavior aren't
+   exercised by InMemory, so they're unverified until phase 3, which actually needs a running database to
+   persist scan results and is the first phase to run `dotnet ef database update` for real.
 3. **Scanning pipeline** — enumerate/enrich phases, `Channel<Guid>` background enrichment, MetadataExtractor
    EXIF, xxHash partial-hash reconciliation, path normalization (NFC, case-insensitive compare, `/`
-   storage), exclude rules, SSE progress, unit tests for path/hash/reconciliation logic.
+   storage), exclude rules, SSE progress, unit tests for path/hash/reconciliation logic. First phase to
+   start phase 1's `db` container and run `dotnet ef database update` against a live Postgres — applies
+   phase 2's migrations for real and is where any InMemory-vs-Postgres surprises (e.g. `jsonb` mapping)
+   surface.
 4. **Thumbnails & image serving** — content-addressed sharded WebP cache, EXIF-orientation-corrected
    derivatives, range-enabled serving, immutable cache headers.
 5. **REST API** — folders, images (keyset pagination/search/favorite), albums (CRUD/reorder/export),
