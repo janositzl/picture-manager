@@ -160,10 +160,16 @@ git commit -m "chore: scaffold PictureManager solution and project references"
   Later phases (EXIF timestamps, `FirstSeenUtc`/`MissingSinceUtc`, `CreatedAt`/`UpdatedAt` columns) inject
   `IClock` instead of calling `DateTime.UtcNow` directly, so tests can control time.
 
-- [ ] **Step 1: Add the DI package needed for the extension method**
+- [ ] **Step 1: Add the DI packages needed**
+
+`PictureManager.Application` only needs the `IServiceCollection` abstraction for its extension method.
+`PictureManager.Application.Tests` needs the concrete `Microsoft.Extensions.DependencyInjection` package
+too — it instantiates `ServiceCollection` and calls `.BuildServiceProvider()`, neither of which is in the
+Abstractions package, and nothing installed in Task 1 provides it transitively.
 
 ```bash
 dotnet add src/PictureManager.Application package Microsoft.Extensions.DependencyInjection.Abstractions
+dotnet add tests/PictureManager.Application.Tests package Microsoft.Extensions.DependencyInjection
 ```
 
 - [ ] **Step 2: Write the failing tests**
@@ -308,10 +314,20 @@ git commit -m "feat: add IClock abstraction and AddApplication DI extension"
 
 - [ ] **Step 1: Add EF Core / Npgsql packages and the `dotnet-ef` local tool**
 
+`PictureManager.Infrastructure` also needs `Microsoft.Extensions.Configuration.Abstractions` explicitly —
+its `AddInfrastructure` method takes an `IConfiguration` parameter, and that type isn't part of the
+`Microsoft.EntityFrameworkCore` dependency chain. The test project needs the concrete
+`Microsoft.Extensions.Configuration` package too (for `ConfigurationBuilder`/`AddInMemoryCollection`,
+neither of which is in the Abstractions package) and the concrete `Microsoft.Extensions.DependencyInjection`
+package (for `ServiceCollection`/`BuildServiceProvider()`) — don't rely on either arriving transitively.
+
 ```bash
 dotnet add src/PictureManager.Infrastructure package Microsoft.EntityFrameworkCore
 dotnet add src/PictureManager.Infrastructure package Npgsql.EntityFrameworkCore.PostgreSQL
 dotnet add src/PictureManager.Infrastructure package Microsoft.EntityFrameworkCore.Design
+dotnet add src/PictureManager.Infrastructure package Microsoft.Extensions.Configuration.Abstractions
+dotnet add tests/PictureManager.Infrastructure.Tests package Microsoft.Extensions.Configuration
+dotnet add tests/PictureManager.Infrastructure.Tests package Microsoft.Extensions.DependencyInjection
 dotnet new tool-manifest
 dotnet tool install dotnet-ef
 ```
