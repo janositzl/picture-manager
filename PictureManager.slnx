@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PictureManager.Api/PictureManager.Api.csproj" />
+    <Project Path="src/PictureManager.Application/PictureManager.Application.csproj" />
+    <Project Path="src/PictureManager.Infrastructure/PictureManager.Infrastructure.csproj" />
+    <Project Path="src/PictureManager.Model/PictureManager.Model.csproj" />
+    <Project Path="src/PictureManager.Worker/PictureManager.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PictureManager.Application.Tests/PictureManager.Application.Tests.csproj" />
+    <Project Path="tests/PictureManager.Infrastructure.Tests/PictureManager.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
