@@ -2,7 +2,9 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PictureManager.Application.Repositories;
 using PictureManager.Infrastructure.Persistence;
+using PictureManager.Infrastructure.Persistence.Repositories;
 
 namespace PictureManager.Infrastructure.DependencyInjection;
 
@@ -17,6 +19,12 @@ public static class InfrastructureServiceCollectionExtensions
                 "Connection string 'PictureManagerDb' is not configured.");
 
         services.AddDbContext<PictureManagerDbContext>(options => options.UseNpgsql(connectionString));
+
+        services.AddScoped<IFolderRepository, FolderRepository>();
+        services.AddScoped<IImageRepository, ImageRepository>();
+        services.AddScoped<IAlbumRepository, AlbumRepository>();
+        services.AddScoped<IAppUserRepository, AppUserRepository>();
+        services.AddScoped<IImageRootRepository, ImageRootRepository>();
 
         return services;
     }

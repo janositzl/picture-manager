@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PictureManager.Application.Repositories;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Infrastructure.Persistence;
 using Xunit;
@@ -42,5 +43,27 @@ public class InfrastructureServiceCollectionExtensionsTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*PictureManagerDb*");
+    }
+
+    [Fact]
+    public void AddInfrastructure_RegistersAllFiveRepositories()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PictureManagerDb"] =
+                    "Host=localhost;Database=picturemanager;Username=test;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IFolderRepository>().Should().NotBeNull();
+        provider.GetService<IImageRepository>().Should().NotBeNull();
+        provider.GetService<IAlbumRepository>().Should().NotBeNull();
+        provider.GetService<IAppUserRepository>().Should().NotBeNull();
+        provider.GetService<IImageRootRepository>().Should().NotBeNull();
     }
 }
