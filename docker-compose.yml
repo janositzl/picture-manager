@@ -1,3 +1,8 @@
+# Local development only. POSTGRES_* defaults below are placeholder credentials for a database
+# reachable only on your own machine (port 5432 bound to localhost via Docker Desktop's default
+# NAT). Never reuse these defaults, and never publish this port, on any shared or internet-facing
+# host: override POSTGRES_PASSWORD (and ideally POSTGRES_USER) via a local .env file (gitignored;
+# see .env.example) before running this anywhere but a developer workstation.
 services:
   db:
     image: postgres:17-alpine
