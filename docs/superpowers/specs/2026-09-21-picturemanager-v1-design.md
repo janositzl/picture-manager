@@ -64,6 +64,14 @@ PictureManager/
 5. **Dev ImageRoot**: `dev-data/images/` inside the repo, bind-mounted read-only into the app container
    for local dev, mirroring the brief's "Docker runs on the NAS itself → bind-mount directly" case. Real
    CIFS-mounted volumes are a production concern, documented but not exercised locally.
+6. **`ImageRoot` entity** (not in the brief's data model, needed to make "multiple independent roots"
+   actually work): `Id, Name, MountPath, IsActive, CreatedUtc`. `MountPath` is the container-visible
+   physical path (e.g. `/images` or `/images/holidays-nas`) that `Folder.RelativePath` values under this
+   root are relative to. Every top-level `Folder` (`ParentId = null`) belongs to exactly one `ImageRoot`
+   via a new `Folder.RootId` FK, inherited implicitly by descendants through the parent/child chain (not
+   duplicated on every row). Without this, there's no way to resolve a stored relative path back to a
+   physical one when more than one root is registered — the brief names the multi-root feature but its
+   listed `Folder` columns alone can't support it.
 
 ## Build phases
 
