@@ -1,0 +1,340 @@
+Main features:
+
+Main fatures of client application:
+- Folder management
+	- it is a virtual references to filesystem folders.
+	- application can manage more root folders, these are independent folders
+		- each root can be a different volume/mount, not necessarily the same NAS share
+		- each root has its own ImageRoot; paths are stored relative to their own root, not a single shared one
+	- add a new folder to folder collection
+	- scan the sub-folders and add it to selected folder
+	- exclude spcific folder names from scan like raw, backup (it is configured)
+	- a folder can be deleted as a sub-folder or main folder from collection -> if a folder is deleted, all images from folder and sub-folders are deleted from database (images, albumimages)
+	- scan a folder means read the images from folder and store image information in database
+	- scan folder can be on single level or recursive
+	- a folder can be set as exclude from scan
+	- don't store absolute paths - use ImageRoot settings and store relative path from ImageRoot	
+		physical path: /images/Holidays/Madeira/IMG001.jpg -> ImageRoot = /images +  path : Holidays/Madeira/IMG001.jpg
+	- app is strictly read-only against the NAS: it never creates, renames, or deletes anything on the share, only in its own catalog
+		- if a folder is removed from the NAS, the next scan detects the missing path and marks its images as missing (MissingSinceUtc), not deleted
+	
+- Image viewer
+	- on the left side of application resides the tree of folders, if a folder is selected, on the right side shows the images of selected folder
+	- images can be ordered by different attriburtes like name, date
+	- in image viewer an image can be set to favorite
+	- favorite is global (single IsFavorite column on Image) - not per-user
+	- thumbnail should store on file system, not in database
+	- thumbnails are generated lazily, on first request, and cached - not during scan
+	- different views of images: All, Favorites
+
+- Album
+	- user can create an album and assign images into album
+	- albums are user-owned (OwnerUserId) - any user can create and manage their own albums
+		- v1 has no login yet (see User management below), so every album is owned by a single seeded placeholder AppUser until v2 introduces real accounts
+	- images can be added from different folders
+	- assing to album is available in folder view as well, some image can be selected and assigned them to an album
+	- user can delete an album
+	- user can export the name of images into a text file: special prefix(optional) + path + image name
+		- export format: one image per line, "{prefix}{RelativePath}/{FileName}{Extension}", prefix optional and empty by default
+		- plain UTF-8, \n line endings, in the album's own order (AlbumImage.SortOrder)
+	- in album, the images can have a special order, the user can set order of images
+	- an image can be assigned to more albums
+	- albums should not duplicate images
+
+- Image scan
+	- the main purpose of image scan is look-up the images from a folder, store the image name and EXIF info and calculate its content hash
+	- thumbnail generation is NOT part of the scan - see Image viewer above (lazy, on first request)
+	- user can select one or more folders to scan and the scan can be on one level or recursive
+	- client app should show the status of scan
+
+- image search feature
+	- v1 scope only: search by folder name, file name, and favorite-only filter
+	- no metadata/EXIF search, no full-text search in v1
+
+- User managemt
+	- application should manage roles: user, admin
+	- DEFERRED TO V2: v1 ships without login/auth - single implicit context, no roles enforced
+	- v2 target: only admin can create or delete albums and export image list is REPLACED by: any user owns and manages their own albums (see Album section above) - admin instead manages folder registrations, rescans, and user accounts
+	- v2 auth is via Zitadel (OIDC, Authorization Code flow + PKCE), ASP.NET Core OpenIdConnect middleware, BFF pattern (React never sees the access token directly)
+	- v2 roles: user (browses, favorites, builds own albums), admin (folder registrations, rescans, albums/user administration) - enforced at the endpoint level (RequireAuthorization policy), not just hidden in the UI
+
+- client application	
+	- application settings: it should have a place where the settings can be configured
+		configure exlude folder names
+		configure exlude or include image extension; ie. heic is excluded
+			- an excluded extension is invisible end-to-end: not scanned, not listed, not counted - it's a scan-time filter, the file never gets a Folder/Image row
+	- search duplicate files using ContentHash
+		- no logical photo grouping: each file is its own Image record regardless of duplicate visual content (e.g. RAW+JPEG pair, or a copy in another folder)
+		- ContentHash is not used to merge records; it powers a separate duplicate-finder view (GROUP BY ContentHash HAVING COUNT(*) > 1) for manual review
+	
+Application logical components:
+==================================
+PictureManager
+│
+├── PictureManager.Api
+│
+├── PictureManager.Application
+│
+├── PictureManager.Model
+│
+├── PictureManager.Infrastructure
+│
+├── PictureManager.Worker
+│
+└── picturemanager.client
+
+Api - PictureManager.Api
+	Responsible for:
+	- REST API
+	- authentication (v2)
+	- authorization (v2)
+	- image serving
+	- thumbnails
+	- search
+	- albums
+	- favorites
+	
+Application - PictureManager.Application
+Business logic:
+	ImageService
+	FolderService
+	AlbumService
+	FavoriteService
+	SearchService
+	ScanService
+	
+Model - PictureManager.Model
+	Image
+	Folder
+	Album
+	AlbumImage
+	AppUser
+	ScanJob
+
+Infrastructure - PictureManager.Infrastructure
+	EF Core
+	PostgreSQL
+	filesystem
+	EXIF reader
+	image resizing
+	thumbnail storage
+	logging
+
+Worker - PictureManager.Worker
+	a class library referenced by the API host, run as an in-process BackgroundService
+	inside the same container - NOT a separate deployable/container
+	Scan NAS
+		↓
+	Find new files
+		↓
+	Read EXIF
+		↓
+	Calculate metadata
+		↓
+	Calculate hash
+		↓
+	Update database
+	(thumbnails are NOT generated here - see Thumbnail architecture below)
+
+
+Database model
+----------------
+
+Folder
+-------
+Id - identifier
+ParentId - parent folder id to build up hierarchy
+Name - name of the folder
+RelativePath - full relative path 
+IsActive - Enable/disable scanning
+CreatedUtc
+ModifiedUtc
+
+Image
+-------
+Id
+FolderId
+FileName - name of the image 
+ContentHash - hash of file content
+PerceptualHash - detect visually similar images - implement it later, only if it is approved!
+FileSize
+Extension
+FileModified
+
+Width
+Height
+Orientation
+
+DateTaken
+CameraMake
+CameraModel
+LensModel
+
+Latitude
+Longitude
+RawMetadata (jsonb)
+IsFavorite - global favorite flag, not per-user
+
+CreatedAt
+UpdatedAt
+
+Album
+-------
+Id
+Name
+Description
+OwnerUserId - FK to AppUser, non-nullable even in v1 (points at a seeded placeholder user until v2 auth lands)
+CreatedAt
+UpdatedAt
+
+AlbumImage
+----------
+AlbumId
+ImageId
+SortOrder
+AddedAt
+
+AppUser
+-------
+Id
+ZitadelSubjectId - unique, populated once v2 auth lands; a placeholder row exists for v1
+DisplayName
+Role
+
+EF Core relationships
+=======================
+Folder 1 ──── * Image
+
+Folder 1 ──── * Folder
+       (Parent/Children)
+
+Album 1 ──── * AlbumImage * ──── 1 Image
+
+AppUser 1 ──── * Album
+
+
+
+Features of server side:
+
+1. Image scanning
+==================
+Scan /images
+      │
+      ├── discover folders
+      │
+      ├── discover files
+      │
+      └── for each image
+              │
+              ├── compare modification date
+              │
+              ├── if unchanged → skip
+              │
+              └── if new/changed
+                    │
+                    ├── read dimensions
+                    ├── read EXIF
+                    ├── calculate hash
+                    └── update database
+
+Note: thumbnail generation is deliberately NOT part of this pipeline - see section 2.
+
+2. Thumbnail architecture
+=========================
+Don't send the original 8–20 MB image to React just to display a 200×200 thumbnail.
+Store thumbnail on local Docker persistent storage or another dedicated cache volume or local folder.
+Generated lazily on first request, not during scan, so a large rescan stays cheap.
+
+React
+  │
+  │ GET /api/images/123/thumbnail
+  ▼
+ASP.NET Core
+  │
+  ├── thumbnail exists?
+  │       │
+  │       ├── yes → return
+  │       │
+  │       └── no
+  │            ↓
+  │         generate
+  │            ↓
+  │         cache
+  │
+  ▼
+Browser
+
+3. Authentication - DEFERRED TO V2
+====================================
+v1 ships without login: single implicit context, no roles enforced. Build endpoints so a
+RequireAuthorization layer can be added later without reshaping them.
+
+v2 target design:
+Identity is delegated to Zitadel rather than rolled by hand. The API is registered in Zitadel as a Web application using the Authorization Code flow with PKCE, and ASP.NET Core's built-in Microsoft.AspNetCore.Authentication.OpenIdConnect middleware handles the flow, cookie-based session, and token exchange.
+Two roles — user and admin — are defined as Zitadel project roles and asserted as claims on the token. 
+
+admin manages folder registrations, triggers rescans, and manages albums/users; user browses, favorites, and builds their own albums. Enforce the split at the endpoint level (.RequireAuthorization("AdminOnly") on the minimal API route), not just by hiding UI — the API is the real boundary.
+For the SPA, avoid handling tokens in JS: use the BFF (backend-for-frontend) pattern, where the ASP.NET Core host owns the session cookie and React never sees a Zitadel access token directly. This sidesteps token storage in the browser entirely.
+
+4. Logging
+==========
+Creating different levels of logs (debug, info, warning, error)
+use serilog
+
+
+Generic requirements
+======================
+- use repository for data models
+- use interfaces for services
+
+Infrastructure 
+==============
+Backend
+  .NET 10
+  ASP.NET Core
+  EF Core 10
+  PostgreSQL Database Server
+  MetadataExtractor
+  ImageSharp
+
+Frontend
+  React
+  TypeScript
+  Vite
+  MUI
+
+Infrastructure
+  Docker
+  NAS mounted filesystem (one Docker volume per independent root, read-only)
+
+Testing
+  xUnit
+  FluentAssertions
+  Playwright
+
+
+Version 1 scope
+================
+I would keep the first implementation small:
+Backend
+- ASP.NET Core
+- EF Core
+- PostgreSQL
+- NAS filesystem access (read-only, multiple independent roots)
+- EXIF reader
+- image hashing
+- lazy thumbnail generation (on first request, cached - not during scan)
+- background scanner (in-process BackgroundService, same container)
+- REST API
+- no auth/roles yet (deferred to v2) - single implicit context
+- albums owned by a seeded placeholder AppUser (schema ready for v2 multi-user)
+- favorites are global (not per-user)
+
+Frontend
+- React
+- folder tree
+- image grid
+- image viewer
+- favorites
+- albums
+- basic search (folder name, file name, favorite-only)

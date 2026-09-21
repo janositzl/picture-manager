@@ -1,0 +1,40 @@
+# =========== .NET ===========
+bin/
+obj/
+out/
+*.user
+*.userosscache
+*.suo
+.vs/
+artifacts/
+
+# =========== Node / Vite ===========
+node_modules/
+web/dist/
+web/dist-ssr/
+*.local
+.eslintcache
+
+# =========== Env / secrets ===========
+.env
+.env.*
+!.env.example
+
+# =========== Docker / data ===========
+dev-data/images/*
+!dev-data/images/.gitkeep
+pgdata/
+thumbnail-cache/
+
+# =========== Logs ===========
+logs/
+*.log
+
+# =========== OS ===========
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========== IDE ===========
+.idea/
+*.swp
