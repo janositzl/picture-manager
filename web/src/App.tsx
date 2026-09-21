@@ -11,7 +11,7 @@ function App() {
         <Typography variant="h4" gutterBottom>
           PictureManager
         </Typography>
-        <Typography variant="body2" className="mb-4">
+        <Typography variant="body2" sx={{ mb: 4 }}>
           API base URL: {env.apiBaseUrl}
         </Typography>
         <Button variant="contained">Scaffold OK</Button>

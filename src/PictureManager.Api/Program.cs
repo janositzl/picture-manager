@@ -44,6 +44,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "PictureManager.Api terminated unexpectedly");
+    Environment.ExitCode = 1;
 }
 finally
 {
