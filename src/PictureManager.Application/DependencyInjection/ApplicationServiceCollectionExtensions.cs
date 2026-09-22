@@ -10,6 +10,7 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IImageEnrichmentService, ImageEnrichmentService>();
+        services.AddScoped<IScanService, ScanService>();
 
         return services;
     }
