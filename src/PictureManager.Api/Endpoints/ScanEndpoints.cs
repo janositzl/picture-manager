@@ -1,0 +1,52 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
+using PictureManager.Model;
+
+namespace PictureManager.Api.Endpoints;
+
+public static class ScanEndpoints
+{
+    public static void MapScanEndpoints(this WebApplication app)
+    {
+        app.MapPost("/api/scans", StartScanAsync);
+        app.MapGet("/api/scans/{id:int}/events", StreamScanEventsAsync);
+    }
+
+    public static async Task<IResult> StartScanAsync(ScanRequest request, IScanService scanService, CancellationToken cancellationToken)
+    {
+        var scanJobId = await scanService.StartScanAsync(request.RootId, request.IsRecursive, cancellationToken);
+        return Results.Ok(new ScanStartedResponse(scanJobId));
+    }
+
+    public static async Task StreamScanEventsAsync(HttpContext context, int id, IScanJobRepository scanJobRepository, CancellationToken cancellationToken)
+    {
+        context.Response.Headers.ContentType = "text/event-stream";
+        context.Response.Headers.CacheControl = "no-cache";
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var scanJob = await scanJobRepository.GetByIdAsync(id, cancellationToken);
+            if (scanJob is null)
+            {
+                await context.Response.WriteAsync("event: error\ndata: not found\n\n", cancellationToken);
+                return;
+            }
+
+            var payload = JsonSerializer.Serialize(new ScanProgress(
+                scanJob.Id, scanJob.Status.ToString(), scanJob.FoldersScanned, scanJob.FilesFound, scanJob.FilesEnriched));
+            await context.Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+
+            if (scanJob.Status is ScanJobStatus.Completed or ScanJobStatus.Failed or ScanJobStatus.Cancelled)
+                return;
+
+            await Task.Delay(1000, cancellationToken);
+        }
+    }
+}
+
+public sealed record ScanRequest(int? RootId, bool IsRecursive);
+public sealed record ScanStartedResponse(int ScanJobId);
+public sealed record ScanProgress(int Id, string Status, int FoldersScanned, int FilesFound, int FilesEnriched);

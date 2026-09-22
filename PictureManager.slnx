@@ -7,6 +7,7 @@
     <Project Path="src/PictureManager.Worker/PictureManager.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/PictureManager.Api.Tests/PictureManager.Api.Tests.csproj" />
     <Project Path="tests/PictureManager.Application.Tests/PictureManager.Application.Tests.csproj" />
     <Project Path="tests/PictureManager.Infrastructure.Tests/PictureManager.Infrastructure.Tests.csproj" />
     <Project Path="tests/PictureManager.Worker.Tests/PictureManager.Worker.Tests.csproj" />
