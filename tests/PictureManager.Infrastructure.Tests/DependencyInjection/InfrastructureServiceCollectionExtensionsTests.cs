@@ -104,4 +104,22 @@ public class InfrastructureServiceCollectionExtensionsTests
 
         provider.GetService<IContentHasher>().Should().NotBeNull();
     }
+
+    [Fact]
+    public void AddInfrastructure_RegistersExifReader()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PictureManagerDb"] =
+                    "Host=localhost;Database=picturemanager;Username=test;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IExifReader>().Should().NotBeNull();
+    }
 }

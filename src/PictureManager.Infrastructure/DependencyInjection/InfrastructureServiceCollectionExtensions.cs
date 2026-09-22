@@ -31,6 +31,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
+        services.AddSingleton<IExifReader, MetadataExtractorExifReader>();
 
         return services;
     }
