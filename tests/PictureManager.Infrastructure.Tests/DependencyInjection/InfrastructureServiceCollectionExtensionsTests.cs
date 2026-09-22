@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Infrastructure.Persistence;
 using Xunit;
@@ -84,5 +85,23 @@ public class InfrastructureServiceCollectionExtensionsTests
 
         provider.GetService<IScanJobRepository>().Should().NotBeNull();
         provider.GetService<IAppSettingsRepository>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddInfrastructure_RegistersContentHasher()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PictureManagerDb"] =
+                    "Host=localhost;Database=picturemanager;Username=test;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IContentHasher>().Should().NotBeNull();
     }
 }
