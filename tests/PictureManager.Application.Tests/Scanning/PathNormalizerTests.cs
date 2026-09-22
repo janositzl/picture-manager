@@ -9,7 +9,7 @@ public class PathNormalizerTests
     [Fact]
     public void Normalize_ConvertsToNfc()
     {
-        var decomposed = "é"; // "e" + combining acute accent
+        var decomposed = "e" + "́"; // "e" + combining acute accent (U+0301) — NOT the precomposed "é"
         var result = PathNormalizer.Normalize(decomposed);
         result.Should().Be("é"); // precomposed "é"
     }
