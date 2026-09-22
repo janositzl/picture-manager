@@ -75,4 +75,38 @@ public class XxHashContentHasherTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public async Task ComputeAsync_FilesDifferingOnlyInMiddleRegion_ProduceSameHash()
+    {
+        var pathA = Path.GetTempFileName();
+        var pathB = Path.GetTempFileName();
+        try
+        {
+            var length = 200_000;
+            var bytesA = new byte[length];
+            new Random(11).NextBytes(bytesA);
+            var bytesB = (byte[])bytesA.Clone();
+
+            // Mutate only the middle region (strictly between the 64KB head and 64KB tail windows)
+            for (var i = 70_000; i < 130_000; i++)
+            {
+                bytesB[i] = (byte)(bytesB[i] ^ 0xFF);
+            }
+
+            await File.WriteAllBytesAsync(pathA, bytesA);
+            await File.WriteAllBytesAsync(pathB, bytesB);
+
+            var hasher = new XxHashContentHasher();
+            var hashA = await hasher.ComputeAsync(pathA, length);
+            var hashB = await hasher.ComputeAsync(pathB, length);
+
+            hashA.Should().Be(hashB);
+        }
+        finally
+        {
+            File.Delete(pathA);
+            File.Delete(pathB);
+        }
+    }
 }
