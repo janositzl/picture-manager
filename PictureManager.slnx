@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/PictureManager.Application.Tests/PictureManager.Application.Tests.csproj" />
     <Project Path="tests/PictureManager.Infrastructure.Tests/PictureManager.Infrastructure.Tests.csproj" />
+    <Project Path="tests/PictureManager.Worker.Tests/PictureManager.Worker.Tests.csproj" />
   </Folder>
 </Solution>
