@@ -1,0 +1,68 @@
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using PictureManager.Application.Common;
+using PictureManager.Application.Repositories;
+using PictureManager.Model;
+
+namespace PictureManager.Application.Scanning;
+
+public sealed class ImageEnrichmentService : IImageEnrichmentService
+{
+    private readonly IImageRepository _imageRepository;
+    private readonly IContentHasher _contentHasher;
+    private readonly IExifReader _exifReader;
+    private readonly IClock _clock;
+
+    public ImageEnrichmentService(IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IClock clock)
+    {
+        _imageRepository = imageRepository;
+        _contentHasher = contentHasher;
+        _exifReader = exifReader;
+        _clock = clock;
+    }
+
+    public async Task EnrichAsync(int imageId, CancellationToken cancellationToken = default)
+    {
+        var image = await _imageRepository.GetByIdWithFolderAsync(imageId, cancellationToken);
+        if (image?.Folder?.Root is null)
+            return;
+
+        var physicalPath = ImagePathResolver.ResolvePhysicalPath(
+            image.Folder.Root.MountPath, image.Folder.RelativePath, image.FileName, image.Extension);
+
+        if (!File.Exists(physicalPath))
+        {
+            image.MissingSinceUtc = _clock.UtcNow;
+            image.UpdatedAt = _clock.UtcNow;
+            await _imageRepository.UpdateAsync(image, cancellationToken);
+            return;
+        }
+
+        var hash = await _contentHasher.ComputeAsync(physicalPath, image.FileSize, cancellationToken);
+        var exif = await _exifReader.ReadAsync(physicalPath, cancellationToken);
+
+        var possibleMove = await _imageRepository.GetByContentHashAsync(hash, cancellationToken);
+        if (possibleMove is not null && possibleMove.Id != image.Id && possibleMove.MissingSinceUtc is not null)
+        {
+            await _imageRepository.DeleteAsync(possibleMove, cancellationToken);
+        }
+
+        image.ContentHash = hash;
+        image.Width = exif.Width;
+        image.Height = exif.Height;
+        image.Orientation = exif.Orientation;
+        image.DateTaken = exif.DateTaken;
+        image.CameraMake = exif.CameraMake;
+        image.CameraModel = exif.CameraModel;
+        image.LensModel = exif.LensModel;
+        image.Latitude = exif.Latitude;
+        image.Longitude = exif.Longitude;
+        image.RawMetadata = exif.RawMetadataJson;
+        image.IndexState = IndexState.Indexed;
+        image.MissingSinceUtc = null;
+        image.UpdatedAt = _clock.UtcNow;
+
+        await _imageRepository.UpdateAsync(image, cancellationToken);
+    }
+}
