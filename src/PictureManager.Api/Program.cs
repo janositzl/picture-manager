@@ -1,6 +1,10 @@
 using Microsoft.Extensions.Configuration;
+using PictureManager.Api.Endpoints;
 using PictureManager.Application.DependencyInjection;
+using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
 using PictureManager.Infrastructure.DependencyInjection;
+using PictureManager.Worker.DependencyInjection;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -27,6 +31,11 @@ try
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddWorker();
+
+    var devImageRootOptions = new DevImageRootOptions();
+    builder.Configuration.GetSection("DevImageRoot").Bind(devImageRootOptions);
+    builder.Services.AddSingleton(devImageRootOptions);
 
     var connectionString = builder.Configuration.GetConnectionString("PictureManagerDb")
         ?? throw new InvalidOperationException("Connection string 'PictureManagerDb' is not configured.");
@@ -38,6 +47,14 @@ try
 
     app.MapHealthChecks("/api/health");
     app.MapGet("/api/ping", () => Results.Ok(new { status = "ok" }));
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var seeder = scope.ServiceProvider.GetRequiredService<IDevImageRootSeeder>();
+        await seeder.SeedAsync();
+    }
+
+    app.MapScanEndpoints();
 
     app.Run();
 }
