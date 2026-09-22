@@ -79,4 +79,66 @@ public class ImageRepositoryTests
 
         images.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task GetByFolderAndFileNameAsync_IsCaseInsensitive()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        context.Images.Add(new Image
+        {
+            FolderId = folder.Id, FileName = "IMG001", Extension = ".jpg", ContentHash = "h1",
+            FileSize = 1, FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var repository = new ImageRepository(context);
+        var found = await repository.GetByFolderAndFileNameAsync(folder.Id, "img001", ".JPG");
+
+        found.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetByContentHashAsync_ReturnsMatchingImage()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        context.Images.Add(new Image
+        {
+            FolderId = folder.Id, FileName = "IMG001", Extension = ".jpg", ContentHash = "abc123",
+            FileSize = 1, FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var repository = new ImageRepository(context);
+        var found = await repository.GetByContentHashAsync("abc123");
+
+        found.Should().NotBeNull();
+        found!.FileName.Should().Be("IMG001");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PersistsChanges_AndDeleteAsync_RemovesRow()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        var image = new Image
+        {
+            FolderId = folder.Id, FileName = "IMG001", Extension = ".jpg", ContentHash = "h1",
+            FileSize = 1, FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+        context.Images.Add(image);
+        await context.SaveChangesAsync();
+
+        var repository = new ImageRepository(context);
+        image.IsFavorite = true;
+        await repository.UpdateAsync(image);
+        (await repository.GetByIdAsync(image.Id))!.IsFavorite.Should().BeTrue();
+
+        await repository.DeleteAsync(image);
+        (await repository.GetByIdAsync(image.Id)).Should().BeNull();
+    }
 }

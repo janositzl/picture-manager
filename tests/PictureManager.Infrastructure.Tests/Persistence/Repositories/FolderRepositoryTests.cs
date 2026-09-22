@@ -70,4 +70,37 @@ public class FolderRepositoryTests
         children.Should().HaveCount(2);
         children.Select(f => f.Name).Should().BeEquivalentTo("Child1", "Child2");
     }
+
+    [Fact]
+    public async Task GetByRootAndRelativePathAsync_IsCaseInsensitive()
+    {
+        await using var context = CreateContext();
+        var root = new ImageRoot { Name = "root", MountPath = "/images", CreatedUtc = DateTime.UtcNow };
+        var folder = new Folder { Name = "Vacation", RelativePath = "Vacation", Root = root, CreatedUtc = DateTime.UtcNow, ModifiedUtc = DateTime.UtcNow };
+        context.AddRange(root, folder);
+        await context.SaveChangesAsync();
+
+        var repository = new FolderRepository(context);
+        var found = await repository.GetByRootAndRelativePathAsync(root.Id, "vacation");
+
+        found.Should().NotBeNull();
+        found!.Id.Should().Be(folder.Id);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PersistsChangesToExistingFolder()
+    {
+        await using var context = CreateContext();
+        var root = new ImageRoot { Name = "root", MountPath = "/images", CreatedUtc = DateTime.UtcNow };
+        var folder = new Folder { Name = "Vacation", RelativePath = "Vacation", Root = root, CreatedUtc = DateTime.UtcNow, ModifiedUtc = DateTime.UtcNow };
+        context.AddRange(root, folder);
+        await context.SaveChangesAsync();
+
+        var repository = new FolderRepository(context);
+        folder.ModifiedUtc = DateTime.UtcNow.AddMinutes(5);
+        await repository.UpdateAsync(folder);
+
+        var fetched = await repository.GetByIdAsync(folder.Id);
+        fetched!.ModifiedUtc.Should().Be(folder.ModifiedUtc);
+    }
 }

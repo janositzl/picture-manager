@@ -33,4 +33,17 @@ public sealed class FolderRepository : IFolderRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
         return folder;
     }
+
+    public async Task<Folder?> GetByRootAndRelativePathAsync(int rootId, string relativePath, CancellationToken cancellationToken = default)
+    {
+        var normalized = relativePath.ToLowerInvariant();
+        return await _dbContext.Folders.FirstOrDefaultAsync(
+            f => f.RootId == rootId && f.RelativePath.ToLower() == normalized, cancellationToken);
+    }
+
+    public async Task UpdateAsync(Folder folder, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Folders.Update(folder);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

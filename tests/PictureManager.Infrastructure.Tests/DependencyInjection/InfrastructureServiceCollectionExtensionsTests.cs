@@ -66,4 +66,23 @@ public class InfrastructureServiceCollectionExtensionsTests
         provider.GetService<IAppUserRepository>().Should().NotBeNull();
         provider.GetService<IImageRootRepository>().Should().NotBeNull();
     }
+
+    [Fact]
+    public void AddInfrastructure_RegistersScanJobAndAppSettingsRepositories()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PictureManagerDb"] =
+                    "Host=localhost;Database=picturemanager;Username=test;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IScanJobRepository>().Should().NotBeNull();
+        provider.GetService<IAppSettingsRepository>().Should().NotBeNull();
+    }
 }
