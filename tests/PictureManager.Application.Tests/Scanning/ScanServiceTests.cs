@@ -477,14 +477,17 @@ public class ScanServiceTests
             });
 
             // Simulate EnrichmentBackgroundService racing ahead of ScanService's own bookkeeping:
-            // by the time ScanService does its final re-fetch-based write, the one queued item has
-            // already been enriched (FilesEnriched = 1), but Status is still Enumerating because
-            // ScanService hasn't performed its own write yet -- the background service's Status ==
-            // Enriching guard (Finding "Part A") correctly refused to flip it to Completed itself.
-            // Without "Part B", ScanService's final write would set Status = Enriching here and
-            // nothing would ever complete the job, since the queue is already drained.
-            var raceScanJob = new ScanJob { Id = 999, FilesFound = 0, FilesEnriched = 1, Status = ScanJobStatus.Enumerating };
-            scanJobRepository.GetByIdAsync(999, Arg.Any<CancellationToken>()).Returns(raceScanJob);
+            // by the time ScanService's final write calls ReloadAsync, the one queued item has
+            // already been enriched (FilesEnriched = 1) in a DIFFERENT scope/DbContext, but Status
+            // is still Enumerating because ScanService hasn't performed its own write yet -- the
+            // background service's Status == Enriching guard ("Part A") correctly refused to flip
+            // it to Completed itself. ReloadAsync is mocked here to mutate the SAME tracked
+            // instance in place (mirroring what EntityEntry.ReloadAsync actually does against a
+            // real DbContext), rather than returning a different object the way a naive
+            // GetByIdAsync-based re-fetch would have to.
+            scanJobRepository
+                .When(x => x.ReloadAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()))
+                .Do(callInfo => callInfo.Arg<ScanJob>().FilesEnriched = 1);
 
             var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
             var clock = Substitute.For<IClock>();

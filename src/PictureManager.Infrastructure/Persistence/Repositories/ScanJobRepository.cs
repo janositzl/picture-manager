@@ -32,4 +32,9 @@ public sealed class ScanJobRepository : IScanJobRepository
         _dbContext.ScanJobs.Update(scanJob);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task ReloadAsync(ScanJob scanJob, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Entry(scanJob).ReloadAsync(cancellationToken);
+    }
 }

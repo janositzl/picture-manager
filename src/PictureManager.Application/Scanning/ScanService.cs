@@ -55,13 +55,15 @@ public sealed class ScanService : IScanService
             StartedUtc = _clock.UtcNow
         }, cancellationToken);
 
+        // Declared outside the try so the catch block can report how far the scan got before
+        // failing (see FinalizeFailureAsync).
+        var foldersScanned = 0;
+        var filesFound = 0;
+
         try
         {
             var settings = await _appSettingsRepository.GetAsync(cancellationToken);
             var excludeRules = new ScanExcludeRules(settings);
-
-            var foldersScanned = 0;
-            var filesFound = 0;
 
             foreach (var root in roots)
             {
@@ -76,59 +78,59 @@ public sealed class ScanService : IScanService
         }
         catch (Exception ex)
         {
-            await FinalizeFailureAsync(scanJob, ex, cancellationToken);
+            // Use CancellationToken.None here: if the scan failed because its own token was
+            // cancelled, reusing that (now-cancelled) token for this write would itself throw
+            // immediately, leaving the job stuck instead of ever recording Failed.
+            await FinalizeFailureAsync(scanJob, ex, foldersScanned, filesFound);
             throw;
         }
     }
 
-    private async Task FinalizeSuccessAsync(ScanJob originalScanJob, int foldersScanned, int filesFound, CancellationToken cancellationToken)
+    private async Task FinalizeSuccessAsync(ScanJob scanJob, int foldersScanned, int filesFound, CancellationToken cancellationToken)
     {
-        // Re-fetch the current row rather than writing through the stale in-memory snapshot:
-        // EnrichmentBackgroundService may have concurrently advanced FilesEnriched/Status while
-        // this scan was still walking the tree, and a blind full-row write here would clobber that.
-        var job = await _scanJobRepository.GetByIdAsync(originalScanJob.Id, cancellationToken) ?? originalScanJob;
+        // scanJob is already tracked by this scope's DbContext (it was created via AddAsync on
+        // the same context). Calling GetByIdAsync(scanJob.Id) here would hit EF Core's identity
+        // resolution and simply hand back this SAME tracked instance instead of re-querying the
+        // database -- silently no-op'ing what looks like a re-fetch. ReloadAsync is the correct
+        // primitive: it re-queries the store and overwrites this tracked instance's current
+        // values in place, so whatever EnrichmentBackgroundService has committed concurrently (in
+        // a different DbContext/scope) actually becomes visible here.
+        await _scanJobRepository.ReloadAsync(scanJob, cancellationToken);
 
-        job.FoldersScanned = foldersScanned;
-        job.FilesFound = filesFound;
+        scanJob.FoldersScanned = foldersScanned;
+        scanJob.FilesFound = filesFound;
 
-        if (job.Status != ScanJobStatus.Completed && job.Status != ScanJobStatus.Failed)
+        if (scanJob.Status != ScanJobStatus.Failed && scanJob.Status != ScanJobStatus.Cancelled)
         {
-            if (filesFound == 0)
+            if (filesFound == 0 || scanJob.FilesEnriched >= filesFound)
             {
-                job.Status = ScanJobStatus.Completed;
-                job.CompletedUtc = _clock.UtcNow;
+                // Either nothing needed enriching, or EnrichmentBackgroundService (guarded by its
+                // own Status == Enriching check in MarkOneEnrichedAsync) already raced ahead and
+                // finished enriching everything before this write ran -- in which case nothing
+                // else will ever trigger it to flip the job to Completed, so we do it here.
+                scanJob.Status = ScanJobStatus.Completed;
+                scanJob.CompletedUtc = _clock.UtcNow;
             }
             else
             {
-                job.Status = ScanJobStatus.Enriching;
-
-                // Self-correct: EnrichmentBackgroundService (guarded by its own Status ==
-                // Enriching check, see MarkOneEnrichedAsync) may have already raced ahead and
-                // finished enriching everything before this write set Status to Enriching in the
-                // first place -- FilesFound was still 0 the whole time it was draining the queue,
-                // so it never had a true count to complete against. Once we know the true
-                // FilesFound here, if enrichment already caught up, finish the job now: nothing
-                // else will trigger MarkOneEnrichedAsync again once the queue is drained.
-                if (job.FilesEnriched >= filesFound)
-                {
-                    job.Status = ScanJobStatus.Completed;
-                    job.CompletedUtc = _clock.UtcNow;
-                }
+                scanJob.Status = ScanJobStatus.Enriching;
             }
         }
 
-        await _scanJobRepository.UpdateAsync(job, cancellationToken);
+        await _scanJobRepository.UpdateAsync(scanJob, cancellationToken);
     }
 
-    private async Task FinalizeFailureAsync(ScanJob originalScanJob, Exception ex, CancellationToken cancellationToken)
+    private async Task FinalizeFailureAsync(ScanJob scanJob, Exception ex, int foldersScanned, int filesFound)
     {
-        var job = await _scanJobRepository.GetByIdAsync(originalScanJob.Id, cancellationToken) ?? originalScanJob;
+        await _scanJobRepository.ReloadAsync(scanJob, CancellationToken.None);
 
-        job.Status = ScanJobStatus.Failed;
-        job.ErrorMessage = TruncateErrorMessage(ex.Message);
-        job.CompletedUtc = _clock.UtcNow;
+        scanJob.FoldersScanned = foldersScanned;
+        scanJob.FilesFound = filesFound;
+        scanJob.Status = ScanJobStatus.Failed;
+        scanJob.ErrorMessage = TruncateErrorMessage(ex.Message);
+        scanJob.CompletedUtc = _clock.UtcNow;
 
-        await _scanJobRepository.UpdateAsync(job, cancellationToken);
+        await _scanJobRepository.UpdateAsync(scanJob, CancellationToken.None);
     }
 
     private static string? TruncateErrorMessage(string? message) =>
