@@ -93,9 +93,28 @@ public sealed class ScanService : IScanService
 
         if (job.Status != ScanJobStatus.Completed && job.Status != ScanJobStatus.Failed)
         {
-            job.Status = filesFound == 0 ? ScanJobStatus.Completed : ScanJobStatus.Enriching;
             if (filesFound == 0)
+            {
+                job.Status = ScanJobStatus.Completed;
                 job.CompletedUtc = _clock.UtcNow;
+            }
+            else
+            {
+                job.Status = ScanJobStatus.Enriching;
+
+                // Self-correct: EnrichmentBackgroundService (guarded by its own Status ==
+                // Enriching check, see MarkOneEnrichedAsync) may have already raced ahead and
+                // finished enriching everything before this write set Status to Enriching in the
+                // first place -- FilesFound was still 0 the whole time it was draining the queue,
+                // so it never had a true count to complete against. Once we know the true
+                // FilesFound here, if enrichment already caught up, finish the job now: nothing
+                // else will trigger MarkOneEnrichedAsync again once the queue is drained.
+                if (job.FilesEnriched >= filesFound)
+                {
+                    job.Status = ScanJobStatus.Completed;
+                    job.CompletedUtc = _clock.UtcNow;
+                }
+            }
         }
 
         await _scanJobRepository.UpdateAsync(job, cancellationToken);

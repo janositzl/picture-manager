@@ -438,6 +438,75 @@ public class ScanServiceTests
         }
     }
 
+    [Fact]
+    public async Task StartScanAsync_EnrichmentAlreadyFinishedBeforeFinalWrite_CompletesInsteadOfStayingAtEnriching()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, "photo.jpg"), new byte[] { 1, 2, 3 });
+
+            var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
+            var rootFolder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
+
+            var imageRootRepository = Substitute.For<IImageRootRepository>();
+            imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+            var folderRepository = Substitute.For<IFolderRepository>();
+            folderRepository.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>()).Returns(rootFolder);
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByFolderAndFileNameAsync(10, "photo", ".jpg", Arg.Any<CancellationToken>()).Returns((Image?)null);
+            imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image>());
+            imageRepository.AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var image = callInfo.Arg<Image>();
+                image.Id = 100;
+                return image;
+            });
+
+            var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+
+            var scanJobRepository = Substitute.For<IScanJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var job = callInfo.Arg<ScanJob>();
+                job.Id = 999;
+                return job;
+            });
+
+            // Simulate EnrichmentBackgroundService racing ahead of ScanService's own bookkeeping:
+            // by the time ScanService does its final re-fetch-based write, the one queued item has
+            // already been enriched (FilesEnriched = 1), but Status is still Enumerating because
+            // ScanService hasn't performed its own write yet -- the background service's Status ==
+            // Enriching guard (Finding "Part A") correctly refused to flip it to Completed itself.
+            // Without "Part B", ScanService's final write would set Status = Enriching here and
+            // nothing would ever complete the job, since the queue is already drained.
+            var raceScanJob = new ScanJob { Id = 999, FilesFound = 0, FilesEnriched = 1, Status = ScanJobStatus.Enumerating };
+            scanJobRepository.GetByIdAsync(999, Arg.Any<CancellationToken>()).Returns(raceScanJob);
+
+            var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var scanService = new ScanService(
+                imageRootRepository, folderRepository, imageRepository,
+                appSettingsRepository, scanJobRepository, enrichmentQueue, clock);
+
+            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+
+            await scanJobRepository.Received(1).UpdateAsync(
+                Arg.Is<ScanJob>(j => j.Id == 999 && j.FilesFound == 1
+                    && j.Status == ScanJobStatus.Completed && j.CompletedUtc == clock.UtcNow),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot.FullName, recursive: true);
+        }
+    }
+
     private static DateTime TruncateToMicroseconds(DateTime value) =>
         new(value.Ticks - (value.Ticks % 10), value.Kind);
 }

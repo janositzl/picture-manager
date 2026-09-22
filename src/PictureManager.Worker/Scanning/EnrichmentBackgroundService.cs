@@ -51,7 +51,12 @@ public sealed class EnrichmentBackgroundService : BackgroundService
             return;
 
         scanJob.FilesEnriched++;
-        if (scanJob.FilesEnriched >= scanJob.FilesFound && scanJob.Status != ScanJobStatus.Completed)
+
+        // FilesFound defaults to 0 and only reaches its true value once ScanService's own final
+        // write flips Status to Enriching (see ScanService.FinalizeSuccessAsync). Requiring
+        // Status == Enriching here stops "FilesEnriched >= FilesFound" from being trivially true
+        // (1 >= 0) the moment the first item is enriched while the scan is still walking the tree.
+        if (scanJob.Status == ScanJobStatus.Enriching && scanJob.FilesEnriched >= scanJob.FilesFound)
         {
             scanJob.Status = ScanJobStatus.Completed;
             scanJob.CompletedUtc = DateTime.UtcNow;
