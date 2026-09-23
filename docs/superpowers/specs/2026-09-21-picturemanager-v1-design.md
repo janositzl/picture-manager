@@ -129,7 +129,8 @@ re-approval, per your direction to proceed continuously.
 4. **Thumbnails & image serving** — content-addressed sharded WebP cache, EXIF-orientation-corrected
    derivatives, range-enabled serving, immutable cache headers.
 5. **REST API** — folders, images (keyset pagination/search/favorite), albums (CRUD/reorder/export),
-   duplicate-finder view, settings; routes shaped for a later `RequireAuthorization` drop-in.
+   duplicate-finder view, settings; routes shaped for a later `RequireAuthorization` drop-in. Detailed
+   decisions: [`2026-09-23-phase5-rest-api-design.md`](2026-09-23-phase5-rest-api-design.md).
 6. **Frontend SPA** — folder tree + virtualized grid, viewer, favorites, albums, search bar, settings page.
 7. **Docker integration pass** — multi-stage build, full `docker compose up` smoke test end-to-end.
 8. **Playwright e2e** — browse → view → favorite → album → export flows.
