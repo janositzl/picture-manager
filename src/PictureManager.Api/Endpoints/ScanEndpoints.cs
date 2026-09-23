@@ -20,7 +20,7 @@ public static class ScanEndpoints
     {
         try
         {
-            var scanJobId = await scanService.StartScanAsync(request.RootId, request.IsRecursive, cancellationToken);
+            var scanJobId = await scanService.QueueScanAsync(request.RootId, request.IsRecursive, cancellationToken);
             return Results.Ok(new ScanStartedResponse(scanJobId));
         }
         catch (ScanAlreadyInProgressException ex)
@@ -48,7 +48,7 @@ public static class ScanEndpoints
             }
 
             var payload = JsonSerializer.Serialize(new ScanProgress(
-                scanJob.Id, scanJob.Status.ToString(), scanJob.FoldersScanned, scanJob.FilesFound, scanJob.FilesEnriched));
+                scanJob.Id, scanJob.Status.ToString(), scanJob.FoldersScanned, scanJob.FilesFound, scanJob.FilesEnriched, scanJob.ErrorMessage));
             await context.Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
             await context.Response.Body.FlushAsync(cancellationToken);
 
@@ -62,4 +62,4 @@ public static class ScanEndpoints
 
 public sealed record ScanRequest(int? RootId, bool IsRecursive);
 public sealed record ScanStartedResponse(int ScanJobId);
-public sealed record ScanProgress(int Id, string Status, int FoldersScanned, int FilesFound, int FilesEnriched);
+public sealed record ScanProgress(int Id, string Status, int FoldersScanned, int FilesFound, int FilesEnriched, string? ErrorMessage);

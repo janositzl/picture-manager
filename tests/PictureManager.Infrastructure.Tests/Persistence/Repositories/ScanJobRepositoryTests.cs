@@ -305,4 +305,30 @@ public class ScanJobRepositoryTests
         fetched!.Status.Should().Be(ScanJobStatus.Cancelled);
         fetched.ErrorMessage.Should().BeNull();
     }
+
+    [Fact]
+    public async Task FailActiveJobsAsync_FailsOnlyEnumeratingAndEnrichingJobs()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var startedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var completedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var enumerating = new ScanJob { Status = ScanJobStatus.Enumerating, StartedUtc = startedUtc };
+        var enriching = new ScanJob { Status = ScanJobStatus.Enriching, StartedUtc = startedUtc };
+        var completed = new ScanJob { Status = ScanJobStatus.Completed, StartedUtc = startedUtc, CompletedUtc = startedUtc };
+        var failed = new ScanJob { Status = ScanJobStatus.Failed, StartedUtc = startedUtc, CompletedUtc = startedUtc, ErrorMessage = "earlier" };
+        db.Context.ScanJobs.AddRange(enumerating, enriching, completed, failed);
+        await db.Context.SaveChangesAsync();
+
+        await using (var context = db.CreateContext())
+            (await new ScanJobRepository(context).FailActiveJobsAsync("Interrupted by an application restart.", completedUtc)).Should().Be(2);
+
+        await using var verify = db.CreateContext();
+        var jobs = await verify.ScanJobs.AsNoTracking().ToDictionaryAsync(j => j.Id);
+        jobs[enumerating.Id].Status.Should().Be(ScanJobStatus.Failed);
+        jobs[enumerating.Id].ErrorMessage.Should().Be("Interrupted by an application restart.");
+        jobs[enumerating.Id].CompletedUtc.Should().Be(completedUtc);
+        jobs[enriching.Id].Status.Should().Be(ScanJobStatus.Failed);
+        jobs[completed.Id].Status.Should().Be(ScanJobStatus.Completed);
+        jobs[failed.Id].ErrorMessage.Should().Be("earlier");
+    }
 }

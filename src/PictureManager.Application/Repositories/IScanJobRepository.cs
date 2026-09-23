@@ -24,6 +24,9 @@ public interface IScanJobRepository
     /// <summary>True if any ScanJob is currently Enumerating or Enriching.</summary>
     Task<bool> HasActiveJobAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Sets every Enumerating or Enriching job to Failed with the message and CompletedUtc. Returns how many changed.</summary>
+    Task<int> FailActiveJobsAsync(string errorMessage, DateTime completedUtc, CancellationToken cancellationToken = default);
+
     /// <summary>Atomically sets FoldersScanned and FilesFound only. Never touches Status.</summary>
     Task SetEnumerationResultAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken = default);
 

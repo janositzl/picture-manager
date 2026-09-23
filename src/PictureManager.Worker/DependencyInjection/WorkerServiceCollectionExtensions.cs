@@ -11,6 +11,8 @@ public static class WorkerServiceCollectionExtensions
     {
         services.AddSingleton<IEnrichmentQueue, ChannelEnrichmentQueue>();
         services.AddHostedService<EnrichmentBackgroundService>();
+        services.AddSingleton<IScanQueue, ChannelScanQueue>();
+        services.AddHostedService<ScanBackgroundService>();
 
         return services;
     }

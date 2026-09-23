@@ -19,7 +19,7 @@ public class ScanEndpointsTests
     public async Task StartScanAsync_CallsScanService_AndReturnsScanJobId()
     {
         var scanService = Substitute.For<IScanService>();
-        scanService.StartScanAsync(1, true, Arg.Any<CancellationToken>()).Returns(42);
+        scanService.QueueScanAsync(1, true, Arg.Any<CancellationToken>()).Returns(42);
 
         var result = await ScanEndpoints.StartScanAsync(new ScanRequest(1, true), scanService, CancellationToken.None);
 
@@ -30,7 +30,7 @@ public class ScanEndpointsTests
     public async Task StartScanAsync_UnavailableRoot_ReturnsValidationProblem()
     {
         var scanService = Substitute.For<IScanService>();
-        scanService.StartScanAsync(2, true, Arg.Any<CancellationToken>())
+        scanService.QueueScanAsync(2, true, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ScanRootUnavailableException(2)));
 
         var result = await ScanEndpoints.StartScanAsync(new ScanRequest(2, true), scanService, CancellationToken.None);
@@ -60,6 +60,29 @@ public class ScanEndpointsTests
         body.Position = 0;
         var written = Encoding.UTF8.GetString(body.ToArray());
         written.Should().Contain("\"Status\":\"Completed\"");
+    }
+
+    [Fact]
+    public async Task StreamScanEventsAsync_FailedJob_IncludesTheErrorMessage()
+    {
+        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ScanJob
+        {
+            Id = 1,
+            Status = ScanJobStatus.Failed,
+            ErrorMessage = "Root 'dev' is unavailable: its folder is missing or empty. Check that the share is mounted."
+        });
+
+        var context = new DefaultHttpContext();
+        var body = new MemoryStream();
+        context.Response.Body = body;
+
+        await ScanEndpoints.StreamScanEventsAsync(context, 1, scanJobRepository, CancellationToken.None);
+
+        var written = Encoding.UTF8.GetString(body.ToArray());
+        written.Should().Contain("\"Status\":\"Failed\"");
+        written.Should().Contain("\"ErrorMessage\":");
+        written.Should().Contain("is unavailable: its folder is missing or empty");
     }
 
     [Fact]

@@ -15,6 +15,7 @@ public sealed class ScanService : IScanService
     private const int MaxScanDepth = 50;
     private const int MaxErrorMessageLength = 4000;
     private const int ProgressInterval = 50;
+    private const string InterruptedMessage = "Interrupted by an application restart.";
 
     private readonly IImageRootRepository _imageRootRepository;
     private readonly IFolderRepository _folderRepository;
@@ -22,6 +23,7 @@ public sealed class ScanService : IScanService
     private readonly IAppSettingsRepository _appSettingsRepository;
     private readonly IScanJobRepository _scanJobRepository;
     private readonly IEnrichmentQueue _enrichmentQueue;
+    private readonly IScanQueue _scanQueue;
     private readonly IClock _clock;
 
     public ScanService(
@@ -31,6 +33,7 @@ public sealed class ScanService : IScanService
         IAppSettingsRepository appSettingsRepository,
         IScanJobRepository scanJobRepository,
         IEnrichmentQueue enrichmentQueue,
+        IScanQueue scanQueue,
         IClock clock)
     {
         _imageRootRepository = imageRootRepository;
@@ -39,18 +42,20 @@ public sealed class ScanService : IScanService
         _appSettingsRepository = appSettingsRepository;
         _scanJobRepository = scanJobRepository;
         _enrichmentQueue = enrichmentQueue;
+        _scanQueue = scanQueue;
         _clock = clock;
     }
 
-    public async Task<int> StartScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default)
+    public async Task<int> QueueScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default)
     {
         if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
             throw new ScanAlreadyInProgressException();
 
-        var roots = rootId.HasValue
-            ? new[] { await GetActiveRootAsync(rootId.Value, cancellationToken) }
-            : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
+        if (rootId.HasValue)
+            await GetActiveRootAsync(rootId.Value, cancellationToken);
 
+        // Created as Enumerating (not Pending) so HasActiveJobAsync refuses a second scan while this one waits
+        // in the queue.
         var scanJob = await _scanJobRepository.AddAsync(new ScanJob
         {
             IsRecursive = isRecursive,
@@ -58,6 +63,12 @@ public sealed class ScanService : IScanService
             StartedUtc = _clock.UtcNow
         }, cancellationToken);
 
+        _scanQueue.Enqueue(new QueuedScan(scanJob.Id, rootId, isRecursive));
+        return scanJob.Id;
+    }
+
+    public async Task RunScanAsync(QueuedScan scan, CancellationToken cancellationToken = default)
+    {
         // Declared outside the try so the catch block can report how far the scan got before
         // failing (see FinalizeFailureAsync).
         var foldersScanned = 0;
@@ -65,9 +76,13 @@ public sealed class ScanService : IScanService
 
         try
         {
+            // Resolved again here: an explicit root can be deactivated or deleted while the scan waits in the queue.
+            var roots = scan.RootId.HasValue
+                ? new[] { await GetActiveRootAsync(scan.RootId.Value, cancellationToken) }
+                : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
+
             var settings = await _appSettingsRepository.GetAsync(cancellationToken);
             var excludeRules = new ScanExcludeRules(settings);
-
             var unavailableRoots = new List<string>();
 
             foreach (var root in roots)
@@ -80,7 +95,7 @@ public sealed class ScanService : IScanService
                 }
 
                 var (rootFoldersScanned, rootFilesFound) = await ScanRootAsync(
-                    root, isRecursive, excludeRules, scanJob.Id, foldersScanned, filesFound, cancellationToken);
+                    root, scan.IsRecursive, excludeRules, scan.ScanJobId, foldersScanned, filesFound, cancellationToken);
                 foldersScanned += rootFoldersScanned;
                 filesFound += rootFilesFound;
             }
@@ -89,16 +104,17 @@ public sealed class ScanService : IScanService
             if (unavailableRoots.Count > 0)
                 throw new ScanRootsUnavailableException(unavailableRoots);
 
-            await FinalizeSuccessAsync(scanJob.Id, foldersScanned, filesFound, cancellationToken);
-
-            return scanJob.Id;
+            await FinalizeSuccessAsync(scan.ScanJobId, foldersScanned, filesFound, cancellationToken);
         }
         catch (Exception ex)
         {
-            await FinalizeFailureAsync(scanJob.Id, ex, foldersScanned, filesFound);
+            await FinalizeFailureAsync(scan.ScanJobId, ex, foldersScanned, filesFound);
             throw;
         }
     }
+
+    public Task<int> FailInterruptedJobsAsync(CancellationToken cancellationToken = default) =>
+        _scanJobRepository.FailActiveJobsAsync(InterruptedMessage, _clock.UtcNow, cancellationToken);
 
     private async Task FinalizeSuccessAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken)
     {

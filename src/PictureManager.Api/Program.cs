@@ -4,6 +4,7 @@ using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Roots;
+using PictureManager.Application.Scanning;
 using PictureManager.Application.Thumbnails;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Worker.DependencyInjection;
@@ -65,6 +66,11 @@ try
     {
         var seeder = scope.ServiceProvider.GetRequiredService<IImageRootSeeder>();
         await seeder.SeedAsync();
+
+        // Before the server accepts requests, so it can only ever fail jobs a previous process left behind.
+        var interrupted = await scope.ServiceProvider.GetRequiredService<IScanService>().FailInterruptedJobsAsync();
+        if (interrupted > 0)
+            Log.Warning("Marked {Count} scan job(s) interrupted by a restart as failed", interrupted);
     }
 
     app.UseMiddleware<ImageCacheControlMiddleware>();

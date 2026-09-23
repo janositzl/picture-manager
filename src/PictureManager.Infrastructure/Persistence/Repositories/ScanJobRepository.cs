@@ -51,6 +51,17 @@ public sealed class ScanJobRepository : IScanJobRepository
             cancellationToken);
     }
 
+    public async Task<int> FailActiveJobsAsync(string errorMessage, DateTime completedUtc, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ScanJobs
+            .Where(j => j.Status == ScanJobStatus.Enumerating || j.Status == ScanJobStatus.Enriching)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(j => j.Status, ScanJobStatus.Failed)
+                .SetProperty(j => j.ErrorMessage, errorMessage)
+                .SetProperty(j => j.CompletedUtc, completedUtc),
+                cancellationToken);
+    }
+
     public async Task SetEnumerationResultAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken = default)
     {
         await _dbContext.ScanJobs

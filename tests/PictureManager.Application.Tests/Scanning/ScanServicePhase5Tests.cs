@@ -57,14 +57,14 @@ public sealed class ScanServicePhase5Tests : IDisposable
 
     public void Dispose() => _tempRoot.Delete(recursive: true);
 
-    private ScanService CreateService() => new(_roots, _folders, _images, _settings, _jobs, _queue, _clock);
+    private ScanService CreateService() => new(_roots, _folders, _images, _settings, _jobs, _queue, Substitute.For<IScanQueue>(), _clock);
 
     [Fact]
     public async Task StartScanAsync_ExplicitInactiveRoot_Throws_AndCreatesNoJob()
     {
         _roots.GetByIdAsync(2, Arg.Any<CancellationToken>()).Returns(new ImageRoot { Id = 2, Name = "off", MountPath = "/x", IsActive = false });
 
-        var act = () => CreateService().StartScanAsync(rootId: 2, isRecursive: true);
+        var act = () => CreateService().ScanNowAsync(rootId: 2, isRecursive: true);
 
         (await act.Should().ThrowAsync<ScanRootUnavailableException>()).Which.RootId.Should().Be(2);
         await _jobs.DidNotReceive().AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>());
@@ -75,7 +75,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
     {
         _roots.GetByIdAsync(3, Arg.Any<CancellationToken>()).Returns((ImageRoot?)null);
 
-        var act = () => CreateService().StartScanAsync(rootId: 3, isRecursive: true);
+        var act = () => CreateService().ScanNowAsync(rootId: 3, isRecursive: true);
 
         await act.Should().ThrowAsync<ScanRootUnavailableException>();
     }
@@ -88,7 +88,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _folders.GetByRootAndRelativePathAsync(1, "removed", Arg.Any<CancellationToken>())
             .Returns(new Folder { Id = 20, RootId = 1, ParentId = 10, RelativePath = "removed", Name = "removed", IsActive = false });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _images.DidNotReceive().GetByFolderAndFileNameAsync(20, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _images.DidNotReceive().AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>());
@@ -105,7 +105,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _images.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image> { heic, goneJpg });
         _settings.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings { ExcludedExtensions = new List<string> { ".HEIC" } });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _images.Received(1).DeleteAsync(heic, Arg.Any<CancellationToken>());
         await _images.DidNotReceive().UpdateAsync(Arg.Is<Image>(i => i.Id == 5), Arg.Any<CancellationToken>());
@@ -127,7 +127,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
             .Returns(new Folder { Id = 31, RootId = 1, ParentId = 10, Name = "keep", RelativePath = "keep" });
         _settings.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings { ExcludedFolderNames = new List<string> { "raw" } });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.Received(1).DeleteSubtreeAsync(30, Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().DeleteSubtreeAsync(31, Arg.Any<CancellationToken>());
@@ -141,7 +141,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _roots.GetByIdAsync(1, Arg.Any<CancellationToken>())
             .Returns(new ImageRoot { Id = 1, Name = "dev", MountPath = Path.Combine(_tempRoot.FullName, "not-mounted"), IsActive = true });
 
-        var act = () => CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        var act = () => CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("dev");
         await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
@@ -154,7 +154,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
     public async Task StartScanAsync_RootFolderEmpty_ChangesNothing_AndFailsWithMessage()
     {
         // The fixture's temp root starts empty: exactly what an unmounted share's mount point looks like.
-        var act = () => CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        var act = () => CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await act.Should().ThrowAsync<ScanRootsUnavailableException>();
         await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
@@ -172,7 +172,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
             new() { Id = 2, Name = "nas", MountPath = Path.Combine(_tempRoot.FullName, "not-mounted"), IsActive = true }
         });
 
-        var act = () => CreateService().StartScanAsync(rootId: null, isRecursive: true);
+        var act = () => CreateService().ScanNowAsync(rootId: null, isRecursive: true);
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("nas");
         await _images.Received(1).AddAsync(Arg.Is<Image>(i => i.FileName == "a"), Arg.Any<CancellationToken>());
@@ -191,7 +191,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
             new() { Id = 40, RootId = 1, ParentId = 10, Name = "Trip", RelativePath = "Trip" }
         });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.Received(1).MarkSubtreeMissingAsync(40, _clock.UtcNow, Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().DeleteSubtreeAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
@@ -209,7 +209,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
             renamed
         });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.Received(1).MarkSubtreeMissingAsync(40, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(41, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -223,7 +223,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _folders.GetByRootAndRelativePathAsync(1, "Trip", Arg.Any<CancellationToken>()).Returns(trip);
         _folders.GetChildrenAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Folder> { trip });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.Received(1).UpdateAsync(Arg.Is<Folder>(f => f.Id == 40 && f.MissingSinceUtc == null), Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -239,7 +239,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
             new() { Id = 43, RootId = 1, ParentId = 10, Name = "Removed", RelativePath = "Removed", IsActive = false }
         });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
@@ -257,7 +257,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _folders.GetByRootAndRelativePathAsync(1, "Café", Arg.Any<CancellationToken>()).Returns(cafe);
         _folders.GetChildrenAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Folder> { trip, cafe });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().AddAsync(Arg.Any<Folder>(), Arg.Any<CancellationToken>());
@@ -271,7 +271,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _folders.GetByRootAndRelativePathAsync(1, "Trip", Arg.Any<CancellationToken>()).Returns(trip);
         _folders.GetChildrenAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Folder> { trip });
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: false);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: false);
 
         await _folders.DidNotReceive().GetChildrenAsync(40, Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -283,7 +283,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         for (var i = 0; i < 50; i++)
             Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, $"f{i:D2}"));
 
-        await CreateService().StartScanAsync(rootId: 1, isRecursive: true);
+        await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         // 51 folders in total (root + 50): one progress write at 50, then the final result.
         await _jobs.Received(1).SetEnumerationResultAsync(999, 50, 0, Arg.Any<CancellationToken>());

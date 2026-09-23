@@ -64,9 +64,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
 
-            var scanJobId = await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            var scanJobId = await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             scanJobId.Should().Be(999);
             await imageRepository.Received(1).AddAsync(
@@ -121,9 +121,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             await imageRepository.Received(1).UpdateAsync(
                 Arg.Is<Image>(i => i.Id == 5 && i.MissingSinceUtc == clock.UtcNow),
@@ -208,9 +208,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             // keep.jpg: New -> created and enqueued
             await imageRepository.Received(1).AddAsync(
@@ -300,9 +300,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             // Root's copy: file is present there and unchanged -> never updated.
             await imageRepository.DidNotReceive().UpdateAsync(
@@ -364,9 +364,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: false);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: false);
 
             // Child Folder row is still created, for tree visibility.
             await folderRepository.Received(1).AddAsync(
@@ -434,9 +434,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             // Unchanged (matched by case-insensitive lookup) and not marked missing: no update at all.
             await imageRepository.DidNotReceive().UpdateAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>());
@@ -502,9 +502,9 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
 
-            await scanService.StartScanAsync(rootId: 1, isRecursive: true);
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
             await scanJobRepository.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 1, Arg.Any<CancellationToken>());
             await scanJobRepository.Received(1).TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>());
@@ -541,9 +541,9 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+        var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
 
@@ -577,9 +577,9 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
 
-        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+        var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
 
@@ -596,9 +596,9 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             Substitute.For<IImageRootRepository>(), Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IClock>());
+            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), Substitute.For<IClock>());
 
-        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+        var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
         await act.Should().ThrowAsync<ScanAlreadyInProgressException>();
 
