@@ -9,11 +9,13 @@ namespace PictureManager.Application.Folders;
 public sealed class FolderService : IFolderService
 {
     private readonly IFolderRepository _folders;
+    private readonly IScanJobRepository _scanJobs;
     private readonly IClock _clock;
 
-    public FolderService(IFolderRepository folders, IClock clock)
+    public FolderService(IFolderRepository folders, IScanJobRepository scanJobs, IClock clock)
     {
         _folders = folders;
+        _scanJobs = scanJobs;
         _clock = clock;
     }
 
@@ -44,6 +46,11 @@ public sealed class FolderService : IFolderService
             return Result.NotFound();
         if (folder.ParentId is null)
             return Result.Invalid("id", "A root's top folder cannot be removed; deactivate the root instead.");
+
+        // A running scan works from Folder objects it loaded earlier and would re-create rows under
+        // the tombstone (or fail on a hard-deleted descendant), so removal waits for it to finish.
+        if (await _scanJobs.HasActiveJobAsync(cancellationToken))
+            return Result.Conflict("A scan is running; remove the folder after it finishes.");
 
         await _folders.RemoveFromCollectionAsync(id, cancellationToken);
         return Result.Ok();

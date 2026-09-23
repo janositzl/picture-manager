@@ -15,13 +15,14 @@ public class FolderServiceTests
 {
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IClock _clock = Substitute.For<IClock>();
+    private readonly IScanJobRepository _scanJobs = Substitute.For<IScanJobRepository>();
 
     public FolderServiceTests()
     {
         _clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
 
-    private FolderService CreateService() => new(_folders, _clock);
+    private FolderService CreateService() => new(_folders, _scanJobs, _clock);
 
     [Fact]
     public async Task GetChildrenAsync_ParentNotVisible_ReturnsNotFound()
@@ -72,6 +73,18 @@ public class FolderServiceTests
         _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = null, IsActive = true });
 
         (await CreateService().RemoveAsync(4)).Status.Should().Be(ResultStatus.Invalid);
+        await _folders.DidNotReceive().RemoveFromCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhileScanIsActive_ReturnsConflict_AndRemovesNothing()
+    {
+        // A running scan holds Folder objects it loaded earlier; removing the subtree underneath it
+        // would let the scan re-create rows under the tombstone (or fail on a deleted parent).
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = true });
+        _scanJobs.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().RemoveAsync(4)).Status.Should().Be(ResultStatus.Conflict);
         await _folders.DidNotReceive().RemoveFromCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
