@@ -42,3 +42,6 @@ desktop.ini
 # =========== Worktrees (superpowers subagent-driven-development scratch) ===========
 .worktrees/
 .superpowers/
+
+# Test run output (coverage collectors)
+[Tt]est[Rr]esults/
