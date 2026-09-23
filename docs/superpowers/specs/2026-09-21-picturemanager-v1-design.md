@@ -53,7 +53,9 @@ PictureManager/
 2. **No raw-original serving endpoint in v1.** The brief only specifies thumbnail (~300px) and preview
    (~1800px) WebP derivatives, generated lazily and cached. The image viewer uses the preview derivative,
    not the original file. Keeps the "never touch the NAS beyond reading for indexing" boundary tight.
-   Revisit in v2 if a "download original" feature is wanted.
+   Revisit in v2 if a "download original" feature is wanted. (Narrow, deliberate exception added in phase
+   4 — see decision 11 — for a per-deployment opt-out that serves the original only when preview
+   generation is turned off.)
 3. **`ScanJob` entity** (referenced in the brief's solution-structure comment but not detailed in the data
    model section): `Id, RootFolderId (nullable = all roots), IsRecursive, Status (Pending/Enumerating/
    Enriching/Completed/Failed/Cancelled), StartedUtc, CompletedUtc, FoldersScanned, FilesFound,
@@ -74,6 +76,34 @@ PictureManager/
    at all, there's no way to resolve a stored relative path back to a physical one when more than one root
    is registered — the brief names the multi-root feature but its listed `Folder` columns alone can't
    support it.
+7. **Thumbnail cache storage** (phase 4): a new `ThumbnailCache:RootPath` config value (appsettings +
+   docker-compose volume, same pattern as `ImageRoot.MountPath` — an infra/deployment concern, not a
+   DB-editable setting). Sharded file layout exactly as the brief's example:
+   `{root}/{hash[0..2]}/{hash[2..4]}/{hash}-{size}.webp`. No DB migration needed — the cache key derives
+   entirely from `Image.ContentHash` plus the requested size (`Thumbnail` = 300, `Preview` = 1800, longest
+   edge), so nothing new needs persisting.
+8. **Resize basis** (phase 4): the longest edge of the source image is scaled to the target size (300 or
+   1800), not a fixed width — this treats portrait and landscape photos uniformly. EXIF orientation
+   correction uses the already-stored `Image.Orientation` column from phase 3's scan (no second EXIF read
+   at generation time).
+9. **Concurrent-generation dedup** (phase 4): an in-process keyed async lock (key = `{hash}-{size}`)
+   prevents duplicate decode/encode work when multiple requests race for the same missing derivative.
+   Generation writes to a temp file in the same shard directory, then atomically renames into place, so a
+   third concurrent reader never observes a partially-written cache file.
+10. **Missing/undecodable source** (phase 4): both `/thumbnail` and `/preview` return 404 when the `Image`
+    row doesn't exist, `MissingSinceUtc` is set, or the source file fails to decode. No placeholder image
+    is served server-side — that's a frontend concern for a later phase.
+11. **Preview generation toggle** (phase 4): a new static config value, `ThumbnailCache:PreviewEnabled`
+    (default `true`). Thumbnails are never affected by this toggle — they're always generated, since
+    serving multi-megabyte originals into a scrolling grid of hundreds of tiles would be far too slow. When
+    `PreviewEnabled` is `false`, the `/preview` endpoint skips derivative generation entirely and serves the
+    original file directly: `Results.File(path, contentType, enableRangeProcessing: true)` with
+    `Cache-Control: private, max-age=300` (short, no `immutable` — unlike the generated-derivative path,
+    the file behind this id-keyed URL can legitimately change after an edit + rescan, so it must revalidate
+    periodically rather than being cached for a year). `contentType` comes from a small, unit-testable
+    `ImageContentTypeResolver.Resolve(extension)` pure function (`.jpg`/`.jpeg` → `image/jpeg`, `.png` →
+    `image/png`, `.heic` → `image/heic`, `.webp` → `image/webp`, `.gif` → `image/gif`, `.bmp` →
+    `image/bmp`, `.tiff`/`.tif` → `image/tiff`, else `application/octet-stream`).
 
 ## Build phases
 
