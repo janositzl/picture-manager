@@ -34,6 +34,7 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddWorker();
+    builder.Services.AddProblemDetails();
 
     var imageRootsOptions = new ImageRootsOptions
     {
@@ -52,6 +53,10 @@ try
         .AddNpgSql(connectionString, name: "postgres");
 
     var app = builder.Build();
+
+    // Outside Development, unhandled exceptions become a 500 ProblemDetails with no stack trace.
+    if (!app.Environment.IsDevelopment())
+        app.UseExceptionHandler();
 
     app.MapHealthChecks("/api/health");
     app.MapGet("/api/ping", () => Results.Ok(new { status = "ok" }));
@@ -89,3 +94,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Exposes the top-level-statement entry point to WebApplicationFactory<Program> in the tests.
+public partial class Program;

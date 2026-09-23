@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentAssertions" Version="[7.0.0,8.0.0)" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NSubstitute" Version="6.2.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -22,6 +23,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PictureManager.Api\PictureManager.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared real-Postgres fixture; its per-assembly template name keeps the two test assemblies apart. -->
+    <Compile Include="..\PictureManager.Infrastructure.Tests\Support\PostgresTestDatabase.cs" Link="Support\PostgresTestDatabase.cs" />
+    <Compile Include="..\PictureManager.Infrastructure.Tests\Support\TestData.cs" Link="Support\TestData.cs" />
   </ItemGroup>
 
 </Project>
