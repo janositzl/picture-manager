@@ -4,9 +4,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Scanning;
+using PictureManager.Application.Thumbnails;
 using PictureManager.Infrastructure.Persistence;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Infrastructure.Scanning;
+using PictureManager.Infrastructure.Thumbnails;
 
 namespace PictureManager.Infrastructure.DependencyInjection;
 
@@ -32,6 +34,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
         services.AddSingleton<IExifReader, MetadataExtractorExifReader>();
+        services.AddSingleton<IThumbnailService, SkiaSharpThumbnailService>();
 
         return services;
     }
