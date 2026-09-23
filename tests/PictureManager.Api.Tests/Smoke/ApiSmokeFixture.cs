@@ -18,6 +18,8 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
     private const string ConnectionStringVariable = "ConnectionStrings__PictureManagerDb";
     private const string CacheRootVariable = "ThumbnailCache__RootPath";
 
+    private readonly string _cacheRoot = Path.Combine(Path.GetTempPath(), "pm-smoke-cache-" + Guid.NewGuid().ToString("N"));
+
     public PostgresTestDatabase Database { get; private set; } = null!;
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
@@ -30,7 +32,7 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
         // WebApplicationFactory's configuration callbacks run, so hand settings over through the
         // environment instead of UseSetting/ConfigureAppConfiguration.
         Environment.SetEnvironmentVariable(ConnectionStringVariable, Database.ConnectionString);
-        Environment.SetEnvironmentVariable(CacheRootVariable, Path.Combine(Path.GetTempPath(), "pm-smoke-cache-" + Guid.NewGuid().ToString("N")));
+        Environment.SetEnvironmentVariable(CacheRootVariable, _cacheRoot);
 
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
         Client = Factory.CreateClient();
@@ -43,5 +45,9 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable(ConnectionStringVariable, null);
         Environment.SetEnvironmentVariable(CacheRootVariable, null);
         await Database.DisposeAsync();
+
+        // The cache directory is only created on demand, so it may not exist.
+        if (Directory.Exists(_cacheRoot))
+            Directory.Delete(_cacheRoot, recursive: true);
     }
 }
