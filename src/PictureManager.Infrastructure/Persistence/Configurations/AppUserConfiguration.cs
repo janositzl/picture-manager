@@ -6,7 +6,7 @@ namespace PictureManager.Infrastructure.Persistence.Configurations;
 
 public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 {
-    public const int SystemUserId = 1;
+    public const int SystemUserId = AppUser.SystemUserId;
 
     public void Configure(EntityTypeBuilder<AppUser> builder)
     {

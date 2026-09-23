@@ -20,6 +20,10 @@ public class Image
     // Local-naive: EXIF DateTimeOriginal carries no timezone. See Global Constraints.
     public DateTime? DateTaken { get; set; }
 
+    // Database-computed (stored generated column): COALESCE(DateTaken read as UTC wall-clock,
+    // FileModified). The keyset key for date sorting. Never assign it from application code.
+    public DateTime SortDate { get; set; }
+
     public string? CameraMake { get; set; }
     public string? CameraModel { get; set; }
     public string? LensModel { get; set; }

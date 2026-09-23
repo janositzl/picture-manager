@@ -43,6 +43,13 @@ public class ImageConfiguration : IEntityTypeConfiguration<Image>
         builder.Property(x => x.DateTaken)
             .HasColumnType("timestamp without time zone");
 
+        // Stored generated column. "DateTaken" is local-naive; AT TIME ZONE 'UTC' reads its wall
+        // clock as UTC so it can be COALESCEd with the timestamptz "FileModified" (immutable, as
+        // generated columns require). Undated images therefore sort by file mtime.
+        builder.Property(x => x.SortDate)
+            .HasColumnType("timestamp with time zone")
+            .HasComputedColumnSql("COALESCE(\"DateTaken\" AT TIME ZONE 'UTC', \"FileModified\")", stored: true);
+
         builder.Property(x => x.FileModified)
             .HasColumnType("timestamp with time zone")
             .IsRequired();
@@ -70,5 +77,9 @@ public class ImageConfiguration : IEntityTypeConfiguration<Image>
         builder.HasIndex(x => x.FolderId);
         builder.HasIndex(x => x.ContentHash);
         builder.HasIndex(x => x.IsFavorite);
+
+        // Folder grid, date sort. The lower(FileName) and favorites indexes are expression/partial
+        // indexes that EF's fluent API can't express; they are raw SQL in the Phase5RestApi migration.
+        builder.HasIndex(x => new { x.FolderId, x.SortDate, x.Id });
     }
 }

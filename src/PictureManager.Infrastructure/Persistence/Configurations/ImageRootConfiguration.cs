@@ -20,11 +20,11 @@ public class ImageRootConfiguration : IEntityTypeConfiguration<ImageRoot>
             .IsRequired()
             .HasMaxLength(1000);
 
+        builder.Property(x => x.Alias)
+            .HasMaxLength(200);
+
         builder.Property(x => x.CreatedUtc)
             .HasColumnType("timestamp with time zone")
             .IsRequired();
-
-        builder.HasIndex(x => x.Name)
-            .IsUnique();
     }
 }
