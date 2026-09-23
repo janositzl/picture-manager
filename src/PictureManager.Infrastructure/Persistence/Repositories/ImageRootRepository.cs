@@ -33,4 +33,10 @@ public sealed class ImageRootRepository : IImageRootRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
         return imageRoot;
     }
+
+    public async Task UpdateAsync(ImageRoot imageRoot, CancellationToken cancellationToken = default)
+    {
+        _dbContext.ImageRoots.Update(imageRoot);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

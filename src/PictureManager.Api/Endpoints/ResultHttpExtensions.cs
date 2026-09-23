@@ -29,6 +29,9 @@ public static class ResultHttpExtensions
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Status, null)
         };
 
+    public static ValidationProblem Invalid(string field, string message) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = new[] { message } });
+
     internal static Dictionary<string, string[]> ToErrors(IReadOnlyDictionary<string, string[]>? errors) =>
         errors is null ? new Dictionary<string, string[]>() : new Dictionary<string, string[]>(errors);
 

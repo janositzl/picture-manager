@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PictureManager.Application.Common;
 using PictureManager.Application.Folders;
 using PictureManager.Application.Images;
+using PictureManager.Application.Roots;
 using PictureManager.Application.Scanning;
 
 namespace PictureManager.Application.DependencyInjection;
@@ -14,7 +15,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ICurrentUser, SystemCurrentUser>();
         services.AddScoped<IImageEnrichmentService, ImageEnrichmentService>();
         services.AddScoped<IScanService, ScanService>();
-        services.AddScoped<IDevImageRootSeeder, DevImageRootSeeder>();
+        services.AddScoped<IImageRootSeeder, ImageRootSeeder>();
+        services.AddScoped<IRootService, RootService>();
         services.AddScoped<IImageQueryService, ImageQueryService>();
         services.AddScoped<IFolderService, FolderService>();
 

@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PictureManager.Application.Scanning;
+namespace PictureManager.Application.Roots;
 
-public interface IDevImageRootSeeder
+public interface IImageRootSeeder
 {
     Task SeedAsync(CancellationToken cancellationToken = default);
 }

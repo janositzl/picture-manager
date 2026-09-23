@@ -3,7 +3,7 @@ using PictureManager.Api.Endpoints;
 using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
 using PictureManager.Application.Repositories;
-using PictureManager.Application.Scanning;
+using PictureManager.Application.Roots;
 using PictureManager.Application.Thumbnails;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Worker.DependencyInjection;
@@ -35,9 +35,11 @@ try
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddWorker();
 
-    var devImageRootOptions = new DevImageRootOptions();
-    builder.Configuration.GetSection("DevImageRoot").Bind(devImageRootOptions);
-    builder.Services.AddSingleton(devImageRootOptions);
+    var imageRootsOptions = new ImageRootsOptions
+    {
+        Entries = builder.Configuration.GetSection("ImageRoots").Get<List<ImageRootConfigEntry>>() ?? new List<ImageRootConfigEntry>()
+    };
+    builder.Services.AddSingleton(imageRootsOptions);
 
     var thumbnailCacheOptions = new ThumbnailCacheOptions();
     builder.Configuration.GetSection("ThumbnailCache").Bind(thumbnailCacheOptions);
@@ -56,7 +58,7 @@ try
 
     using (var scope = app.Services.CreateScope())
     {
-        var seeder = scope.ServiceProvider.GetRequiredService<IDevImageRootSeeder>();
+        var seeder = scope.ServiceProvider.GetRequiredService<IImageRootSeeder>();
         await seeder.SeedAsync();
     }
 
@@ -71,6 +73,7 @@ try
     user.MapImageQueryEndpoints();
     user.MapFolderEndpoints(admin);
     admin.MapScanEndpoints();
+    admin.MapRootEndpoints();
 
     app.Run();
 }
