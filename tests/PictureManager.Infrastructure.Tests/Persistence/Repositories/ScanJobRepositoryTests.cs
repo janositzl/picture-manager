@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PictureManager.Infrastructure.Persistence;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Model;
+using PictureManager.Tests.Support;
 using Xunit;
 
 namespace PictureManager.Infrastructure.Tests.Persistence.Repositories;
@@ -17,48 +17,8 @@ public class ScanJobRepositoryTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options);
 
-    // EF Core's InMemory provider does not support ExecuteUpdateAsync at all -- every call throws
-    // "The methods 'ExecuteUpdate' and 'ExecuteUpdateAsync' are not supported by the current
-    // database provider", regardless of the query shape. That's every method this fix round added
-    // to ScanJobRepository (SetEnumerationResultAsync, TryTransitionToEnrichingAsync,
-    // IncrementFilesEnrichedAsync, TryMarkCompletedIfEnrichedAsync, SetFailureResultAsync). Since
-    // this file tests the CONCRETE repository (not a consumer that could mock IScanJobRepository
-    // instead), a real round-trip needs a provider that actually implements ExecuteUpdateAsync's
-    // SQL translation -- SQLite's in-memory mode does. EnsureCreatedAsync tolerates this model's
-    // Postgres-flavored HasColumnType annotations ("jsonb", "timestamp with time zone", etc.)
-    // because SQLite's column type declarations are untyped strings; it never validates them.
-    private sealed class SqliteTestDatabase : IAsyncDisposable
-    {
-        private readonly SqliteConnection _connection;
-        public PictureManagerDbContext Context { get; }
-
-        private SqliteTestDatabase(SqliteConnection connection, PictureManagerDbContext context)
-        {
-            _connection = connection;
-            Context = context;
-        }
-
-        public static async Task<SqliteTestDatabase> CreateAsync()
-        {
-            // "Filename=:memory:" without shared cache: the database lives only as long as this
-            // one connection stays open, and is private to it -- exactly what a single-scope test
-            // needs (the tests below each exercise ScanJobRepository against a single DbContext
-            // scope, same as every other test in this file).
-            var connection = new SqliteConnection("Filename=:memory:");
-            await connection.OpenAsync();
-            var context = new PictureManagerDbContext(new DbContextOptionsBuilder<PictureManagerDbContext>()
-                .UseSqlite(connection)
-                .Options);
-            await context.Database.EnsureCreatedAsync();
-            return new SqliteTestDatabase(connection, context);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await Context.DisposeAsync();
-            await _connection.DisposeAsync();
-        }
-    }
+    // ExecuteUpdateAsync-based methods need a real relational provider (InMemory doesn't implement
+    // ExecuteUpdate). These tests use a throwaway real-Postgres database per test.
 
     [Fact]
     public async Task AddAsync_PersistsScanJob_AndGetByIdAsync_ReturnsIt()
@@ -213,7 +173,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task SetEnumerationResultAsync_UpdatesFoldersScannedAndFilesFound_ButNotStatus()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Enumerating, StartedUtc = DateTime.UtcNow });
@@ -229,7 +189,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task TryTransitionToEnrichingAsync_WhenEnumerating_FlipsStatusAndReturnsTrue()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Enumerating, StartedUtc = DateTime.UtcNow });
@@ -243,7 +203,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task TryTransitionToEnrichingAsync_WhenNotEnumerating_ReturnsFalse_AndLeavesRowUnchanged()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Completed, StartedUtc = DateTime.UtcNow });
@@ -257,7 +217,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task IncrementFilesEnrichedAsync_IncrementsByOne()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Enriching, FilesEnriched = 2, StartedUtc = DateTime.UtcNow });
@@ -270,7 +230,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task TryMarkCompletedIfEnrichedAsync_WhenEnrichedBelowFound_ReturnsFalse_AndLeavesRowUnchanged()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob
@@ -292,7 +252,7 @@ public class ScanJobRepositoryTests
         // This is the actual race this whole fix round exists for: the last FilesEnriched
         // increment and the completion check must be atomic against concurrent writers, and
         // TryMarkCompletedIfEnrichedAsync must correctly flip the job once the count catches up.
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob
@@ -314,7 +274,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task SetFailureResultAsync_SetsAllFailureFields()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Enumerating, StartedUtc = DateTime.UtcNow });
@@ -333,7 +293,7 @@ public class ScanJobRepositoryTests
     [Fact]
     public async Task SetFailureResultAsync_CancelledStatus_AllowsNullErrorMessage()
     {
-        await using var db = await SqliteTestDatabase.CreateAsync();
+        await using var db = await PostgresTestDatabase.CreateAsync();
         var repository = new ScanJobRepository(db.Context);
 
         var scanJob = await repository.AddAsync(new ScanJob { Status = ScanJobStatus.Enumerating, StartedUtc = DateTime.UtcNow });
