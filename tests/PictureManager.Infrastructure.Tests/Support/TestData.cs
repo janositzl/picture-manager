@@ -17,13 +17,14 @@ public static class TestData
         CreatedUtc = Utc
     };
 
-    public static Folder Folder(ImageRoot root, string relativePath, Folder? parent = null, bool isActive = true) => new()
+    public static Folder Folder(ImageRoot root, string relativePath, Folder? parent = null, bool isActive = true, DateTime? missingSinceUtc = null) => new()
     {
         Root = root,
         Parent = parent,
         Name = relativePath.Length == 0 ? root.Name : relativePath[(relativePath.LastIndexOf('/') + 1)..],
         RelativePath = relativePath,
         IsActive = isActive,
+        MissingSinceUtc = missingSinceUtc,
         CreatedUtc = Utc,
         ModifiedUtc = Utc
     };

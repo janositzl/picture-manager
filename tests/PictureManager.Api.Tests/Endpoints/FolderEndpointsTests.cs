@@ -19,7 +19,7 @@ public class FolderEndpointsTests
     [Fact]
     public async Task GetRootsAsync_ReturnsOk()
     {
-        _service.GetRootsAsync(Arg.Any<CancellationToken>()).Returns(new[] { new FolderNode(1, "nas", true, 0) });
+        _service.GetRootsAsync(Arg.Any<CancellationToken>()).Returns(new[] { new FolderNode(1, "nas", true, 0, false) });
 
         var result = await FolderEndpoints.GetRootsAsync(_service, CancellationToken.None);
 

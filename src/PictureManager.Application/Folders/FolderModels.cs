@@ -2,8 +2,12 @@ using System.Collections.Generic;
 
 namespace PictureManager.Application.Folders;
 
-/// <summary>Tree node. ImageCount = visible images directly in the folder (what its grid shows).</summary>
-public sealed record FolderNode(int Id, string Name, bool HasChildren, int ImageCount);
+/// <summary>
+/// Tree node. ImageCount = images directly in the folder that are not individually missing: for a present
+/// folder that is what its grid shows; for a missing folder (IsMissing) it is what comes back if the folder
+/// reappears, and what "remove from collection" would purge.
+/// </summary>
+public sealed record FolderNode(int Id, string Name, bool HasChildren, int ImageCount, bool IsMissing);
 
 public sealed record BreadcrumbItem(int Id, string Name);
 
@@ -15,6 +19,7 @@ public sealed record FolderDetail(
     string RootName,
     string RelativePath,
     int ImageCount,
+    bool IsMissing,
     IReadOnlyList<BreadcrumbItem> Breadcrumb);
 
 public sealed record RemovedFolder(int Id, string Name, string RootName, string RelativePath);

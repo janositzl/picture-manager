@@ -35,7 +35,7 @@ public class FolderServiceTests
     [Fact]
     public async Task GetChildrenAsync_ParentVisible_ReturnsChildren()
     {
-        var children = new[] { new FolderNode(5, "a", false, 3) };
+        var children = new[] { new FolderNode(5, "a", false, 3, false) };
         _folders.IsVisibleAsync(4, Arg.Any<CancellationToken>()).Returns(true);
         _folders.GetVisibleChildrenAsync(4, Arg.Any<CancellationToken>()).Returns(children);
 

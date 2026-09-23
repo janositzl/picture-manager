@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -77,7 +78,8 @@ public sealed class FolderRepository : IFolderRepository
                 f.RootId,
                 RootName = f.Root!.Name,
                 f.RelativePath,
-                ImageCount = f.Images.Count(i => i.MissingSinceUtc == null)
+                ImageCount = f.Images.Count(i => i.MissingSinceUtc == null),
+                IsMissing = f.MissingSinceUtc != null
             })
             .FirstOrDefaultAsync(cancellationToken);
         if (folder is null)
@@ -95,7 +97,7 @@ public sealed class FolderRepository : IFolderRepository
             .ToList();
 
         return new FolderDetail(folder.Id, folder.Name, folder.RootId, folder.RootName, folder.RelativePath,
-            folder.ImageCount, breadcrumb);
+            folder.ImageCount, folder.IsMissing, breadcrumb);
     }
 
     public async Task<IReadOnlyList<RemovedFolder>> GetRemovedAsync(CancellationToken cancellationToken = default)
@@ -127,6 +129,21 @@ public sealed class FolderRepository : IFolderRepository
         await _dbContext.Folders.Where(f => f.Id == folderId).ExecuteDeleteAsync(cancellationToken);
     }
 
+    public async Task MarkSubtreeMissingAsync(int folderId, DateTime missingSinceUtc, CancellationToken cancellationToken = default)
+    {
+        // One statement for the whole subtree: image visibility checks each folder's own flag, not its
+        // ancestors', so every descendant must carry the mark.
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH RECURSIVE subtree AS (
+                SELECT "Id" FROM "Folders" WHERE "Id" = {folderId}
+                UNION ALL
+                SELECT f."Id" FROM "Folders" f JOIN subtree s ON f."ParentId" = s."Id"
+            )
+            UPDATE "Folders" SET "MissingSinceUtc" = {missingSinceUtc}
+            WHERE "Id" IN (SELECT "Id" FROM subtree) AND "MissingSinceUtc" IS NULL AND "IsActive"
+            """, cancellationToken);
+    }
+
     public async Task RenameRootFolderAsync(int rootId, string name, CancellationToken cancellationToken = default)
     {
         await _dbContext.Folders.Where(f => f.RootId == rootId && f.ParentId == null)
@@ -140,7 +157,8 @@ public sealed class FolderRepository : IFolderRepository
                 f.Id,
                 f.Name,
                 f.Children.Any(c => c.IsActive),
-                f.Images.Count(i => i.MissingSinceUtc == null)));
+                f.Images.Count(i => i.MissingSinceUtc == null),
+                f.MissingSinceUtc != null));
 
     // "", "a", "a/b" for "a/b": the root's top folder plus every ancestor and the folder itself.
     private static List<string> AncestorPaths(string relativePath)

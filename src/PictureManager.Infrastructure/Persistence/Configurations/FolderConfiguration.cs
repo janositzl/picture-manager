@@ -28,6 +28,9 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(x => x.MissingSinceUtc)
+            .HasColumnType("timestamp with time zone");
+
         builder.HasOne(x => x.Root)
             .WithMany()
             .HasForeignKey(x => x.RootId)

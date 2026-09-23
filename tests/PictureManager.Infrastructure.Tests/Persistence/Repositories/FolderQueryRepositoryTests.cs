@@ -69,8 +69,8 @@ public class FolderQueryRepositoryTests
         var nodes = await new FolderRepository(context).GetVisibleChildrenAsync(top.Id);
 
         nodes.Should().Equal(
-            new FolderNode(madeira.Id, "Madeira", HasChildren: true, ImageCount: 2),
-            new FolderNode(portugal.Id, "portugal", HasChildren: false, ImageCount: 0));
+            new FolderNode(madeira.Id, "Madeira", HasChildren: true, ImageCount: 2, IsMissing: false),
+            new FolderNode(portugal.Id, "portugal", HasChildren: false, ImageCount: 0, IsMissing: false));
     }
 
     [Fact]

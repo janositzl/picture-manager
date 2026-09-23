@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,6 +37,12 @@ public interface IFolderRepository
 
     /// <summary>Hard-deletes the folder and everything beneath it (no tombstone).</summary>
     Task DeleteSubtreeAsync(int folderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets MissingSinceUtc on the folder and every active folder beneath it that isn't already marked (earlier
+    /// dates are kept). Tombstones (IsActive == false) are left alone. Nothing is deleted.
+    /// </summary>
+    Task MarkSubtreeMissingAsync(int folderId, DateTime missingSinceUtc, CancellationToken cancellationToken = default);
 
     /// <summary>Renames the root's top folder (the tree node that shows the root's name).</summary>
     Task RenameRootFolderAsync(int rootId, string name, CancellationToken cancellationToken = default);
