@@ -31,6 +31,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IImageRootRepository, ImageRootRepository>();
         services.AddScoped<IScanJobRepository, ScanJobRepository>();
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
+        services.AddScoped<IImageQueryRepository, ImageQueryRepository>();
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
         services.AddSingleton<IExifReader, MetadataExtractorExifReader>();
