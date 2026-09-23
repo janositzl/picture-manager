@@ -56,6 +56,39 @@ public class ImageEndpointsTests
     }
 
     [Fact]
+    public async Task GetThumbnailAsync_ContentHashNotYetComputed_ReturnsNotFound()
+    {
+        var image = BuildImage(1);
+        image.ContentHash = string.Empty;
+        var imageRepository = Substitute.For<IImageRepository>();
+        imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
+        var thumbnailService = Substitute.For<IThumbnailService>();
+
+        var result = await ImageEndpoints.GetThumbnailAsync(1, imageRepository, thumbnailService, CancellationToken.None);
+
+        result.Should().BeOfType<NotFound>();
+        await thumbnailService.DidNotReceive().GetOrCreateDerivativePathAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<DerivativeSize>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_PreviewEnabled_ContentHashNotYetComputed_ReturnsNotFound()
+    {
+        var image = BuildImage(1);
+        image.ContentHash = string.Empty;
+        var imageRepository = Substitute.For<IImageRepository>();
+        imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
+        var thumbnailService = Substitute.For<IThumbnailService>();
+        var options = new ThumbnailCacheOptions { PreviewEnabled = true };
+
+        var result = await ImageEndpoints.GetPreviewAsync(1, imageRepository, thumbnailService, options, CancellationToken.None);
+
+        result.Should().BeOfType<NotFound>();
+        await thumbnailService.DidNotReceive().GetOrCreateDerivativePathAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<DerivativeSize>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task GetThumbnailAsync_ThumbnailServiceReturnsNull_ReturnsNotFound()
     {
         var imageRepository = Substitute.For<IImageRepository>();

@@ -25,6 +25,10 @@ public static class ImageEndpoints
         var physicalPath = ImagePathResolver.ResolvePhysicalPath(
             image.Folder.Root.MountPath, image.Folder.RelativePath, image.FileName, image.Extension);
 
+        // A freshly discovered image has no content hash until enrichment runs, so no cache key exists yet.
+        if (string.IsNullOrEmpty(image.ContentHash))
+            return Results.NotFound();
+
         var derivativePath = await thumbnailService.GetOrCreateDerivativePathAsync(
             image.ContentHash, physicalPath, image.Orientation, DerivativeSize.Thumbnail, cancellationToken);
         if (derivativePath is null)
@@ -50,6 +54,9 @@ public static class ImageEndpoints
 
             return ServePhysicalFile(physicalPath, ImageContentTypeResolver.Resolve(image.Extension));
         }
+
+        if (string.IsNullOrEmpty(image.ContentHash))
+            return Results.NotFound();
 
         var derivativePath = await thumbnailService.GetOrCreateDerivativePathAsync(
             image.ContentHash, physicalPath, image.Orientation, DerivativeSize.Preview, cancellationToken);
