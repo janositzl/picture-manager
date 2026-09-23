@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using PictureManager.Application.Repositories;
+using PictureManager.Infrastructure.Persistence.Queries;
 using PictureManager.Model;
 
 namespace PictureManager.Infrastructure.Persistence.Repositories;
@@ -45,5 +46,10 @@ public sealed class FolderRepository : IFolderRepository
     {
         _dbContext.Folders.Update(folder);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsVisibleAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Folders.AsNoTracking().WhereVisible().AnyAsync(f => f.Id == id, cancellationToken);
     }
 }

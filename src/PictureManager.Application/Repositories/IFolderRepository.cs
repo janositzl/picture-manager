@@ -12,4 +12,7 @@ public interface IFolderRepository
     Task<Folder> AddAsync(Folder folder, CancellationToken cancellationToken = default);
     Task<Folder?> GetByRootAndRelativePathAsync(int rootId, string relativePath, CancellationToken cancellationToken = default);
     Task UpdateAsync(Folder folder, CancellationToken cancellationToken = default);
+
+    /// <summary>True when the folder exists, is active, and its root is active.</summary>
+    Task<bool> IsVisibleAsync(int id, CancellationToken cancellationToken = default);
 }
