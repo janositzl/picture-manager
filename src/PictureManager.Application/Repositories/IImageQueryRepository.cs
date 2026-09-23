@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using PictureManager.Application.Duplicates;
 using PictureManager.Application.Images;
 
 namespace PictureManager.Application.Repositories;
@@ -24,4 +25,9 @@ public interface IImageQueryRepository
 
     /// <summary>Visible images directly in the folder, ordered by (SortDate, Id) ascending.</summary>
     Task<IReadOnlyList<int>> GetVisibleIdsInFolderAsync(int folderId, CancellationToken cancellationToken = default);
+
+    /// <summary>ContentHash groups with 2+ visible, hashed members; ordered by Count desc, ContentHash asc; after = keyset.</summary>
+    Task<IReadOnlyList<DuplicateGroupKey>> GetDuplicateGroupsAsync(DuplicateGroupKey? after, int take, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DuplicateMemberRow>> GetDuplicateMembersAsync(IReadOnlyCollection<string> contentHashes, CancellationToken cancellationToken = default);
 }

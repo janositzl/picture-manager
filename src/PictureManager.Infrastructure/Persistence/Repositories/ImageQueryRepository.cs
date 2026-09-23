@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using PictureManager.Application.Duplicates;
 using PictureManager.Application.Images;
 using PictureManager.Application.Repositories;
 using PictureManager.Infrastructure.Persistence.Queries;
@@ -97,6 +98,41 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Where(i => i.FolderId == folderId)
             .OrderBy(i => i.SortDate).ThenBy(i => i.Id)
             .Select(i => i.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DuplicateGroupKey>> GetDuplicateGroupsAsync(DuplicateGroupKey? after, int take, CancellationToken cancellationToken = default)
+    {
+        var groups = _dbContext.Images.AsNoTracking().WhereVisible()
+            .Where(i => i.ContentHash != "")
+            .GroupBy(i => i.ContentHash)
+            .Where(g => g.Count() > 1)
+            .Select(g => new { ContentHash = g.Key, Count = g.Count() });
+
+        if (after is not null)
+        {
+            var afterCount = after.Count;
+            var afterHash = after.ContentHash;
+            groups = groups.Where(g => g.Count < afterCount || (g.Count == afterCount && string.Compare(g.ContentHash, afterHash) > 0));
+        }
+
+        return await groups
+            .OrderByDescending(g => g.Count).ThenBy(g => g.ContentHash)
+            .Take(take)
+            .Select(g => new DuplicateGroupKey(g.ContentHash, g.Count))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DuplicateMemberRow>> GetDuplicateMembersAsync(IReadOnlyCollection<string> contentHashes, CancellationToken cancellationToken = default)
+    {
+        var hashes = contentHashes.ToList();
+        return await _dbContext.Images.AsNoTracking().WhereVisible()
+            .Where(i => hashes.Contains(i.ContentHash))
+            .Select(i => new DuplicateMemberRow(
+                new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
+                    i.ContentHash, i.SortDate, i.FileName.ToLower()),
+                i.Folder!.Root!.Name,
+                i.Folder.RelativePath))
             .ToListAsync(cancellationToken);
     }
 

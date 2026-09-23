@@ -73,6 +73,7 @@ try
     user.MapImageQueryEndpoints();
     user.MapFolderEndpoints(admin);
     user.MapAlbumEndpoints();
+    user.MapDuplicateEndpoints();
     admin.MapScanEndpoints();
     admin.MapRootEndpoints();
 
