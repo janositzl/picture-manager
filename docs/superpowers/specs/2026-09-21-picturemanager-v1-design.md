@@ -131,6 +131,8 @@ re-approval, per your direction to proceed continuously.
 5. **REST API** — folders, images (keyset pagination/search/favorite), albums (CRUD/reorder/export),
    duplicate-finder view, settings; routes shaped for a later `RequireAuthorization` drop-in. Detailed
    decisions: [`2026-09-23-phase5-rest-api-design.md`](2026-09-23-phase5-rest-api-design.md).
+   Follow-up before phase 6 (missing folders, unavailable roots, background scans; rename/relink deferred):
+   [`2026-09-24-scanner-missing-folders-design.md`](2026-09-24-scanner-missing-folders-design.md).
 6. **Frontend SPA** — folder tree + virtualized grid, viewer, favorites, albums, search bar, settings page.
 7. **Docker integration pass** — multi-stage build, full `docker compose up` smoke test end-to-end.
 8. **Playwright e2e** — browse → view → favorite → album → export flows.
