@@ -89,6 +89,9 @@ public class ScanServiceTests
         var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
         try
         {
+            // An ignored file keeps the root non-empty (an empty root is treated as an unmounted share).
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, "readme.txt"), new byte[] { 1 });
+
             var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
             var rootFolder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
             var missingImage = new Image { Id = 5, FolderId = 10, FileName = "gone", Extension = ".jpg", MissingSinceUtc = null };
@@ -103,7 +106,7 @@ public class ScanServiceTests
             imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image> { missingImage });
 
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
-            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings { ExcludedExtensions = new List<string> { ".txt" } });
 
             var scanJobRepository = Substitute.For<IScanJobRepository>();
             scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>

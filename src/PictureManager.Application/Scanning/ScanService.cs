@@ -14,6 +14,7 @@ public sealed class ScanService : IScanService
 {
     private const int MaxScanDepth = 50;
     private const int MaxErrorMessageLength = 4000;
+    private const int ProgressInterval = 50;
 
     private readonly IImageRootRepository _imageRootRepository;
     private readonly IFolderRepository _folderRepository;
@@ -67,12 +68,26 @@ public sealed class ScanService : IScanService
             var settings = await _appSettingsRepository.GetAsync(cancellationToken);
             var excludeRules = new ScanExcludeRules(settings);
 
+            var unavailableRoots = new List<string>();
+
             foreach (var root in roots)
             {
-                var (rootFoldersScanned, rootFilesFound) = await ScanRootAsync(root, isRecursive, excludeRules, scanJob.Id, cancellationToken);
+                // A missing or empty mount folder is a mount problem, not a deletion: change nothing under it.
+                if (!IsRootAvailable(root.MountPath))
+                {
+                    unavailableRoots.Add(root.Name);
+                    continue;
+                }
+
+                var (rootFoldersScanned, rootFilesFound) = await ScanRootAsync(
+                    root, isRecursive, excludeRules, scanJob.Id, foldersScanned, filesFound, cancellationToken);
                 foldersScanned += rootFoldersScanned;
                 filesFound += rootFilesFound;
             }
+
+            // The available roots were scanned in full; the job still fails so the user sees the warning.
+            if (unavailableRoots.Count > 0)
+                throw new ScanRootsUnavailableException(unavailableRoots);
 
             await FinalizeSuccessAsync(scanJob.Id, foldersScanned, filesFound, cancellationToken);
 
@@ -127,7 +142,8 @@ public sealed class ScanService : IScanService
     }
 
     private async Task<(int FoldersScanned, int FilesFound)> ScanRootAsync(
-        ImageRoot root, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId, CancellationToken cancellationToken)
+        ImageRoot root, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId,
+        int foldersBefore, int filesBefore, CancellationToken cancellationToken)
     {
         var foldersScanned = 0;
         var filesFound = 0;
@@ -141,10 +157,15 @@ public sealed class ScanService : IScanService
             var (folder, physicalPath, depth) = pending.Dequeue();
             foldersScanned++;
 
+            // Live progress for the UI; totals include the roots scanned before this one.
+            if (foldersScanned % ProgressInterval == 0)
+                await _scanJobRepository.SetEnumerationResultAsync(scanJobId, foldersBefore + foldersScanned, filesBefore + filesFound, cancellationToken);
+
             if (!Directory.Exists(physicalPath))
                 continue;
 
             var observedFiles = new HashSet<(string FileName, string Extension)>();
+            var observedFolders = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var entryPath in Directory.EnumerateFileSystemEntries(physicalPath))
             {
@@ -152,6 +173,10 @@ public sealed class ScanService : IScanService
 
                 if (Directory.Exists(entryPath))
                 {
+                    // Every directory on disk counts as seen, excluded or not: excluded ones are pruned below,
+                    // never marked missing.
+                    observedFolders.Add(FolderNameKey(name));
+
                     // Excluded names are skipped here; rows that already exist for them are pruned
                     // after this folder's pass (below).
                     if (excludeRules.IsFolderExcluded(name))
@@ -163,6 +188,15 @@ public sealed class ScanService : IScanService
                     // Removed from the collection (tombstone): never descend into it or re-index it.
                     if (!childFolder.IsActive)
                         continue;
+
+                    // Back on disk (remounted, or renamed back): clear the mark. Its descendants are cleared as
+                    // the walk reaches them.
+                    if (childFolder.MissingSinceUtc is not null)
+                    {
+                        childFolder.MissingSinceUtc = null;
+                        childFolder.ModifiedUtc = _clock.UtcNow;
+                        await _folderRepository.UpdateAsync(childFolder, cancellationToken);
+                    }
 
                     // Always create the child Folder row for tree visibility, but stop descending
                     // once isRecursive is false, or once a depth cap is hit (guards against unbounded
@@ -244,18 +278,33 @@ public sealed class ScanService : IScanService
                 }
             }
 
-            // Prune on scan: child folders whose name is now excluded go with their whole subtree.
-            // No tombstone is left, because the exclusion rule itself keeps them out, and removing
-            // the rule brings them back on the next scan.
             foreach (var child in await _folderRepository.GetChildrenAsync(folder.Id, cancellationToken))
             {
+                // Prune on scan: child folders whose name is now excluded go with their whole subtree.
+                // No tombstone is left, because the exclusion rule itself keeps them out, and removing
+                // the rule brings them back on the next scan.
                 if (excludeRules.IsFolderExcluded(child.Name))
+                {
                     await _folderRepository.DeleteSubtreeAsync(child.Id, cancellationToken);
+                    continue;
+                }
+
+                // Gone from disk (renamed, moved or deleted): mark it and its subtree missing. Nothing is
+                // deleted -- the user decides whether to remove it, and it's unmarked if it comes back.
+                if (child.IsActive && child.MissingSinceUtc is null && !observedFolders.Contains(FolderNameKey(child.Name)))
+                    await _folderRepository.MarkSubtreeMissingAsync(child.Id, _clock.UtcNow, cancellationToken);
             }
         }
 
         return (foldersScanned, filesFound);
     }
+
+    // A root whose folder is missing or has no entries at all is treated as an unmounted share.
+    private static bool IsRootAvailable(string mountPath) =>
+        Directory.Exists(mountPath) && Directory.EnumerateFileSystemEntries(mountPath).Any();
+
+    // Same folding as the scanner's path comparisons: NFC, case-insensitive.
+    private static string FolderNameKey(string name) => PathNormalizer.Normalize(name).ToLowerInvariant();
 
     private async Task<Folder> GetOrCreateFolderAsync(int rootId, int? parentId, string relativePath, string name, CancellationToken cancellationToken)
     {
