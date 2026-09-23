@@ -42,8 +42,8 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         var hash = await _contentHasher.ComputeAsync(physicalPath, image.FileSize, cancellationToken);
         var exif = await _exifReader.ReadAsync(physicalPath, cancellationToken);
 
-        var possibleMove = await _imageRepository.GetByContentHashAsync(hash, cancellationToken);
-        if (possibleMove is not null && possibleMove.Id != image.Id && possibleMove.MissingSinceUtc is not null)
+        var possibleMove = await _imageRepository.GetMissingByContentHashAsync(hash, cancellationToken);
+        if (possibleMove is not null && possibleMove.Id != image.Id)
         {
             await _imageRepository.DeleteAsync(possibleMove, cancellationToken);
         }

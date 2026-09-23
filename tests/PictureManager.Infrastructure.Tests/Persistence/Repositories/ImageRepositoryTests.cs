@@ -100,7 +100,7 @@ public class ImageRepositoryTests
     }
 
     [Fact]
-    public async Task GetByContentHashAsync_ReturnsMatchingImage()
+    public async Task GetMissingByContentHashAsync_ReturnsMatchingMissingImage()
     {
         await using var context = CreateContext();
         var folder = await SeedFolderAsync(context);
@@ -108,15 +108,34 @@ public class ImageRepositoryTests
         {
             FolderId = folder.Id, FileName = "IMG001", Extension = ".jpg", ContentHash = "abc123",
             FileSize = 1, FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, MissingSinceUtc = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
 
         var repository = new ImageRepository(context);
-        var found = await repository.GetByContentHashAsync("abc123");
+        var found = await repository.GetMissingByContentHashAsync("abc123");
 
         found.Should().NotBeNull();
         found!.FileName.Should().Be("IMG001");
+    }
+
+    [Fact]
+    public async Task GetMissingByContentHashAsync_ExcludesActiveImageWithSameHash()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        context.Images.Add(new Image
+        {
+            FolderId = folder.Id, FileName = "IMG001", Extension = ".jpg", ContentHash = "abc123",
+            FileSize = 1, FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, MissingSinceUtc = null
+        });
+        await context.SaveChangesAsync();
+
+        var repository = new ImageRepository(context);
+        var found = await repository.GetMissingByContentHashAsync("abc123");
+
+        found.Should().BeNull();
     }
 
     [Fact]

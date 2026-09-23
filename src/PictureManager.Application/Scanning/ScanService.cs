@@ -43,6 +43,9 @@ public sealed class ScanService : IScanService
 
     public async Task<int> StartScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default)
     {
+        if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
+            throw new ScanAlreadyInProgressException();
+
         var roots = rootId.HasValue
             ? new[] { await _imageRootRepository.GetByIdAsync(rootId.Value, cancellationToken)
                 ?? throw new InvalidOperationException($"ImageRoot {rootId} not found.") }
@@ -72,65 +75,47 @@ public sealed class ScanService : IScanService
                 filesFound += rootFilesFound;
             }
 
-            await FinalizeSuccessAsync(scanJob, foldersScanned, filesFound, cancellationToken);
+            await FinalizeSuccessAsync(scanJob.Id, foldersScanned, filesFound, cancellationToken);
 
             return scanJob.Id;
         }
         catch (Exception ex)
         {
-            // Use CancellationToken.None here: if the scan failed because its own token was
-            // cancelled, reusing that (now-cancelled) token for this write would itself throw
-            // immediately, leaving the job stuck instead of ever recording Failed.
-            await FinalizeFailureAsync(scanJob, ex, foldersScanned, filesFound);
+            await FinalizeFailureAsync(scanJob.Id, ex, foldersScanned, filesFound);
             throw;
         }
     }
 
-    private async Task FinalizeSuccessAsync(ScanJob scanJob, int foldersScanned, int filesFound, CancellationToken cancellationToken)
+    private async Task FinalizeSuccessAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken)
     {
-        // scanJob is already tracked by this scope's DbContext (it was created via AddAsync on
-        // the same context). Calling GetByIdAsync(scanJob.Id) here would hit EF Core's identity
-        // resolution and simply hand back this SAME tracked instance instead of re-querying the
-        // database -- silently no-op'ing what looks like a re-fetch. ReloadAsync is the correct
-        // primitive: it re-queries the store and overwrites this tracked instance's current
-        // values in place, so whatever EnrichmentBackgroundService has committed concurrently (in
-        // a different DbContext/scope) actually becomes visible here.
-        await _scanJobRepository.ReloadAsync(scanJob, cancellationToken);
+        // Every write below is a targeted, atomic SQL UPDATE (ExecuteUpdateAsync), not a whole-row
+        // read-modify-write: EnrichmentBackgroundService concurrently increments FilesEnriched (and
+        // can itself flip Status to Completed) on this same row from a different DbContext scope, on
+        // every scan with enough files that draining starts before the walk finishes. A whole-row
+        // write here would silently overwrite whatever it just committed, and vice versa -- this was a
+        // reachable production race, not a hypothetical one.
+        await _scanJobRepository.SetEnumerationResultAsync(scanJobId, foldersScanned, filesFound, cancellationToken);
+        await _scanJobRepository.TryTransitionToEnrichingAsync(scanJobId, cancellationToken);
 
-        scanJob.FoldersScanned = foldersScanned;
-        scanJob.FilesFound = filesFound;
-
-        if (scanJob.Status != ScanJobStatus.Failed && scanJob.Status != ScanJobStatus.Cancelled)
-        {
-            if (filesFound == 0 || scanJob.FilesEnriched >= filesFound)
-            {
-                // Either nothing needed enriching, or EnrichmentBackgroundService (guarded by its
-                // own Status == Enriching check in MarkOneEnrichedAsync) already raced ahead and
-                // finished enriching everything before this write ran -- in which case nothing
-                // else will ever trigger it to flip the job to Completed, so we do it here.
-                scanJob.Status = ScanJobStatus.Completed;
-                scanJob.CompletedUtc = _clock.UtcNow;
-            }
-            else
-            {
-                scanJob.Status = ScanJobStatus.Enriching;
-            }
-        }
-
-        await _scanJobRepository.UpdateAsync(scanJob, cancellationToken);
+        // Whichever of "transition to Enriching" (just above) or the background service's last
+        // FilesEnriched increment happens last is the one that will see FilesEnriched >= FilesFound
+        // and flip the job to Completed -- so this must be attempted here too, not just from
+        // EnrichmentBackgroundService.MarkOneEnrichedAsync. When filesFound == 0 this also correctly
+        // completes the job immediately (FilesEnriched 0 >= FilesFound 0).
+        await _scanJobRepository.TryMarkCompletedIfEnrichedAsync(scanJobId, _clock.UtcNow, cancellationToken);
     }
 
-    private async Task FinalizeFailureAsync(ScanJob scanJob, Exception ex, int foldersScanned, int filesFound)
+    private async Task FinalizeFailureAsync(int scanJobId, Exception ex, int foldersScanned, int filesFound)
     {
-        await _scanJobRepository.ReloadAsync(scanJob, CancellationToken.None);
+        var isCancellation = ex is OperationCanceledException;
+        var status = isCancellation ? ScanJobStatus.Cancelled : ScanJobStatus.Failed;
+        var errorMessage = isCancellation ? null : TruncateErrorMessage(ex.Message);
 
-        scanJob.FoldersScanned = foldersScanned;
-        scanJob.FilesFound = filesFound;
-        scanJob.Status = ScanJobStatus.Failed;
-        scanJob.ErrorMessage = TruncateErrorMessage(ex.Message);
-        scanJob.CompletedUtc = _clock.UtcNow;
-
-        await _scanJobRepository.UpdateAsync(scanJob, CancellationToken.None);
+        // CancellationToken.None: if the scan failed because its own token was cancelled, reusing
+        // that (now-cancelled) token for this write would itself throw immediately, leaving the job
+        // stuck instead of ever recording its terminal status.
+        await _scanJobRepository.SetFailureResultAsync(
+            scanJobId, foldersScanned, filesFound, errorMessage, status, _clock.UtcNow, CancellationToken.None);
     }
 
     private static string? TruncateErrorMessage(string? message) =>

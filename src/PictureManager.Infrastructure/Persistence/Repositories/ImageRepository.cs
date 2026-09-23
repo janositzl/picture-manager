@@ -50,9 +50,10 @@ public sealed class ImageRepository : IImageRepository
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
     }
 
-    public async Task<Image?> GetByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
+    public async Task<Image?> GetMissingByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Images.FirstOrDefaultAsync(i => i.ContentHash == contentHash, cancellationToken);
+        return await _dbContext.Images.FirstOrDefaultAsync(
+            i => i.ContentHash == contentHash && i.MissingSinceUtc != null, cancellationToken);
     }
 
     public async Task UpdateAsync(Image image, CancellationToken cancellationToken = default)

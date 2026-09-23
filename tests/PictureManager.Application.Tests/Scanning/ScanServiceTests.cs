@@ -52,6 +52,11 @@ public class ScanServiceTests
                 job.Id = 999;
                 return job;
             });
+            scanJobRepository.TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>()).Returns(true);
+            // Nothing enriched anything during this test (the enrichment queue is mocked, not
+            // drained), so with a real DB the completion check would correctly see
+            // FilesEnriched < FilesFound and leave the job at Enriching.
+            scanJobRepository.TryMarkCompletedIfEnrichedAsync(999, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
 
             var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
             var clock = Substitute.For<IClock>();
@@ -68,9 +73,9 @@ public class ScanServiceTests
                 Arg.Is<Image>(i => i.FolderId == 10 && i.FileName == "photo" && i.Extension == ".jpg" && i.IndexState == IndexState.Pending),
                 Arg.Any<CancellationToken>());
             enrichmentQueue.Received(1).Enqueue(999, 100);
-            await scanJobRepository.Received(1).UpdateAsync(
-                Arg.Is<ScanJob>(j => j.FilesFound == 1 && j.Status == ScanJobStatus.Enriching),
-                Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 1, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).TryMarkCompletedIfEnrichedAsync(999, clock.UtcNow, Arg.Any<CancellationToken>());
         }
         finally
         {
@@ -191,6 +196,8 @@ public class ScanServiceTests
                 job.Id = 999;
                 return job;
             });
+            scanJobRepository.TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>()).Returns(true);
+            scanJobRepository.TryMarkCompletedIfEnrichedAsync(999, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
 
             var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
             var clock = Substitute.For<IClock>();
@@ -223,9 +230,8 @@ public class ScanServiceTests
             enrichmentQueue.Received(1).Enqueue(999, 31);
 
             // FilesFound counts only what was actually enqueued (keep + changed), not the unchanged file.
-            await scanJobRepository.Received(1).UpdateAsync(
-                Arg.Is<ScanJob>(j => j.FoldersScanned == 2 && j.FilesFound == 2 && j.Status == ScanJobStatus.Enriching),
-                Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).SetEnumerationResultAsync(999, foldersScanned: 2, filesFound: 2, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>());
         }
         finally
         {
@@ -477,17 +483,15 @@ public class ScanServiceTests
             });
 
             // Simulate EnrichmentBackgroundService racing ahead of ScanService's own bookkeeping:
-            // by the time ScanService's final write calls ReloadAsync, the one queued item has
-            // already been enriched (FilesEnriched = 1) in a DIFFERENT scope/DbContext, but Status
-            // is still Enumerating because ScanService hasn't performed its own write yet -- the
-            // background service's Status == Enriching guard ("Part A") correctly refused to flip
-            // it to Completed itself. ReloadAsync is mocked here to mutate the SAME tracked
-            // instance in place (mirroring what EntityEntry.ReloadAsync actually does against a
-            // real DbContext), rather than returning a different object the way a naive
-            // GetByIdAsync-based re-fetch would have to.
-            scanJobRepository
-                .When(x => x.ReloadAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()))
-                .Do(callInfo => callInfo.Arg<ScanJob>().FilesEnriched = 1);
+            // by the time ScanService's final write runs, the one queued item has already been
+            // enriched in a DIFFERENT scope/DbContext -- with a real DB, TryMarkCompletedIfEnrichedAsync
+            // would then see FilesEnriched >= FilesFound and flip the job to Completed itself
+            // (whichever of "transition to Enriching" or the last increment runs last is the one
+            // whose completion check actually fires). Stubbing it to return true here proves
+            // ScanService always attempts this call after transitioning to Enriching, regardless
+            // of whether it "won" the race to be the one that actually flips the row.
+            scanJobRepository.TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>()).Returns(true);
+            scanJobRepository.TryMarkCompletedIfEnrichedAsync(999, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
 
             var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
             var clock = Substitute.For<IClock>();
@@ -499,15 +503,103 @@ public class ScanServiceTests
 
             await scanService.StartScanAsync(rootId: 1, isRecursive: true);
 
-            await scanJobRepository.Received(1).UpdateAsync(
-                Arg.Is<ScanJob>(j => j.Id == 999 && j.FilesFound == 1
-                    && j.Status == ScanJobStatus.Completed && j.CompletedUtc == clock.UtcNow),
-                Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 1, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).TryTransitionToEnrichingAsync(999, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).TryMarkCompletedIfEnrichedAsync(999, clock.UtcNow, Arg.Any<CancellationToken>());
         }
         finally
         {
             Directory.Delete(tempRoot.FullName, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task StartScanAsync_GenericExceptionDuringScan_RecordsFailedStatus_AndRethrows()
+    {
+        var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = "/nonexistent", IsActive = true };
+
+        var imageRootRepository = Substitute.For<IImageRootRepository>();
+        imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+        var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+        appSettingsRepository.GetAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<AppSettings>>(_ => throw new InvalidOperationException("boom"));
+
+        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        {
+            var job = callInfo.Arg<ScanJob>();
+            job.Id = 999;
+            return job;
+        });
+
+        var clock = Substitute.For<IClock>();
+        clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var scanService = new ScanService(
+            imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+
+        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        await scanJobRepository.Received(1).SetFailureResultAsync(
+            999, foldersScanned: 0, filesFound: 0, errorMessage: "boom", status: ScanJobStatus.Failed,
+            completedUtc: clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartScanAsync_OperationCanceledExceptionDuringScan_RecordsCancelledStatus_WithNoErrorMessage()
+    {
+        var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = "/nonexistent", IsActive = true };
+
+        var imageRootRepository = Substitute.For<IImageRootRepository>();
+        imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+        var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+        appSettingsRepository.GetAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<AppSettings>>(_ => throw new OperationCanceledException());
+
+        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        {
+            var job = callInfo.Arg<ScanJob>();
+            job.Id = 999;
+            return job;
+        });
+
+        var clock = Substitute.For<IClock>();
+        clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var scanService = new ScanService(
+            imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), clock);
+
+        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+
+        await scanJobRepository.Received(1).SetFailureResultAsync(
+            999, foldersScanned: 0, filesFound: 0, errorMessage: null, status: ScanJobStatus.Cancelled,
+            completedUtc: clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartScanAsync_WhenAScanIsAlreadyActive_ThrowsAndNeverCreatesAJob()
+    {
+        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        scanJobRepository.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var scanService = new ScanService(
+            Substitute.For<IImageRootRepository>(), Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
+            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IClock>());
+
+        var act = () => scanService.StartScanAsync(rootId: 1, isRecursive: true);
+
+        await act.Should().ThrowAsync<ScanAlreadyInProgressException>();
+
+        await scanJobRepository.DidNotReceive().AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>());
     }
 
     private static DateTime TruncateToMicroseconds(DateTime value) =>

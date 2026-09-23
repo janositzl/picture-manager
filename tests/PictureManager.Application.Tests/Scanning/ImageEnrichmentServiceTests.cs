@@ -36,7 +36,7 @@ public class ImageEnrichmentServiceTests
 
             var imageRepository = Substitute.For<IImageRepository>();
             imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
-            imageRepository.GetByContentHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Image?)null);
+            imageRepository.GetMissingByContentHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Image?)null);
 
             var contentHasher = Substitute.For<IContentHasher>();
             contentHasher.ComputeAsync(tempFile, 3, Arg.Any<CancellationToken>()).Returns("hash-abc");
@@ -109,7 +109,7 @@ public class ImageEnrichmentServiceTests
 
             var imageRepository = Substitute.For<IImageRepository>();
             imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
-            imageRepository.GetByContentHashAsync("hash-abc", Arg.Any<CancellationToken>()).Returns(staleMissingImage);
+            imageRepository.GetMissingByContentHashAsync("hash-abc", Arg.Any<CancellationToken>()).Returns(staleMissingImage);
 
             var contentHasher = Substitute.For<IContentHasher>();
             contentHasher.ComputeAsync(tempFile, 3, Arg.Any<CancellationToken>()).Returns("hash-abc");

@@ -16,8 +16,15 @@ public static class ScanEndpoints
 
     public static async Task<IResult> StartScanAsync(ScanRequest request, IScanService scanService, CancellationToken cancellationToken)
     {
-        var scanJobId = await scanService.StartScanAsync(request.RootId, request.IsRecursive, cancellationToken);
-        return Results.Ok(new ScanStartedResponse(scanJobId));
+        try
+        {
+            var scanJobId = await scanService.StartScanAsync(request.RootId, request.IsRecursive, cancellationToken);
+            return Results.Ok(new ScanStartedResponse(scanJobId));
+        }
+        catch (ScanAlreadyInProgressException ex)
+        {
+            return Results.Conflict(new { message = ex.Message });
+        }
     }
 
     public static async Task StreamScanEventsAsync(HttpContext context, int id, IScanJobRepository scanJobRepository, CancellationToken cancellationToken)
