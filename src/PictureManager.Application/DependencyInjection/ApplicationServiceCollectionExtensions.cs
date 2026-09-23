@@ -6,6 +6,7 @@ using PictureManager.Application.Folders;
 using PictureManager.Application.Images;
 using PictureManager.Application.Roots;
 using PictureManager.Application.Scanning;
+using PictureManager.Application.Settings;
 
 namespace PictureManager.Application.DependencyInjection;
 
@@ -23,6 +24,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IFolderService, FolderService>();
         services.AddScoped<IAlbumService, AlbumService>();
         services.AddScoped<IDuplicateService, DuplicateService>();
+        services.AddScoped<ISettingsService, SettingsService>();
 
         return services;
     }

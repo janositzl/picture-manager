@@ -20,4 +20,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     {
         return await _dbContext.Settings.SingleAsync(s => s.Id == AppSettingsConfiguration.SingletonId, cancellationToken);
     }
+
+    public async Task UpdateAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Settings.Update(settings);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

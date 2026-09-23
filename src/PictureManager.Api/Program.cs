@@ -76,6 +76,7 @@ try
     user.MapDuplicateEndpoints();
     admin.MapScanEndpoints();
     admin.MapRootEndpoints();
+    admin.MapSettingsEndpoints();
 
     app.Run();
 }
