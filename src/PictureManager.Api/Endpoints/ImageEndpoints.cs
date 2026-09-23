@@ -30,7 +30,7 @@ public static class ImageEndpoints
         if (derivativePath is null)
             return Results.NotFound();
 
-        return Results.File(derivativePath, "image/webp", enableRangeProcessing: true);
+        return ServePhysicalFile(derivativePath, "image/webp");
     }
 
     public static async Task<IResult> GetPreviewAsync(
@@ -48,7 +48,7 @@ public static class ImageEndpoints
             if (!File.Exists(physicalPath))
                 return Results.NotFound();
 
-            return Results.File(physicalPath, ImageContentTypeResolver.Resolve(image.Extension), enableRangeProcessing: true);
+            return ServePhysicalFile(physicalPath, ImageContentTypeResolver.Resolve(image.Extension));
         }
 
         var derivativePath = await thumbnailService.GetOrCreateDerivativePathAsync(
@@ -56,6 +56,11 @@ public static class ImageEndpoints
         if (derivativePath is null)
             return Results.NotFound();
 
-        return Results.File(derivativePath, "image/webp", enableRangeProcessing: true);
+        return ServePhysicalFile(derivativePath, "image/webp");
     }
+
+    // Results.File treats a non-rooted path as virtual (resolved against the web root), but the cache
+    // root and image mount paths are configured relative to the process working directory.
+    private static IResult ServePhysicalFile(string path, string contentType) =>
+        Results.File(Path.IsPathRooted(path) ? path : Path.GetFullPath(path), contentType, enableRangeProcessing: true);
 }

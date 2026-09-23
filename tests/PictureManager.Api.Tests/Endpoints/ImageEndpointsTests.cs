@@ -134,6 +134,49 @@ public class ImageEndpointsTests
     }
 
     [Fact]
+    public async Task GetThumbnailAsync_RelativeDerivativePath_ReturnsPhysicalFileResultWithFullPath()
+    {
+        var imageRepository = Substitute.For<IImageRepository>();
+        imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(BuildImage(1));
+        var thumbnailService = Substitute.For<IThumbnailService>();
+        var relativePath = Path.Combine("..", "..", "thumbnail-cache", "ab", "cd", "abcd1234-300.webp");
+        thumbnailService.GetOrCreateDerivativePathAsync("abcd1234", Arg.Any<string>(), Arg.Any<int?>(), DerivativeSize.Thumbnail, Arg.Any<CancellationToken>())
+            .Returns(relativePath);
+
+        var result = await ImageEndpoints.GetThumbnailAsync(1, imageRepository, thumbnailService, CancellationToken.None);
+
+        var fileResult = result.Should().BeOfType<PhysicalFileHttpResult>().Subject;
+        fileResult.FileName.Should().Be(Path.GetFullPath(relativePath));
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_PreviewDisabled_RelativeMountPath_ReturnsPhysicalFileResultWithFullPath()
+    {
+        var relativeRoot = "pm-preview-relative-" + System.Guid.NewGuid();
+        Directory.CreateDirectory(Path.Combine(relativeRoot, "vacation"));
+        var relativeOriginalPath = Path.Combine(relativeRoot, "vacation", "photo.jpg");
+        await File.WriteAllBytesAsync(relativeOriginalPath, new byte[] { 1, 2, 3 });
+        try
+        {
+            var image = BuildImage(1);
+            image.Folder!.Root!.MountPath = relativeRoot;
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
+            var thumbnailService = Substitute.For<IThumbnailService>();
+            var options = new ThumbnailCacheOptions { PreviewEnabled = false };
+
+            var result = await ImageEndpoints.GetPreviewAsync(1, imageRepository, thumbnailService, options, CancellationToken.None);
+
+            var fileResult = result.Should().BeOfType<PhysicalFileHttpResult>().Subject;
+            fileResult.FileName.Should().Be(Path.GetFullPath(relativeOriginalPath));
+        }
+        finally
+        {
+            Directory.Delete(relativeRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task GetPreviewAsync_PreviewDisabled_OriginalFileMissing_ReturnsNotFound()
     {
         var image = BuildImage(1);
