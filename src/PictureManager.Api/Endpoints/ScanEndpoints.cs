@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using PictureManager.Application.Repositories;
@@ -25,6 +26,10 @@ public static class ScanEndpoints
         catch (ScanAlreadyInProgressException ex)
         {
             return Results.Conflict(new { message = ex.Message });
+        }
+        catch (ScanRootUnavailableException ex)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["rootId"] = new[] { ex.Message } });
         }
     }
 

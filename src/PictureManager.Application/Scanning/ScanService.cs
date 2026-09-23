@@ -47,8 +47,7 @@ public sealed class ScanService : IScanService
             throw new ScanAlreadyInProgressException();
 
         var roots = rootId.HasValue
-            ? new[] { await _imageRootRepository.GetByIdAsync(rootId.Value, cancellationToken)
-                ?? throw new InvalidOperationException($"ImageRoot {rootId} not found.") }
+            ? new[] { await GetActiveRootAsync(rootId.Value, cancellationToken) }
             : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
 
         var scanJob = await _scanJobRepository.AddAsync(new ScanJob
@@ -121,6 +120,12 @@ public sealed class ScanService : IScanService
     private static string? TruncateErrorMessage(string? message) =>
         message is { Length: > MaxErrorMessageLength } ? message[..MaxErrorMessageLength] : message;
 
+    private async Task<ImageRoot> GetActiveRootAsync(int rootId, CancellationToken cancellationToken)
+    {
+        var root = await _imageRootRepository.GetByIdAsync(rootId, cancellationToken);
+        return root is { IsActive: true } ? root : throw new ScanRootUnavailableException(rootId);
+    }
+
     private async Task<(int FoldersScanned, int FilesFound)> ScanRootAsync(
         ImageRoot root, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId, CancellationToken cancellationToken)
     {
@@ -147,11 +152,17 @@ public sealed class ScanService : IScanService
 
                 if (Directory.Exists(entryPath))
                 {
+                    // Excluded names are skipped here; rows that already exist for them are pruned
+                    // after this folder's pass (below).
                     if (excludeRules.IsFolderExcluded(name))
                         continue;
 
                     var childRelativePath = PathNormalizer.Combine(folder.RelativePath, name);
                     var childFolder = await GetOrCreateFolderAsync(root.Id, folder.Id, childRelativePath, name, cancellationToken);
+
+                    // Removed from the collection (tombstone): never descend into it or re-index it.
+                    if (!childFolder.IsActive)
+                        continue;
 
                     // Always create the child Folder row for tree visibility, but stop descending
                     // once isRecursive is false, or once a depth cap is hit (guards against unbounded
@@ -217,12 +228,29 @@ public sealed class ScanService : IScanService
             var existingImages = await _imageRepository.GetByFolderIdAsync(folder.Id, cancellationToken);
             foreach (var image in existingImages)
             {
+                // Prune on scan: an extension the settings now exclude removes the row (and, by
+                // cascade, its album entries) instead of leaving it marked missing forever.
+                if (!excludeRules.IsExtensionAllowed(image.Extension))
+                {
+                    await _imageRepository.DeleteAsync(image, cancellationToken);
+                    continue;
+                }
+
                 if (image.MissingSinceUtc is null && !observedFiles.Contains(NormalizeKey(image.FileName, image.Extension)))
                 {
                     image.MissingSinceUtc = _clock.UtcNow;
                     image.UpdatedAt = _clock.UtcNow;
                     await _imageRepository.UpdateAsync(image, cancellationToken);
                 }
+            }
+
+            // Prune on scan: child folders whose name is now excluded go with their whole subtree.
+            // No tombstone is left, because the exclusion rule itself keeps them out, and removing
+            // the rule brings them back on the next scan.
+            foreach (var child in await _folderRepository.GetChildrenAsync(folder.Id, cancellationToken))
+            {
+                if (excludeRules.IsFolderExcluded(child.Name))
+                    await _folderRepository.DeleteSubtreeAsync(child.Id, cancellationToken);
             }
         }
 

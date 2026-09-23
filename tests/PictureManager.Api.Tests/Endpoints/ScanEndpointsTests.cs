@@ -27,6 +27,18 @@ public class ScanEndpointsTests
     }
 
     [Fact]
+    public async Task StartScanAsync_UnavailableRoot_ReturnsValidationProblem()
+    {
+        var scanService = Substitute.For<IScanService>();
+        scanService.StartScanAsync(2, true, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(new ScanRootUnavailableException(2)));
+
+        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(2, true), scanService, CancellationToken.None);
+
+        result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ValidationProblem>();
+    }
+
+    [Fact]
     public async Task StreamScanEventsAsync_JobAlreadyCompleted_WritesOneEventThenStops()
     {
         var scanJobRepository = Substitute.For<IScanJobRepository>();
