@@ -8,10 +8,11 @@ namespace PictureManager.Api.Endpoints;
 
 public static class ScanEndpoints
 {
-    public static void MapScanEndpoints(this WebApplication app)
+    public static IEndpointRouteBuilder MapScanEndpoints(this IEndpointRouteBuilder admin)
     {
-        app.MapPost("/api/scans", StartScanAsync);
-        app.MapGet("/api/scans/{id:int}/events", StreamScanEventsAsync);
+        admin.MapPost("/scans", StartScanAsync);
+        admin.MapGet("/scans/{id:int}/events", StreamScanEventsAsync);
+        return admin;
     }
 
     public static async Task<IResult> StartScanAsync(ScanRequest request, IScanService scanService, CancellationToken cancellationToken)

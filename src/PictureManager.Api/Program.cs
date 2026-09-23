@@ -60,10 +60,16 @@ try
         await seeder.SeedAsync();
     }
 
-    app.MapScanEndpoints();
-
     app.UseMiddleware<ImageCacheControlMiddleware>();
-    app.MapImageEndpoints();
+
+    // Every /api endpoint lives in exactly one of these two groups (ApiSurfaceMetadata). v2 auth seam:
+    // user.RequireAuthorization(); admin.RequireAuthorization("AdminOnly"); with no route changes.
+    var user = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.User));
+    var admin = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.Admin));
+
+    user.MapImageEndpoints();
+    user.MapImageQueryEndpoints();
+    admin.MapScanEndpoints();
 
     app.Run();
 }

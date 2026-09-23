@@ -9,10 +9,11 @@ namespace PictureManager.Api.Endpoints;
 
 public static class ImageEndpoints
 {
-    public static void MapImageEndpoints(this WebApplication app)
+    public static IEndpointRouteBuilder MapImageEndpoints(this IEndpointRouteBuilder user)
     {
-        app.MapGet("/api/images/{id:int}/thumbnail", GetThumbnailAsync);
-        app.MapGet("/api/images/{id:int}/preview", GetPreviewAsync);
+        user.MapGet("/images/{id:int}/thumbnail", GetThumbnailAsync);
+        user.MapGet("/images/{id:int}/preview", GetPreviewAsync);
+        return user;
     }
 
     public static async Task<IResult> GetThumbnailAsync(
