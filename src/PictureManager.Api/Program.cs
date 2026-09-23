@@ -69,6 +69,7 @@ try
 
     user.MapImageEndpoints();
     user.MapImageQueryEndpoints();
+    user.MapFolderEndpoints(admin);
     admin.MapScanEndpoints();
 
     app.Run();
