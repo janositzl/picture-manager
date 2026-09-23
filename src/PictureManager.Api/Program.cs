@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using PictureManager.Api.Endpoints;
+using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Scanning;
+using PictureManager.Application.Thumbnails;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Worker.DependencyInjection;
 using Serilog;
@@ -37,6 +39,10 @@ try
     builder.Configuration.GetSection("DevImageRoot").Bind(devImageRootOptions);
     builder.Services.AddSingleton(devImageRootOptions);
 
+    var thumbnailCacheOptions = new ThumbnailCacheOptions();
+    builder.Configuration.GetSection("ThumbnailCache").Bind(thumbnailCacheOptions);
+    builder.Services.AddSingleton(thumbnailCacheOptions);
+
     var connectionString = builder.Configuration.GetConnectionString("PictureManagerDb")
         ?? throw new InvalidOperationException("Connection string 'PictureManagerDb' is not configured.");
 
@@ -55,6 +61,9 @@ try
     }
 
     app.MapScanEndpoints();
+
+    app.UseMiddleware<ImageCacheControlMiddleware>();
+    app.MapImageEndpoints();
 
     app.Run();
 }
