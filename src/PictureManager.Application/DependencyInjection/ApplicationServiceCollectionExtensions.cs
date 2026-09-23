@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
 using PictureManager.Application.Folders;
 using PictureManager.Application.Images;
@@ -19,6 +20,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IRootService, RootService>();
         services.AddScoped<IImageQueryService, ImageQueryService>();
         services.AddScoped<IFolderService, FolderService>();
+        services.AddScoped<IAlbumService, AlbumService>();
 
         return services;
     }
