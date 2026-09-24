@@ -6,8 +6,9 @@ import { useImages } from '../api/queries'
 import type { ImageListItem } from '../api/types'
 import { PhotoGrid } from '../grid/PhotoGrid'
 import { PhotoTile } from '../grid/PhotoTile'
-import { withParams } from '../routing/urlState'
+import { parseGridParams, withParams } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { PhotoViewer } from '../viewer/PhotoViewer'
 import { GridSkeleton } from './GridSkeleton'
 
 type Props = {
@@ -30,6 +31,7 @@ export function ImageBrowser({
   emptyState,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { image } = parseGridParams(searchParams)
   const images = useImages(filter)
   const setFavorite = useSetFavorite()
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
@@ -75,6 +77,7 @@ export function ImageBrowser({
       {header}
       {banner}
       {body}
+      {image !== null && <PhotoViewer filter={filter} />}
     </>
   )
 }
