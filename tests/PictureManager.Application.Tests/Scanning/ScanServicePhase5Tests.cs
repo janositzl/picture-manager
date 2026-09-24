@@ -248,13 +248,13 @@ public sealed class ScanServicePhase5Tests : IDisposable
     public async Task StartScanAsync_ChildNameDiffersOnlyInCaseOrUnicodeNormalization_IsNotMarked()
     {
         // On disk: "trip" (case differs) and "Cafe" + combining acute (NFD, as macOS SMB clients write it).
-        // Stored: "Trip" and precomposed "Café" (NFC). Escapes keep an editor from normalizing the test away.
+        // Stored: "Trip" and precomposed "Caf\u00e9" (NFC). Escapes keep an editor from normalizing the test away.
         Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "trip"));
-        Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "Café"));
+        Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "Cafe\u0301"));
         var trip = new Folder { Id = 44, RootId = 1, ParentId = 10, Name = "Trip", RelativePath = "Trip" };
-        var cafe = new Folder { Id = 45, RootId = 1, ParentId = 10, Name = "Café", RelativePath = "Café" };
+        var cafe = new Folder { Id = 45, RootId = 1, ParentId = 10, Name = "Caf\u00e9", RelativePath = "Caf\u00e9" };
         _folders.GetByRootAndRelativePathAsync(1, "trip", Arg.Any<CancellationToken>()).Returns(trip);
-        _folders.GetByRootAndRelativePathAsync(1, "Café", Arg.Any<CancellationToken>()).Returns(cafe);
+        _folders.GetByRootAndRelativePathAsync(1, "Caf\u00e9", Arg.Any<CancellationToken>()).Returns(cafe);
         _folders.GetChildrenAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Folder> { trip, cafe });
 
         await CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
