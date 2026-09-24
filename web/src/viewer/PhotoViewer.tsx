@@ -170,7 +170,9 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
     stage = <CircularProgress color="inherit" />
   } else if (isMissingItem(current)) {
     stage = (
-      <Typography sx={{ color: 'grey.400' }}>The file for this photo is missing on disk.</Typography>
+      <Typography sx={{ color: 'grey.400' }}>
+        The file for this photo is missing on disk.
+      </Typography>
     )
   } else if (src === null) {
     stage = (
