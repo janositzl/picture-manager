@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
 import { NotifyProvider } from '../app/notify'
+import { appRoutes } from '../app/routes'
 
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -36,4 +37,9 @@ export function renderRoutes(routes: RouteObject[], path: string) {
     </Wrapper>,
   )
   return { ...view, user, router, queryClient }
+}
+
+/** The whole app (shell + routes) at `path`. */
+export function renderApp(path: string) {
+  return renderRoutes(appRoutes, path)
 }
