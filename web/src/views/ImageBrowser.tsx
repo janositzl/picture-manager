@@ -77,7 +77,15 @@ export function ImageBrowser({
       {header}
       {banner}
       {body}
-      {image !== null && <PhotoViewer filter={filter} />}
+      {image !== null && (
+        <PhotoViewer
+          list={{
+            items,
+            hasNextPage: images.hasNextPage,
+            fetchNextPage: () => images.fetchNextPage({ cancelRefetch: false }),
+          }}
+        />
+      )}
     </>
   )
 }

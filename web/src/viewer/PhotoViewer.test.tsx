@@ -1,6 +1,8 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
+import { useMemo } from 'react'
 import { describe, expect, it } from 'vitest'
+import { useImages } from '../api/queries'
 import type { ImageFilter } from '../api/imageFilter'
 import { madeiraImages } from '../test/fixtures'
 import { renderApp, renderRoutes } from '../test/render'
@@ -9,6 +11,20 @@ import { PhotoViewer } from './PhotoViewer'
 
 const viewerImage = (name: string) => screen.findByRole('img', { name })
 const infoPanel = () => screen.queryByRole('complementary', { name: 'Photo info' })
+
+function ViewerHarness({ filter }: { filter: ImageFilter }) {
+  const images = useImages(filter)
+  const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
+  return (
+    <PhotoViewer
+      list={{
+        items,
+        hasNextPage: images.hasNextPage,
+        fetchNextPage: () => images.fetchNextPage({ cancelRefetch: false }),
+      }}
+    />
+  )
+}
 
 describe('PhotoViewer', () => {
   it('opens from the grid and steps with the arrow keys', async () => {
@@ -134,7 +150,7 @@ describe('PhotoViewer', () => {
     )
     const filter: ImageFilter = { kind: 'folder', folderId: 3, sort: 'date', order: 'desc' }
     const { user, router } = renderRoutes(
-      [{ path: '/', element: <PhotoViewer filter={filter} /> }],
+      [{ path: '/', element: <ViewerHarness filter={filter} /> }],
       '/?image=21',
     )
 
@@ -147,5 +163,23 @@ describe('PhotoViewer', () => {
     expect(router.state.location.search).toBe('?image=22')
     expect(cursors).toEqual([null, 'p1'])
     expect(screen.queryByRole('button', { name: 'Next photo' })).not.toBeInTheDocument()
+  })
+
+  it('says when a photo in the list has no file on disk', async () => {
+    const items = [{ ...madeiraImages[0]!, isMissing: true, previewUrl: null, thumbnailUrl: null }]
+    renderRoutes(
+      [
+        {
+          path: '/',
+          element: (
+            <PhotoViewer list={{ items, hasNextPage: false, fetchNextPage: () => undefined }} />
+          ),
+        },
+      ],
+      '/?image=20',
+    )
+    expect(
+      await screen.findByText('The file for this photo is missing on disk.'),
+    ).toBeInTheDocument()
   })
 })

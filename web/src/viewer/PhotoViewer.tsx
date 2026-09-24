@@ -5,12 +5,12 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
-import type { ImageFilter } from '../api/imageFilter'
-import { useImage, useImages } from '../api/queries'
+import { useImage } from '../api/queries'
+import type { ImageListItem } from '../api/types'
 import { parseGridParams, withParams } from '../routing/urlState'
 import { InfoPanel } from './InfoPanel'
 
@@ -34,21 +34,29 @@ function writeInfoOpen(open: boolean): void {
 
 type ViewerHistoryState = { viewer?: boolean } | null
 
+export type ViewerItem = ImageListItem & { isMissing?: boolean }
+/** What the viewer steps through: the grid's loaded items, and how to load more. */
+export type ViewerList = {
+  items: readonly ViewerItem[]
+  hasNextPage: boolean
+  fetchNextPage: () => unknown
+}
+
+const isMissingItem = (item: object): boolean => 'isMissing' in item && item.isMissing === true
+
 /** Full-screen viewer for ?image=, stepping through the same cached list as the grid below it. */
-export function PhotoViewer({ filter }: { filter: ImageFilter }) {
+export function PhotoViewer({ list }: { list: ViewerList }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
   const imageId = parseGridParams(searchParams).image
-  // No refetch on mount: it would drop a just-unstarred photo from an open Favorites view.
-  const list = useImages(filter, { refetchOnMount: false })
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
   const [infoOpen, setInfoOpen] = useState(readInfoOpen)
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const pendingNext = useRef(false)
 
-  const items = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data])
+  const items = list.items
   const index = imageId === null ? -1 : items.findIndex((item) => item.id === imageId)
   const inList = index >= 0
   const current = inList ? items[index] : detail.data
@@ -160,6 +168,10 @@ export function PhotoViewer({ filter }: { filter: ImageFilter }) {
     )
   } else if (current === undefined) {
     stage = <CircularProgress color="inherit" />
+  } else if (isMissingItem(current)) {
+    stage = (
+      <Typography sx={{ color: 'grey.400' }}>The file for this photo is missing on disk.</Typography>
+    )
   } else if (src === null) {
     stage = (
       <Typography sx={{ color: 'grey.400' }}>This photo hasn't been processed yet.</Typography>
