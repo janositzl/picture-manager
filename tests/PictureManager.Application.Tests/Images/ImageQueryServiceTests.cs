@@ -31,7 +31,7 @@ public class ImageQueryServiceTests
 
     private static ImageRow Row(int id, string hash = "H", string name = "img") =>
         new(id, 7, name, ".jpg", 10, 20, null, false, hash,
-            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(-id), name.ToLowerInvariant());
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(-id), name.ToLowerInvariant(), "nas", "");
 
     private void StubRows(IReadOnlyList<ImageRow> rows) =>
         _images.ListAsync(Arg.Any<ImageListFilter>(), Arg.Any<ImageSort>(), Arg.Any<SortDirection>(),
@@ -203,5 +203,19 @@ public class ImageQueryServiceTests
 
         (await CreateService().SetFavoriteAsync(9, false)).IsSuccess.Should().BeTrue();
         await _images.Received(1).SetFavoriteAsync(9, false, _clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListAsync_ItemsCarryFolderPath_RootNameAloneForTheTopFolder()
+    {
+        StubRows(new[]
+        {
+            Row(1) with { RootName = "nas", RelativePath = "" },
+            Row(2) with { RootName = "nas", RelativePath = "Holidays/Madeira" }
+        });
+
+        var items = (await CreateService().ListAsync(new ImageListRequest())).Value!.Items;
+
+        items.Select(i => i.FolderPath).Should().Equal("nas", "nas/Holidays/Madeira");
     }
 }

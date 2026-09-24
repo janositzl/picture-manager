@@ -20,7 +20,7 @@ public sealed record ImageListFilter(int? FolderId, string? FolderName, string? 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);
 
-/// <summary>Slim list row projected in SQL (never loads RawMetadata).</summary>
+/// <summary>Slim list row projected in SQL (never loads RawMetadata). RootName/RelativePath build FolderPath.</summary>
 public sealed record ImageRow(
     int Id,
     int FolderId,
@@ -32,7 +32,9 @@ public sealed record ImageRow(
     bool IsFavorite,
     string ContentHash,
     DateTime SortDate,
-    string SortName);
+    string SortName,
+    string RootName,
+    string RelativePath);
 
 public sealed record ImageDetailRow(
     ImageRow Image,

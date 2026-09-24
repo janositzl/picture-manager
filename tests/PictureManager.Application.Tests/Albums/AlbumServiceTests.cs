@@ -41,7 +41,7 @@ public class AlbumServiceTests
     private AlbumService CreateService() => new(_albums, _images, _folders, _currentUser, _clock);
 
     private static ImageRow Row(int id, string hash = "H") =>
-        new(id, 3, $"img{id}", ".jpg", null, null, null, false, hash, DateTime.UtcNow, $"img{id}");
+        new(id, 3, $"img{id}", ".jpg", null, null, null, false, hash, DateTime.UtcNow, $"img{id}", "nas", "");
 
     [Theory]
     [InlineData(null)]

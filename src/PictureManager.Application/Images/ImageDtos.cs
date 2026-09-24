@@ -16,11 +16,13 @@ public sealed record ImageListItem(
     DateTime? DateTaken,
     bool IsFavorite,
     string? ThumbnailUrl,
-    string? PreviewUrl)
+    string? PreviewUrl,
+    string FolderPath)
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
-        ImageUrls.Thumbnail(row.Id, row.ContentHash), ImageUrls.Preview(row.Id, row.ContentHash));
+        ImageUrls.Thumbnail(row.Id, row.ContentHash), ImageUrls.Preview(row.Id, row.ContentHash),
+        FolderDisplayPath.For(row.RootName, row.RelativePath));
 }
 
 public sealed record ImageDetail(

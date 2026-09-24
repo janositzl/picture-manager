@@ -20,7 +20,7 @@ public class DuplicateServiceTests
     private DuplicateService CreateService() => new(_images);
 
     private static DuplicateMemberRow Member(int id, string hash, string name, string relativePath) =>
-        new(new ImageRow(id, 1, name, ".jpg", null, null, null, false, hash, DateTime.UtcNow, name.ToLowerInvariant()), "nas", relativePath);
+        new(new ImageRow(id, 1, name, ".jpg", null, null, null, false, hash, DateTime.UtcNow, name.ToLowerInvariant(), "nas", relativePath), "nas", relativePath);
 
     [Theory]
     [InlineData(0)]

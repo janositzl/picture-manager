@@ -320,4 +320,24 @@ public class ImageQueryRepositoryTests
 
         albums.Should().Equal(new AlbumRef(beach.Id, "beach"), new AlbumRef(zoo.Id, "Zoo"));
     }
+
+    [Fact]
+    public async Task ListAsync_RowsCarryRootNameAndRelativePath()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("nas");
+        var top = TestData.Folder(root, "");
+        var madeira = TestData.Folder(root, "Holidays/Madeira", top);
+        var atTop = TestData.Image(top, "a");
+        var nested = TestData.Image(madeira, "b");
+        db.Context.Images.AddRange(atTop, nested);
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50);
+
+        rows.Select(r => (r.Id, r.RootName, r.RelativePath)).Should().Equal(
+            (atTop.Id, "nas", ""),
+            (nested.Id, "nas", "Holidays/Madeira"));
+    }
 }
