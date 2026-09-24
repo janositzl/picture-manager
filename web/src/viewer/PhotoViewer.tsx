@@ -87,7 +87,7 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
       show(next.id)
     } else if (inList && list.hasNextPage) {
       pendingNext.current = true
-      void list.fetchNextPage({ cancelRefetch: false })
+      void list.fetchNextPage()
     }
   }
 
