@@ -87,24 +87,27 @@ export function PhotoTile({ item, size, caption, dimmed, onOpen, onToggleFavorit
       >
         {item.isFavorite ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
       </IconButton>
-      {caption !== null && (
-        <Typography
-          variant="caption"
-          noWrap
-          sx={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            px: 1,
-            py: 0.25,
-            color: 'common.white',
-            bgcolor: 'rgba(0,0,0,0.5)',
-          }}
-        >
-          {caption}
+      <Box
+        sx={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          px: 1,
+          py: 0.25,
+          color: 'common.white',
+          bgcolor: 'rgba(0,0,0,0.5)',
+        }}
+      >
+        <Typography variant="caption" noWrap component="div">
+          {name}
         </Typography>
-      )}
+        {caption !== null && (
+          <Typography variant="caption" noWrap component="div" sx={{ opacity: 0.8 }}>
+            {caption}
+          </Typography>
+        )}
+      </Box>
     </Box>
   )
 }

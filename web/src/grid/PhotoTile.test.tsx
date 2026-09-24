@@ -36,6 +36,20 @@ describe('PhotoTile', () => {
     expect(screen.getByText('Thumbnail unavailable')).toBeInTheDocument()
   })
 
+  it('shows the file name on the tile, even without a caption', () => {
+    render(
+      <PhotoTile
+        item={image(7, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    expect(screen.getByText('IMG_0007.jpg')).toBeInTheDocument()
+  })
+
   it('shows the caption and opens on Enter', async () => {
     const onOpen = vi.fn()
     render(

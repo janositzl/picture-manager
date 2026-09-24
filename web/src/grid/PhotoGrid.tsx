@@ -14,6 +14,8 @@ type Props = {
 
 /** Rows within this many of the end of the loaded items trigger the next page. */
 const PREFETCH_ROWS = 2
+/** Breathing room on the right and bottom edges of the grid. */
+const GRID_PADDING = 8
 
 export function PhotoGrid({
   items,
@@ -28,8 +30,10 @@ export function PhotoGrid({
   const attach = useCallback((element: HTMLDivElement | null) => {
     setScrollElement(element)
     if (element === null) return
-    setWidth(element.clientWidth)
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth))
+    // clientWidth includes the padding but not the (always reserved) scrollbar gutter.
+    const measure = () => setWidth(Math.max(0, element.clientWidth - GRID_PADDING))
+    measure()
+    const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
@@ -59,7 +63,13 @@ export function PhotoGrid({
   }, [hasNextPage, isFetchingNextPage, lastVisibleRow, rowCount, fetchNextPage])
 
   return (
-    <div ref={attach} className="min-h-0 flex-1 overflow-y-auto" data-testid="photo-grid">
+    <div
+      ref={attach}
+      className="min-h-0 flex-1 overflow-y-auto"
+      data-testid="photo-grid"
+      // A stable gutter stops the scrollbar appearing/disappearing from resizing the tiles in a loop.
+      style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}
+    >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {width > 0 &&
           virtualRows.map((row) => (

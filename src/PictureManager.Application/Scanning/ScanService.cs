@@ -25,6 +25,7 @@ public sealed class ScanService : IScanService
     private readonly IEnrichmentQueue _enrichmentQueue;
     private readonly IScanQueue _scanQueue;
     private readonly IClock _clock;
+    private readonly ScanningOptions _scanningOptions;
 
     public ScanService(
         IImageRootRepository imageRootRepository,
@@ -34,7 +35,8 @@ public sealed class ScanService : IScanService
         IScanJobRepository scanJobRepository,
         IEnrichmentQueue enrichmentQueue,
         IScanQueue scanQueue,
-        IClock clock)
+        IClock clock,
+        ScanningOptions scanningOptions)
     {
         _imageRootRepository = imageRootRepository;
         _folderRepository = folderRepository;
@@ -44,6 +46,7 @@ public sealed class ScanService : IScanService
         _enrichmentQueue = enrichmentQueue;
         _scanQueue = scanQueue;
         _clock = clock;
+        _scanningOptions = scanningOptions;
     }
 
     public async Task<int> QueueScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default)
@@ -82,7 +85,7 @@ public sealed class ScanService : IScanService
                 : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
 
             var settings = await _appSettingsRepository.GetAsync(cancellationToken);
-            var excludeRules = new ScanExcludeRules(settings);
+            var excludeRules = new ScanExcludeRules(settings, _scanningOptions.SupportedExtensions);
             var unavailableRoots = new List<string>();
 
             foreach (var root in roots)

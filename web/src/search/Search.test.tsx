@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { holidaysImages, madeiraImages } from '../test/fixtures'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
@@ -35,17 +36,27 @@ describe('Search', () => {
     expect(await screen.findByRole('button', { name: 'IMG_0001 copy.jpg' })).toBeInTheDocument()
   })
 
-  it('shows a prompt and sends no request for an empty query', async () => {
-    let requests = 0
+  it('lists every photo when the query is empty, without a file-name filter', async () => {
+    const sentFileName: boolean[] = []
     server.use(
-      http.get('/api/images', () => {
-        requests++
-        return HttpResponse.json({ items: [], nextCursor: null })
+      http.get('/api/images', ({ request }) => {
+        sentFileName.push(new URL(request.url).searchParams.has('fileName'))
+        return HttpResponse.json({ items: [...holidaysImages, ...madeiraImages], nextCursor: null })
       }),
     )
     renderApp('/search')
-    expect(await screen.findByText('Type a file name to search.')).toBeInTheDocument()
-    expect(requests).toBe(0)
+    expect(await screen.findByRole('heading', { name: 'All photos' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'screenshot.png' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'IMG_0003.jpg' })).toBeInTheDocument()
+    expect(sentFileName).toEqual([false])
+  })
+
+  it('clearing the search box shows every photo again', async () => {
+    const { user } = renderApp('/search?q=IMG_0001')
+    await screen.findByRole('heading', { name: 'Search: IMG_0001' })
+    await user.clear(await searchBox())
+    expect(await screen.findByRole('heading', { name: 'All photos' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'screenshot.png' })).toBeInTheDocument()
   })
 
   it('says when nothing matches', async () => {

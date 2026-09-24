@@ -10,8 +10,7 @@ export function SearchView() {
   const { sort, order } = parseGridParams(searchParams)
   const { q, in: scopeId } = parseSearchState(searchParams)
 
-  if (q === '') return <EmptyMessage>Type a file name to search.</EmptyMessage>
-
+  // An empty query lists every photo (within the scope, if set) rather than a prompt.
   const filter: ImageFilter =
     scopeId === null
       ? { kind: 'search', q, sort, order }
@@ -20,9 +19,13 @@ export function SearchView() {
   return (
     <ImageBrowser
       filter={filter}
-      header={<GridHeader title={`Search: ${q}`} sort={sort} order={order} />}
+      header={
+        <GridHeader title={q === '' ? 'All photos' : `Search: ${q}`} sort={sort} order={order} />
+      }
       captionFor={(item) => item.folderPath}
-      emptyState={<EmptyMessage>No photos match “{q}”.</EmptyMessage>}
+      emptyState={
+        <EmptyMessage>{q === '' ? 'No photos yet.' : `No photos match “${q}”.`}</EmptyMessage>
+      }
     />
   )
 }

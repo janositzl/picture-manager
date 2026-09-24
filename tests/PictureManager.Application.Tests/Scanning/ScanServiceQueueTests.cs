@@ -41,7 +41,7 @@ public sealed class ScanServiceQueueTests : IDisposable
     public void Dispose() => _tempRoot.Delete(recursive: true);
 
     private ScanService CreateService() =>
-        new(_roots, _folders, _images, _settings, _jobs, Substitute.For<IEnrichmentQueue>(), _scanQueue, _clock);
+        new(_roots, _folders, _images, _settings, _jobs, Substitute.For<IEnrichmentQueue>(), _scanQueue, _clock, new ScanningOptions());
 
     [Fact]
     public async Task QueueScanAsync_CreatesEnumeratingJob_EnqueuesIt_AndDoesNotWalk()

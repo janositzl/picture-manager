@@ -16,6 +16,68 @@ namespace PictureManager.Application.Tests.Scanning;
 public class ScanServiceTests
 {
     [Fact]
+    public async Task ScanNowAsync_WithSupportedExtensions_SkipsNonImageFiles_AndPrunesIndexedOnes()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, "photo.jpg"), new byte[] { 1, 2, 3 });
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, ".gitkeep"), Array.Empty<byte>());
+
+            var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
+            var rootFolder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
+            var indexedGitkeep = new Image { Id = 7, FolderId = 10, FileName = string.Empty, Extension = ".gitkeep" };
+
+            var imageRootRepository = Substitute.For<IImageRootRepository>();
+            imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+            var folderRepository = Substitute.For<IFolderRepository>();
+            folderRepository.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>()).Returns(rootFolder);
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByFolderAndFileNameAsync(10, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns((Image?)null);
+            imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image> { indexedGitkeep });
+            imageRepository.AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var image = callInfo.Arg<Image>();
+                image.Id = 100;
+                return image;
+            });
+
+            var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+
+            var scanJobRepository = Substitute.For<IScanJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var job = callInfo.Arg<ScanJob>();
+                job.Id = 999;
+                return job;
+            });
+
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var scanService = new ScanService(
+                imageRootRepository, folderRepository, imageRepository,
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock,
+                new ScanningOptions { SupportedExtensions = new List<string> { ".jpg" } });
+
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
+
+            await imageRepository.Received(1).AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>());
+            await imageRepository.Received(1).AddAsync(Arg.Is<Image>(i => i.Extension == ".jpg"), Arg.Any<CancellationToken>());
+            await imageRepository.Received(1).DeleteAsync(indexedGitkeep, Arg.Any<CancellationToken>());
+            await scanJobRepository.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 1, Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StartScanAsync_NewFileInRoot_CreatesPendingImage_AndEnqueuesForEnrichment()
     {
         var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
@@ -64,7 +126,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             var scanJobId = await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -121,7 +183,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -208,7 +270,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -300,7 +362,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -364,7 +426,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: false);
 
@@ -434,7 +496,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -502,7 +564,7 @@ public class ScanServiceTests
 
             var scanService = new ScanService(
                 imageRootRepository, folderRepository, imageRepository,
-                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock);
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
             await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -541,7 +603,7 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
         var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -577,7 +639,7 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             imageRootRepository, Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock);
+            appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock, new ScanningOptions());
 
         var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 
@@ -596,7 +658,7 @@ public class ScanServiceTests
 
         var scanService = new ScanService(
             Substitute.For<IImageRootRepository>(), Substitute.For<IFolderRepository>(), Substitute.For<IImageRepository>(),
-            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), Substitute.For<IClock>());
+            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), Substitute.For<IClock>(), new ScanningOptions());
 
         var act = () => scanService.ScanNowAsync(rootId: 1, isRecursive: true);
 

@@ -57,7 +57,8 @@ public sealed class ScanServicePhase5Tests : IDisposable
 
     public void Dispose() => _tempRoot.Delete(recursive: true);
 
-    private ScanService CreateService() => new(_roots, _folders, _images, _settings, _jobs, _queue, Substitute.For<IScanQueue>(), _clock);
+    private ScanService CreateService() =>
+        new(_roots, _folders, _images, _settings, _jobs, _queue, Substitute.For<IScanQueue>(), _clock, new ScanningOptions());
 
     [Fact]
     public async Task StartScanAsync_ExplicitInactiveRoot_Throws_AndCreatesNoJob()

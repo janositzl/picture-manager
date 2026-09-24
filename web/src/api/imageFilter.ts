@@ -20,7 +20,7 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
       params.set('favoritesOnly', 'true')
       break
     case 'search':
-      params.set('fileName', filter.q)
+      if (filter.q !== '') params.set('fileName', filter.q)
       if (filter.in !== undefined) params.set('folderId', String(filter.in))
       break
   }
