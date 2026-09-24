@@ -169,14 +169,15 @@ the loaded items.
 
 ### Folder tree (`FolderTree`, `FolderTreeNode`)
 
-- Built from MUI `List` + `Collapse`. `@mui/x-tree-view` is not used, because its lazy loading of children
-  is a paid feature.
+- Built from MUI `List`, with a node's children rendered only while it is expanded. `@mui/x-tree-view` is not
+  used, because its lazy loading of children is a paid feature.
 - A node fetches its children on first expand, and shows a small spinner while they load.
 - The expand arrow appears only when `hasChildren` is true.
 - A missing node (`isMissing`) shows a ⚠ badge and muted text. There are no actions on it in 6a.
 - The selected folder is highlighted.
-- **Deep links.** On `/folders/:id`, every ancestor in the folder's breadcrumb is expanded, and the selected
-  node is scrolled into view.
+- **Deep links.** On `/folders/:id`, the whole breadcrumb is expanded: every ancestor and the selected folder
+  itself, so its subfolders show. An explicit expand or collapse by the user wins. The selected node is
+  scrolled into view.
 
 ### Photo grid (`PhotoGrid`, `PhotoTile`)
 
