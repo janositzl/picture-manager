@@ -1,5 +1,6 @@
 import { AppBar, Box, Button, Toolbar, Typography } from '@mui/material'
 import { NavLink, Outlet } from 'react-router'
+import { SearchBox } from '../search/SearchBox'
 import { FolderTree } from '../tree/FolderTree'
 
 export function AppShell() {
@@ -10,7 +11,9 @@ export function AppShell() {
           <Typography variant="h6" component="div" sx={{ flexShrink: 0 }}>
             PictureManager
           </Typography>
-          <Box sx={{ flex: 1 }} />
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <SearchBox />
+          </Box>
           <Button color="inherit" component={NavLink} to="/">
             Folders
           </Button>

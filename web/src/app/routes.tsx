@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from 'react-router'
 import { FavoritesView } from '../views/FavoritesView'
 import { FolderView } from '../views/FolderView'
 import { RootRedirect } from '../views/RootRedirect'
+import { SearchView } from '../views/SearchView'
 import { AppShell } from './AppShell'
 
 export const appRoutes: RouteObject[] = [
@@ -12,6 +13,7 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <RootRedirect /> },
       { path: 'folders/:folderId', element: <FolderView /> },
       { path: 'favorites', element: <FavoritesView /> },
+      { path: 'search', element: <SearchView /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
