@@ -21,7 +21,8 @@ public sealed record AlbumImageItem(
     bool IsFavorite,
     string? ThumbnailUrl,
     string? PreviewUrl,
-    bool IsMissing)
+    bool IsMissing,
+    string FolderPath)
 {
     public static AlbumImageItem From(AlbumImageRow row)
     {
@@ -31,7 +32,8 @@ public sealed record AlbumImageItem(
             image.IsFavorite,
             row.IsMissing ? null : ImageUrls.Thumbnail(image.Id, image.ContentHash),
             row.IsMissing ? null : ImageUrls.Preview(image.Id, image.ContentHash),
-            row.IsMissing);
+            row.IsMissing,
+            FolderDisplayPath.For(image.RootName, image.RelativePath));
     }
 }
 

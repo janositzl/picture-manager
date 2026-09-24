@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PictureManager.Application.Albums;
+using PictureManager.Application.Images;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Model;
 using PictureManager.Tests.Support;
@@ -97,6 +98,22 @@ public class AlbumQueryRepositoryTests
         first.Select(r => r.Image.Id).Should().Equal(c.Id, a.Id);
         first.Should().OnlyContain(r => !r.IsMissing);
         second.Should().ContainSingle().Which.Should().Match<AlbumImageRow>(r => r.Image.Id == b.Id && r.IsMissing);
+    }
+
+    [Fact]
+    public async Task ListImagesAsync_RowsCarryRootNameAndRelativePath()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("nas"), "Holidays/Madeira");
+        var image = TestData.Image(folder, "a");
+        var album = TestData.Album("A");
+        db.Context.AlbumImages.Add(TestData.AlbumImage(album, image, 0));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, null, null, 10);
+
+        rows.Should().ContainSingle().Which.Image.Should().Match<ImageRow>(r => r.RootName == "nas" && r.RelativePath == "Holidays/Madeira");
     }
 
     [Fact]

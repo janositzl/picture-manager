@@ -144,6 +144,21 @@ public class AlbumServiceTests
     }
 
     [Fact]
+    public async Task ListImagesAsync_ItemsCarryFolderPath_RootNameAloneForTheTopFolder()
+    {
+        var nested = new ImageRow(4, 3, "img4", ".jpg", null, null, null, false, "H", DateTime.UtcNow, "img4", "nas", "Holidays/Madeira");
+        _albums.ListImagesAsync(7, null, null, 101, Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new AlbumImageRow(Row(1), 0, false),
+            new AlbumImageRow(nested, 1, false)
+        });
+
+        var page = (await CreateService().ListImagesAsync(7, null, null)).Value!;
+
+        page.Items.Select(i => i.FolderPath).Should().Equal("nas", "nas/Holidays/Madeira");
+    }
+
+    [Fact]
     public async Task ListImagesAsync_BadCursor_ReturnsInvalid()
     {
         (await CreateService().ListImagesAsync(7, "garbage!!", null)).Errors!.Keys.Should().Contain("cursor");
