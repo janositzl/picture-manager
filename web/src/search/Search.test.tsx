@@ -51,6 +51,14 @@ describe('Search', () => {
     expect(sentFileName).toEqual([false])
   })
 
+  it('removing the scope chip with an empty query widens to every photo', async () => {
+    const { user, router } = renderApp('/search?in=3')
+    const chip = await screen.findByRole('button', { name: 'in: Madeira' })
+    await user.click(within(chip).getByTestId('CancelIcon'))
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+    expect(await screen.findByRole('button', { name: 'screenshot.png' })).toBeInTheDocument()
+  })
+
   it('clearing the search box shows every photo again', async () => {
     const { user } = renderApp('/search?q=IMG_0001')
     await screen.findByRole('heading', { name: 'Search: IMG_0001' })

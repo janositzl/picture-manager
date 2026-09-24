@@ -89,6 +89,81 @@ describe('useSetFavorite', () => {
     expect(queryClient.getQueryState(queryKeys.images(folderFilter))?.isInvalidated).toBe(false)
   })
 
+  it("a failure on one photo does not undo another photo's star", async () => {
+    server.use(
+      http.put('/api/images/:id/favorite', async ({ params }) => {
+        if (params.id !== '20') return new HttpResponse(null, { status: 204 })
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return HttpResponse.json({ title: 'boom' }, { status: 500 })
+      }),
+    )
+    const { queryClient, wrapper } = seed()
+    const { result } = renderHook(() => useSetFavorite(), { wrapper })
+
+    act(() => {
+      result.current.mutate({ id: 20, isFavorite: true })
+      result.current.mutate({ id: 22, isFavorite: true })
+    })
+
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    expect(listItem(queryClient, folderFilter, 20)?.isFavorite).toBe(false)
+    expect(listItem(queryClient, folderFilter, 22)?.isFavorite).toBe(true)
+  })
+
+  it('sends toggles in order, and an earlier failure does not override a later success', async () => {
+    const calls: string[] = []
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let puts = 0
+    server.use(
+      http.put('/api/images/:id/favorite', async () => {
+        calls.push('PUT')
+        if (++puts === 1) {
+          await gate
+          return HttpResponse.json({ title: 'boom' }, { status: 500 })
+        }
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.delete('/api/images/:id/favorite', () => {
+        calls.push('DELETE')
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const { queryClient, wrapper } = seed()
+    const { result } = renderHook(() => useSetFavorite(), { wrapper })
+
+    act(() => {
+      result.current.mutate({ id: 20, isFavorite: true })
+      result.current.mutate({ id: 20, isFavorite: false })
+      result.current.mutate({ id: 20, isFavorite: true })
+    })
+    await waitFor(() => expect(calls).toEqual(['PUT']))
+    expect(listItem(queryClient, folderFilter, 20)?.isFavorite).toBe(true)
+
+    release()
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    expect(calls).toEqual(['PUT', 'DELETE', 'PUT'])
+    expect(listItem(queryClient, folderFilter, 20)?.isFavorite).toBe(true)
+  })
+
+  it('when every toggle fails, the star returns to what the server has', async () => {
+    server.use(
+      http.put('/api/images/:id/favorite', () => HttpResponse.json({}, { status: 500 })),
+      http.delete('/api/images/:id/favorite', () => HttpResponse.json({}, { status: 500 })),
+    )
+    const { queryClient, wrapper } = seed()
+    const { result } = renderHook(() => useSetFavorite(), { wrapper })
+
+    act(() => {
+      result.current.mutate({ id: 20, isFavorite: true })
+      result.current.mutate({ id: 20, isFavorite: false })
+    })
+
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    expect(listItem(queryClient, folderFilter, 20)?.isFavorite).toBe(false)
+    expect(detail(queryClient, 20)?.isFavorite).toBe(false)
+  })
+
   it('two quick toggles end in the last state', async () => {
     const { queryClient, wrapper } = seed()
     const { result } = renderHook(() => useSetFavorite(), { wrapper })

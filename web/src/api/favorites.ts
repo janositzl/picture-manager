@@ -36,28 +36,58 @@ function isFavoritesList(queryKey: readonly unknown[]): boolean {
   return filter?.kind === 'favorites'
 }
 
+/** Per image: the latest toggle's sequence number and the last state the server confirmed. */
+type Tracker = Map<number, { latest: number; confirmed: boolean }>
+const trackers = new WeakMap<QueryClient, Tracker>()
+
+function trackerFor(queryClient: QueryClient): Tracker {
+  let tracker = trackers.get(queryClient)
+  if (tracker === undefined) {
+    tracker = new Map()
+    trackers.set(queryClient, tracker)
+  }
+  return tracker
+}
+
 export function useSetFavorite() {
   const queryClient = useQueryClient()
   const notify = useNotify()
+  const tracker = trackerFor(queryClient)
 
   return useMutation({
+    // One queue for all toggles, so a PUT and a DELETE never race each other to the server.
+    scope: { id: 'favorite' },
     mutationFn: ({ id, isFavorite }: FavoriteChange) =>
       apiFetch<void>(`/api/images/${id}/favorite`, { method: isFavorite ? 'PUT' : 'DELETE' }),
     onMutate: ({ id, isFavorite }: FavoriteChange) => {
-      const snapshot = queryClient.getQueriesData({ queryKey: ['images'] })
+      const entry = tracker.get(id)
+      // A toggle always flips the shown state, so with nothing in flight the server has !isFavorite.
+      const seq = (entry?.latest ?? 0) + 1
+      tracker.set(id, { latest: seq, confirmed: entry?.confirmed ?? !isFavorite })
       patchFavorite(queryClient, id, isFavorite)
-      return { snapshot }
+      return { seq }
     },
-    onError: (_error, _change, context) => {
-      context?.snapshot.forEach(([key, data]) => queryClient.setQueryData(key, data))
+    onError: (_error, { id }, context) => {
+      const entry = tracker.get(id)
+      // Only the newest toggle may repaint: an older failure is superseded by what came after it.
+      if (entry !== undefined && entry.latest === context?.seq) {
+        patchFavorite(queryClient, id, entry.confirmed)
+        tracker.delete(id)
+      }
       notify("Couldn't update favorite.")
     },
-    onSuccess: () =>
+    onSuccess: (_data, { id, isFavorite }, context) => {
+      const entry = tracker.get(id)
+      if (entry !== undefined) {
+        if (entry.latest === context.seq) tracker.delete(id)
+        else entry.confirmed = isFavorite
+      }
       // Stale, not refetched: an open Favorites view keeps the dimmed photo until it's left.
-      queryClient.invalidateQueries({
+      return queryClient.invalidateQueries({
         queryKey: queryKeys.imageLists(),
         predicate: (query) => isFavoritesList(query.queryKey),
         refetchType: 'none',
-      }),
+      })
+    },
   })
 }

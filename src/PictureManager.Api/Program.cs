@@ -47,9 +47,8 @@ try
     builder.Configuration.GetSection("ThumbnailCache").Bind(thumbnailCacheOptions);
     builder.Services.AddSingleton(thumbnailCacheOptions);
 
-    var scanningOptions = new ScanningOptions();
-    builder.Configuration.GetSection("Scanning").Bind(scanningOptions);
-    builder.Services.AddSingleton(scanningOptions);
+    builder.Services.AddSingleton(ScanningOptions.FromConfig(
+        builder.Configuration.GetSection("Scanning:SupportedExtensions").Get<List<string?>>()));
 
     var connectionString = builder.Configuration.GetConnectionString("PictureManagerDb")
         ?? throw new InvalidOperationException("Connection string 'PictureManagerDb' is not configured.");

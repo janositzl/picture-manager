@@ -43,7 +43,8 @@ export function SearchBox() {
 
   const changeScope = (next: number | null) => {
     setScopeId(next)
-    if (text.trim() !== '') submit(text, next)
+    // On /search an empty query still lists photos, so the scope must reach the URL too.
+    if (text.trim() !== '' || onSearchRoute) submit(text, next)
   }
 
   return (
