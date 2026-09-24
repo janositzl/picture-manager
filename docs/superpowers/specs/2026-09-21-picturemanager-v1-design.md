@@ -134,6 +134,8 @@ re-approval, per your direction to proceed continuously.
    Follow-up before phase 6 (missing folders, unavailable roots, background scans; rename/relink deferred):
    [`2026-09-24-scanner-missing-folders-design.md`](2026-09-24-scanner-missing-folders-design.md).
 6. **Frontend SPA** — folder tree + virtualized grid, viewer, favorites, albums, search bar, settings page.
+   Split into 6a Browse, 6b Organize and 6c Admin, each with its own spec. 6a:
+   [`2026-09-24-phase6a-spa-browse-design.md`](2026-09-24-phase6a-spa-browse-design.md).
 7. **Docker integration pass** — multi-stage build, full `docker compose up` smoke test end-to-end.
 8. **Playwright e2e** — browse → view → favorite → album → export flows.
 
