@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
+      // jsdom + MUI + a virtualized grid is CPU-heavy per file; too many parallel workers on a
+      // modest machine starve individual tests past their timeout (seen as flaky findBy failures).
+      poolOptions: { threads: { maxThreads: 4 } },
+      testTimeout: 10_000,
     },
   }
 })

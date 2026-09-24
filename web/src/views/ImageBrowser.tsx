@@ -1,0 +1,80 @@
+import { useMemo, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router'
+import { useSetFavorite } from '../api/favorites'
+import type { ImageFilter } from '../api/imageFilter'
+import { useImages } from '../api/queries'
+import type { ImageListItem } from '../api/types'
+import { PhotoGrid } from '../grid/PhotoGrid'
+import { PhotoTile } from '../grid/PhotoTile'
+import { withParams } from '../routing/urlState'
+import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { GridSkeleton } from './GridSkeleton'
+
+type Props = {
+  filter: ImageFilter
+  header: ReactNode
+  banner?: ReactNode
+  /** Favorites view: an unstarred photo stays, dimmed, until the view is left. */
+  dimUnfavorited?: boolean
+  captionFor?: (item: ImageListItem) => string | null
+  emptyState: ReactNode
+}
+
+/** Header, banner and virtualized grid for one image filter. */
+export function ImageBrowser({
+  filter,
+  header,
+  banner,
+  dimUnfavorited = false,
+  captionFor,
+  emptyState,
+}: Props) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const images = useImages(filter)
+  const setFavorite = useSetFavorite()
+  const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
+
+  // Opening is a push (Back closes the viewer); the state marks it as opened in-app.
+  const open = (id: number) =>
+    setSearchParams(withParams(searchParams, { image: id }), { state: { viewer: true } })
+
+  let body: ReactNode
+  if (images.isPending) {
+    body = <GridSkeleton />
+  } else if (images.isError) {
+    body = <QueryErrorAlert message="Couldn't load photos." onRetry={() => void images.refetch()} />
+  } else if (items.length === 0) {
+    body = emptyState
+  } else {
+    body = (
+      <PhotoGrid
+        // A new filter (folder, sort, query) starts a new grid at the top.
+        key={JSON.stringify(filter)}
+        items={items}
+        hasNextPage={images.hasNextPage}
+        isFetchingNextPage={images.isFetchingNextPage}
+        fetchNextPage={() => void images.fetchNextPage({ cancelRefetch: false })}
+        renderTile={(item, size) => (
+          <PhotoTile
+            item={item}
+            size={size}
+            caption={captionFor?.(item) ?? null}
+            dimmed={dimUnfavorited && !item.isFavorite}
+            onOpen={open}
+            onToggleFavorite={(tile) =>
+              setFavorite.mutate({ id: tile.id, isFavorite: !tile.isFavorite })
+            }
+          />
+        )}
+      />
+    )
+  }
+
+  return (
+    <>
+      {header}
+      {banner}
+      {body}
+    </>
+  )
+}

@@ -1,7 +1,12 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { server } from './server'
+
+// Default findBy* timeout (1000ms) is tight when several test files run in parallel on a loaded
+// machine; a query that would resolve in well under a second in isolation can be pushed past it
+// purely by CPU contention. This doesn't loosen what's asserted, only how long an async query waits.
+configure({ asyncUtilTimeout: 5000 })
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
