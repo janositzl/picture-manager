@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { resetAlbumStore } from './albumHandlers'
 import { server } from './server'
 
 // Default findBy* timeout (1000ms) is tight when several test files run in parallel on a loaded
@@ -9,6 +10,7 @@ import { server } from './server'
 configure({ asyncUtilTimeout: 5000 })
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeEach(() => resetAlbumStore())
 afterEach(() => {
   server.resetHandlers()
   cleanup()

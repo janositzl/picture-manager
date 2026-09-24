@@ -44,3 +44,15 @@ async function readProblem(response: Response): Promise<ProblemDetails | null> {
     return null
   }
 }
+
+/** Like apiFetch, for plain-text responses (album export). */
+export async function apiFetchText(path: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(new URL(path, window.location.origin), {
+    ...init,
+    headers: { Accept: 'text/plain', ...init?.headers },
+  })
+  if (!response.ok) {
+    throw new ApiError(response.status, await readProblem(response))
+  }
+  return response.text()
+}

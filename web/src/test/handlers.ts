@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { ImageListItem } from '../api/types'
+import { albumHandlers, duplicateHandlers } from './albumHandlers'
 import {
   childrenById,
   folderDetails,
@@ -38,6 +39,8 @@ export const handlers = [
   }),
   http.put('/api/images/:id/favorite', () => new HttpResponse(null, { status: 204 })),
   http.delete('/api/images/:id/favorite', () => new HttpResponse(null, { status: 204 })),
+  ...albumHandlers,
+  ...duplicateHandlers,
 ]
 
 /** Serves `pages` in order for GET /api/images, whatever the filter; cursor "p{n}" asks for page n. */

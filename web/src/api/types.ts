@@ -58,3 +58,28 @@ export type ProblemDetails = {
   detail?: string
   errors?: Record<string, string[]>
 }
+
+export type AlbumSummary = {
+  id: number
+  name: string
+  description: string | null
+  imageCount: number
+  coverThumbnailUrl: string | null
+  updatedAt: string
+}
+
+export type AlbumDetail = {
+  id: number
+  name: string
+  description: string | null
+  imageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Missing files stay listed, with null URLs. */
+export type AlbumImageItem = ImageListItem & { isMissing: boolean }
+
+export type AlbumAddResult = { added: number; skipped: number }
+
+export type DuplicateGroup = { contentHash: string; count: number; images: ImageListItem[] }

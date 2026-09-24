@@ -8,7 +8,7 @@ import { useNotify } from '../app/notify'
 import { apiFetch } from './client'
 import type { ImageFilter } from './imageFilter'
 import { queryKeys } from './queries'
-import type { ImageDetail, ImageListItem, Page } from './types'
+import type { DuplicateGroup, ImageDetail, ImageListItem, Page } from './types'
 
 type ListData = InfiniteData<Page<ImageListItem>, string | null>
 type FavoriteChange = { id: number; isFavorite: boolean }
@@ -28,6 +28,24 @@ export function patchFavorite(queryClient: QueryClient, id: number, isFavorite: 
   )
   queryClient.setQueryData<ImageDetail>(queryKeys.image(id), (detail) =>
     detail === undefined ? detail : { ...detail, isFavorite },
+  )
+  queryClient.setQueriesData<InfiniteData<Page<DuplicateGroup>, string | null>>(
+    { queryKey: queryKeys.duplicates() },
+    (data) =>
+      data === undefined
+        ? data
+        : {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              items: page.items.map((group) => ({
+                ...group,
+                images: group.images.map((item) =>
+                  item.id === id ? { ...item, isFavorite } : item,
+                ),
+              })),
+            })),
+          },
   )
 }
 

@@ -1,4 +1,10 @@
-import type { FolderDetail, FolderNode, ImageDetail, ImageListItem } from '../api/types'
+import type {
+  DuplicateGroup,
+  FolderDetail,
+  FolderNode,
+  ImageDetail,
+  ImageListItem,
+} from '../api/types'
 
 export const devRoot: FolderNode = {
   id: 1,
@@ -137,3 +143,19 @@ export function imageDetail(item: ImageListItem): ImageDetail {
     albums: [{ id: 5, name: 'Best of 2025' }],
   }
 }
+
+export const albumSeed = [
+  {
+    id: 5,
+    name: 'Best of 2025',
+    description: 'Keepers',
+    imageIds: [21, 20],
+    updatedAt: '2026-09-20T10:00:00.000Z',
+  },
+  { id: 6, name: 'Empty', description: null, imageIds: [], updatedAt: '2026-09-10T10:00:00.000Z' },
+]
+
+export const duplicateGroups: DuplicateGroup[] = [
+  { contentHash: 'H20', count: 2, images: [madeiraImages[0]!, holidaysImages[0]!] },
+  { contentHash: 'H22', count: 2, images: [madeiraImages[2]!, holidaysImages[1]!] },
+]
