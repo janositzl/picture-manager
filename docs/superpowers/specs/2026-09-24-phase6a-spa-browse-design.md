@@ -291,6 +291,17 @@ the loaded items.
 
 - Albums and duplicates (6b).
 - Settings, roots, the scan button with progress, and remove/restore of missing or removed folders (6c).
+- Live tree and grid refresh while a scan runs (6c). The scanner commits each folder row as soon as its
+  parent is listed, and each image as its folder is visited, so a refresh driven by the scan's event stream
+  shows the tree filling in. In 6a, new folders appear on the next fetch (expand or reload).
+- **Rescan a single folder** (6c). The backend part is `POST /api/scans` with a `folderId`, walking from that
+  folder instead of the root. The UI part is a "Rescan folder" action in the tree and the folder header.
+  Rules to carry into the 6c design:
+  - check the root's mount first, and fail as "root unavailable" if it is missing or empty;
+  - if the folder itself is gone from disk, mark it and its subtree missing;
+  - reject a removed (tombstoned) folder with `400`;
+  - allow a missing folder, which is how the user checks whether it's back;
+  - `isRecursive` keeps its meaning.
 - Subtree search, folder-name search, a thumbnail-size slider, selection and bulk actions.
 - Mobile and tablet layouts, i18n, and a manual theme toggle.
 - Serving the SPA from the API (phase 7) and Playwright end-to-end tests (phase 8).
