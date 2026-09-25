@@ -20,6 +20,9 @@ export function AppShell() {
           <Button color="inherit" component={NavLink} to="/favorites">
             Favorites
           </Button>
+          <Button color="inherit" component={NavLink} to="/albums">
+            Albums
+          </Button>
         </Toolbar>
       </AppBar>
       <div className="flex min-h-0 flex-1">
