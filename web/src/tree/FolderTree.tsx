@@ -4,6 +4,7 @@ import { useMatch } from 'react-router'
 import { useFolder, useRootFolders } from '../api/queries'
 import { parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { FolderJobsProvider } from './FolderJobsContext'
 import { FolderTreeNode } from './FolderTreeNode'
 
 export function FolderTree() {
@@ -33,17 +34,19 @@ export function FolderTree() {
   }
 
   return (
-    <List dense role="tree" aria-label="Folder tree">
-      {roots.data.map((node) => (
-        <FolderTreeNode
-          key={node.id}
-          node={node}
-          depth={0}
-          selectedId={selectedId}
-          isExpanded={isExpanded}
-          onToggle={toggle}
-        />
-      ))}
-    </List>
+    <FolderJobsProvider>
+      <List dense role="tree" aria-label="Folder tree">
+        {roots.data.map((node) => (
+          <FolderTreeNode
+            key={node.id}
+            node={node}
+            depth={0}
+            selectedId={selectedId}
+            isExpanded={isExpanded}
+            onToggle={toggle}
+          />
+        ))}
+      </List>
+    </FolderJobsProvider>
   )
 }

@@ -9,6 +9,7 @@ import {
   madeiraImages,
   rootFolders,
 } from './fixtures'
+import { jobHandlers } from './jobHandlers'
 
 const allImages = (): ImageListItem[] => [...holidaysImages, ...madeiraImages]
 const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { status: 404 })
@@ -41,6 +42,7 @@ export const handlers = [
   http.delete('/api/images/:id/favorite', () => new HttpResponse(null, { status: 204 })),
   ...albumHandlers,
   ...duplicateHandlers,
+  ...jobHandlers,
 ]
 
 /** Serves `pages` in order for GET /api/images, whatever the filter; cursor "p{n}" asks for page n. */

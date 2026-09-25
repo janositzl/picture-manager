@@ -83,3 +83,22 @@ export type AlbumImageItem = ImageListItem & { isMissing: boolean }
 export type AlbumAddResult = { added: number; skipped: number }
 
 export type DuplicateGroup = { contentHash: string; count: number; images: ImageListItem[] }
+
+export type JobStatus =
+  'Pending' | 'Enumerating' | 'Enriching' | 'Completed' | 'Failed' | 'Cancelled'
+
+export type DiscoveryProgress = {
+  id: number
+  status: JobStatus
+  foldersDiscovered: number
+  errorMessage: string | null
+}
+
+export type ScanProgress = {
+  id: number
+  status: JobStatus
+  foldersScanned: number
+  filesFound: number
+  filesEnriched: number
+  errorMessage: string | null
+}

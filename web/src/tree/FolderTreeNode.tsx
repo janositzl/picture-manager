@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router'
 import { useFolderChildren } from '../api/queries'
 import type { FolderNode } from '../api/types'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { FolderActionsMenu } from './FolderActionsMenu'
 
 type Props = {
   node: FolderNode
@@ -60,6 +61,7 @@ export function FolderTreeNode({ node, depth, selectedId, isExpanded, onToggle }
           }}
         />
         {expanded && children.isFetching && <CircularProgress size={14} />}
+        <FolderActionsMenu folderId={node.id} folderName={node.name} />
       </ListItemButton>
       {expanded && children.isError && (
         <QueryErrorAlert
