@@ -1,5 +1,7 @@
 export const MIN_TILE_WIDTH = 180
 export const TILE_GAP = 4
+/** Breathing room on the right and bottom edges of a grid. */
+export const GRID_PADDING = 8
 
 export function columnCount(width: number): number {
   return Math.max(1, Math.floor(width / MIN_TILE_WIDTH))

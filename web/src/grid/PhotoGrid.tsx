@@ -2,7 +2,7 @@ import { LinearProgress } from '@mui/material'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ImageListItem } from '../api/types'
-import { columnCount, TILE_GAP, tileSize } from './columns'
+import { columnCount, GRID_PADDING, TILE_GAP, tileSize } from './columns'
 
 type Props = {
   items: ImageListItem[]
@@ -14,8 +14,6 @@ type Props = {
 
 /** Rows within this many of the end of the loaded items trigger the next page. */
 const PREFETCH_ROWS = 2
-/** Breathing room on the right and bottom edges of the grid. */
-const GRID_PADDING = 8
 
 export function PhotoGrid({
   items,
