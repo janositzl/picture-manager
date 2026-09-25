@@ -20,7 +20,7 @@ public static class ScanEndpoints
     {
         try
         {
-            var scanJobId = await scanService.QueueScanAsync(request.RootId, request.IsRecursive, cancellationToken);
+            var scanJobId = await scanService.QueueScanAsync(request.RootId, null, request.IsRecursive, cancellationToken);
             return Results.Ok(new ScanStartedResponse(scanJobId));
         }
         catch (ScanAlreadyInProgressException ex)

@@ -23,9 +23,9 @@ public class ScanBackgroundServiceTests
         var queue = new ChannelScanQueue();
         var scanService = Substitute.For<IScanService>();
         var secondRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        scanService.RunScanAsync(new QueuedScan(1, null, true), Arg.Any<CancellationToken>())
+        scanService.RunScanAsync(new QueuedScan(1, null, null, true), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException("boom")));
-        scanService.RunScanAsync(new QueuedScan(2, null, true), Arg.Any<CancellationToken>())
+        scanService.RunScanAsync(new QueuedScan(2, null, null, true), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 secondRan.SetResult();
@@ -40,13 +40,13 @@ public class ScanBackgroundServiceTests
             clock, NullLogger<ScanBackgroundService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        queue.Enqueue(new QueuedScan(1, null, true));
-        queue.Enqueue(new QueuedScan(2, null, true));
+        queue.Enqueue(new QueuedScan(1, null, null, true));
+        queue.Enqueue(new QueuedScan(2, null, null, true));
 
         await secondRan.Task.WaitAsync(WaitTimeout);
         await service.StopAsync(CancellationToken.None);
 
-        await scanService.Received(1).RunScanAsync(new QueuedScan(1, null, true), Arg.Any<CancellationToken>());
+        await scanService.Received(1).RunScanAsync(new QueuedScan(1, null, null, true), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class ScanBackgroundServiceTests
         // RunScanAsync throws, and the first retry to mark the job Failed throws too before the second succeeds.
         var queue = new ChannelScanQueue();
         var scanService = Substitute.For<IScanService>();
-        scanService.RunScanAsync(new QueuedScan(5, null, true), Arg.Any<CancellationToken>())
+        scanService.RunScanAsync(new QueuedScan(5, null, null, true), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException("boom")));
 
         var jobs = Substitute.For<IJobRepository>();
@@ -78,7 +78,7 @@ public class ScanBackgroundServiceTests
             clock, NullLogger<ScanBackgroundService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        queue.Enqueue(new QueuedScan(5, null, true));
+        queue.Enqueue(new QueuedScan(5, null, null, true));
 
         await marked.Task.WaitAsync(WaitTimeout);
         await service.StopAsync(CancellationToken.None);
@@ -87,14 +87,40 @@ public class ScanBackgroundServiceTests
     }
 
     [Fact]
+    public async Task ScanBackgroundService_ExpectedTargetFailure_DoesNotRetryMarkingTheJobFailed()
+    {
+        var queue = new ChannelScanQueue();
+        var scanService = Substitute.For<IScanService>();
+        var ran = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        scanService.RunScanAsync(new QueuedScan(8, null, 20, true), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                ran.SetResult();
+                return Task.FromException(new FolderNotOnDiskException("dev", "Trips"));
+            });
+
+        var jobs = Substitute.For<IJobRepository>();
+        var provider = new ServiceCollection().AddScoped(_ => scanService).AddScoped(_ => jobs).BuildServiceProvider();
+        var service = new ScanBackgroundService(queue, provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<IClock>(), NullLogger<ScanBackgroundService>.Instance);
+
+        await service.StartAsync(CancellationToken.None);
+        queue.Enqueue(new QueuedScan(8, null, 20, true));
+        await ran.Task.WaitAsync(WaitTimeout);
+        await service.StopAsync(CancellationToken.None);
+
+        await jobs.DidNotReceive().FailActiveJobsAsync(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ChannelScanQueue_Enqueue_ThenReadAllAsync_YieldsTheScan()
     {
         var queue = new ChannelScanQueue();
-        queue.Enqueue(new QueuedScan(7, 1, false));
+        queue.Enqueue(new QueuedScan(7, 1, null, false));
 
         await foreach (var scan in queue.ReadAllAsync())
         {
-            scan.Should().Be(new QueuedScan(7, 1, false));
+            scan.Should().Be(new QueuedScan(7, 1, null, false));
             break;
         }
     }

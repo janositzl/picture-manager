@@ -11,4 +11,9 @@ public static class ImagePathResolver
             ? Path.Combine(mountPath, fullFileName)
             : Path.Combine(mountPath, relativeFolderPath.Replace('/', Path.DirectorySeparatorChar), fullFileName);
     }
+
+    public static string ResolveFolderPath(string mountPath, string relativeFolderPath) =>
+        string.IsNullOrEmpty(relativeFolderPath)
+            ? mountPath
+            : Path.Combine(mountPath, relativeFolderPath.Replace('/', Path.DirectorySeparatorChar));
 }

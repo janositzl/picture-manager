@@ -39,14 +39,11 @@ public sealed class ScanBackgroundService : BackgroundService
                 var scanService = scope.ServiceProvider.GetRequiredService<IScanService>();
                 await scanService.RunScanAsync(scan, stoppingToken);
             }
-            catch (ScanRootsUnavailableException ex)
+            catch (Exception ex) when (ex is ScanRootsUnavailableException or ScanRootUnavailableException
+                                            or FolderUnavailableException or FolderNotOnDiskException)
             {
-                // Expected when a share isn't mounted; the job already carries the message for the UI.
-                _logger.LogWarning("Scan {ScanJobId} failed: {Message}", scan.ScanJobId, ex.Message);
-            }
-            catch (ScanRootUnavailableException ex)
-            {
-                // Expected when the explicit root was deactivated or deleted while the scan waited in the queue.
+                // Expected (share not mounted, root or folder removed while queued, folder gone from disk): the job
+                // already carries the message for the UI.
                 _logger.LogWarning("Scan {ScanJobId} failed: {Message}", scan.ScanJobId, ex.Message);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

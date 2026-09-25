@@ -20,4 +20,17 @@ public class ImagePathResolverTests
         var result = ImagePathResolver.ResolvePhysicalPath("/images", "Vacation/Madeira", "IMG001", ".jpg");
         result.Should().Be(Path.Combine("/images", "Vacation", "Madeira", "IMG001.jpg"));
     }
+
+    [Fact]
+    public void ResolveFolderPath_TopFolder_IsTheMountPath()
+    {
+        ImagePathResolver.ResolveFolderPath("/mnt/dev", "").Should().Be("/mnt/dev");
+    }
+
+    [Fact]
+    public void ResolveFolderPath_Subfolder_UsesTheOsSeparator()
+    {
+        ImagePathResolver.ResolveFolderPath("/mnt/dev", "Trips/Madeira")
+            .Should().Be(Path.Combine("/mnt/dev", "Trips", "Madeira"));
+    }
 }

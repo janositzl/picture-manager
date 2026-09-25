@@ -146,7 +146,8 @@ public sealed class ScanServicePhase5Tests : IDisposable
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("dev");
         await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
-        await _folders.DidNotReceive().GetByRootAndRelativePathAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        // GetByRootAndRelativePathAsync IS called once now, at queue time, to resolve the job's FolderId
+        // bookkeeping -- that happens before mount availability is even checked. The walk itself never runs.
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _images.DidNotReceive().GetByFolderIdAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
@@ -159,7 +160,8 @@ public sealed class ScanServicePhase5Tests : IDisposable
 
         await act.Should().ThrowAsync<ScanRootsUnavailableException>();
         await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
-        await _folders.DidNotReceive().GetByRootAndRelativePathAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        // GetByRootAndRelativePathAsync IS called once now, at queue time, to resolve the job's FolderId
+        // bookkeeping -- that happens before mount availability is even checked. The walk itself never runs.
         await _images.DidNotReceive().GetByFolderIdAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 

@@ -6,11 +6,12 @@ namespace PictureManager.Application.Scanning;
 public interface IScanService
 {
     /// <summary>
-    /// Validates the request, creates the job (Enumerating, so a second scan is refused while this one waits) and
-    /// queues the walk. Returns the job id at once. Throws ScanAlreadyInProgressException or
-    /// ScanRootUnavailableException.
+    /// Validates the request, creates the job (Enumerating, so any other job is refused while this one waits) and
+    /// queues the walk. Returns the job id at once. folderId set = scan that folder; otherwise rootId (one root)
+    /// or neither (all active roots). Throws ScanAlreadyInProgressException, ScanRootUnavailableException or
+    /// FolderUnavailableException.
     /// </summary>
-    Task<int> QueueScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default);
+    Task<int> QueueScanAsync(int? rootId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Walks a queued scan and records the outcome on its job (Enriching/Completed, Failed with a message, or

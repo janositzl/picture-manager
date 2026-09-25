@@ -12,7 +12,6 @@ namespace PictureManager.Application.Scanning;
 
 public sealed class ScanService : IScanService
 {
-    private const int MaxScanDepth = 50;
     private const int MaxErrorMessageLength = 4000;
     private const int ProgressInterval = 50;
     private const string InterruptedMessage = "Interrupted by an application restart.";
@@ -49,24 +48,42 @@ public sealed class ScanService : IScanService
         _scanningOptions = scanningOptions;
     }
 
-    public async Task<int> QueueScanAsync(int? rootId, bool isRecursive, CancellationToken cancellationToken = default)
+    public async Task<int> QueueScanAsync(int? rootId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
     {
         if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
             throw new ScanAlreadyInProgressException();
 
-        if (rootId.HasValue)
+        int? jobFolderId = null;
+        if (folderId.HasValue)
+        {
+            var (_, folder) = await ScanTargets.GetVisibleFolderAsync(_folderRepository, _imageRootRepository, folderId.Value, cancellationToken);
+
+            // The walk couldn't reach it; scanning or discovering its parent is what notices it's back.
+            if (folder.MissingSinceUtc is not null)
+                throw FolderUnavailableException.Missing(folderId.Value);
+
+            jobFolderId = folder.Id;
+        }
+        else if (rootId.HasValue)
+        {
             await GetActiveRootAsync(rootId.Value, cancellationToken);
 
-        // Created as Enumerating (not Pending) so HasActiveJobAsync refuses a second scan while this one waits
+            // Every root has a top folder (ImageRootSeeder); it's the job's recorded scope.
+            jobFolderId = (await _folderRepository.GetByRootAndRelativePathAsync(rootId.Value, string.Empty, cancellationToken))?.Id;
+        }
+
+        // Created as Enumerating (not Pending) so HasActiveJobAsync refuses any other job while this one waits
         // in the queue.
         var scanJob = await _scanJobRepository.AddAsync(new Job
         {
+            Kind = JobKind.Scan,
+            FolderId = jobFolderId,
             IsRecursive = isRecursive,
             Status = JobStatus.Enumerating,
             StartedUtc = _clock.UtcNow
         }, cancellationToken);
 
-        _scanQueue.Enqueue(new QueuedScan(scanJob.Id, rootId, isRecursive));
+        _scanQueue.Enqueue(new QueuedScan(scanJob.Id, folderId.HasValue ? null : rootId, folderId, isRecursive));
         return scanJob.Id;
     }
 
@@ -79,33 +96,40 @@ public sealed class ScanService : IScanService
 
         try
         {
-            // Resolved again here: an explicit root can be deactivated or deleted while the scan waits in the queue.
-            var roots = scan.RootId.HasValue
-                ? new[] { await GetActiveRootAsync(scan.RootId.Value, cancellationToken) }
-                : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
-
-            var settings = await _appSettingsRepository.GetAsync(cancellationToken);
-            var excludeRules = new ScanExcludeRules(settings, _scanningOptions.SupportedExtensions);
-            var unavailableRoots = new List<string>();
-
-            foreach (var root in roots)
+            if (scan.FolderId.HasValue)
             {
-                // A missing or empty mount folder is a mount problem, not a deletion: change nothing under it.
-                if (!IsRootAvailable(root.MountPath))
+                (foldersScanned, filesFound) = await ScanFolderTargetAsync(scan.FolderId.Value, scan, cancellationToken);
+            }
+            else
+            {
+                // Resolved again here: an explicit root can be deactivated or deleted while the scan waits in the queue.
+                var roots = scan.RootId.HasValue
+                    ? new[] { await GetActiveRootAsync(scan.RootId.Value, cancellationToken) }
+                    : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
+
+                var settings = await _appSettingsRepository.GetAsync(cancellationToken);
+                var excludeRules = new ScanExcludeRules(settings, _scanningOptions.SupportedExtensions);
+                var unavailableRoots = new List<string>();
+
+                foreach (var root in roots)
                 {
-                    unavailableRoots.Add(root.Name);
-                    continue;
+                    // A missing or empty mount folder is a mount problem, not a deletion: change nothing under it.
+                    if (!ScanTargets.IsRootAvailable(root.MountPath))
+                    {
+                        unavailableRoots.Add(root.Name);
+                        continue;
+                    }
+
+                    var (rootFoldersScanned, rootFilesFound) = await ScanRootAsync(
+                        root, scan.IsRecursive, excludeRules, scan.ScanJobId, foldersScanned, filesFound, cancellationToken);
+                    foldersScanned += rootFoldersScanned;
+                    filesFound += rootFilesFound;
                 }
 
-                var (rootFoldersScanned, rootFilesFound) = await ScanRootAsync(
-                    root, scan.IsRecursive, excludeRules, scan.ScanJobId, foldersScanned, filesFound, cancellationToken);
-                foldersScanned += rootFoldersScanned;
-                filesFound += rootFilesFound;
+                // The available roots were scanned in full; the job still fails so the user sees the warning.
+                if (unavailableRoots.Count > 0)
+                    throw new ScanRootsUnavailableException(unavailableRoots);
             }
-
-            // The available roots were scanned in full; the job still fails so the user sees the warning.
-            if (unavailableRoots.Count > 0)
-                throw new ScanRootsUnavailableException(unavailableRoots);
 
             await FinalizeSuccessAsync(scan.ScanJobId, foldersScanned, filesFound, cancellationToken);
         }
@@ -118,6 +142,25 @@ public sealed class ScanService : IScanService
 
     public Task<int> FailInterruptedJobsAsync(CancellationToken cancellationToken = default) =>
         _scanJobRepository.FailActiveJobsAsync(InterruptedMessage, _clock.UtcNow, cancellationToken);
+
+    private async Task<(int FoldersScanned, int FilesFound)> ScanFolderTargetAsync(int folderId, QueuedScan scan, CancellationToken cancellationToken)
+    {
+        // Resolved again here: the folder can be removed, or its root deactivated, while the scan waits in the queue.
+        var (root, folder) = await ScanTargets.GetVisibleFolderAsync(_folderRepository, _imageRootRepository, folderId, cancellationToken);
+
+        // Same rule as a whole-root scan: an unmounted share changes nothing.
+        if (!ScanTargets.IsRootAvailable(root.MountPath))
+            throw new ScanRootsUnavailableException(new[] { root.Name });
+
+        // Gone from disk: fail without marking anything; a scan or discovery of its parent does that.
+        var folderPath = ImagePathResolver.ResolveFolderPath(root.MountPath, folder.RelativePath);
+        if (!Directory.Exists(folderPath))
+            throw new FolderNotOnDiskException(root.Name, folder.RelativePath);
+
+        var settings = await _appSettingsRepository.GetAsync(cancellationToken);
+        var excludeRules = new ScanExcludeRules(settings, _scanningOptions.SupportedExtensions);
+        return await ScanTreeAsync(root, folder, folderPath, scan.IsRecursive, excludeRules, scan.ScanJobId, 0, 0, cancellationToken);
+    }
 
     private async Task FinalizeSuccessAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken)
     {
@@ -164,12 +207,19 @@ public sealed class ScanService : IScanService
         ImageRoot root, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId,
         int foldersBefore, int filesBefore, CancellationToken cancellationToken)
     {
+        var rootFolder = await GetOrCreateFolderAsync(root.Id, parentId: null, relativePath: string.Empty, name: root.Name, cancellationToken);
+        return await ScanTreeAsync(root, rootFolder, root.MountPath, isRecursive, excludeRules, scanJobId, foldersBefore, filesBefore, cancellationToken);
+    }
+
+    private async Task<(int FoldersScanned, int FilesFound)> ScanTreeAsync(
+        ImageRoot root, Folder startFolder, string startPath, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId,
+        int foldersBefore, int filesBefore, CancellationToken cancellationToken)
+    {
         var foldersScanned = 0;
         var filesFound = 0;
 
-        var rootFolder = await GetOrCreateFolderAsync(root.Id, parentId: null, relativePath: string.Empty, name: root.Name, cancellationToken);
         var pending = new Queue<(Folder Folder, string PhysicalPath, int Depth)>();
-        pending.Enqueue((rootFolder, root.MountPath, 0));
+        pending.Enqueue((startFolder, startPath, 0));
 
         while (pending.Count > 0)
         {
@@ -194,7 +244,7 @@ public sealed class ScanService : IScanService
                 {
                     // Every directory on disk counts as seen, excluded or not: excluded ones are pruned below,
                     // never marked missing.
-                    observedFolders.Add(FolderNameKey(name));
+                    observedFolders.Add(PathNormalizer.FolderNameKey(name));
 
                     // Excluded names are skipped here; rows that already exist for them are pruned
                     // after this folder's pass (below).
@@ -220,7 +270,7 @@ public sealed class ScanService : IScanService
                     // Always create the child Folder row for tree visibility, but stop descending
                     // once isRecursive is false, or once a depth cap is hit (guards against unbounded
                     // growth from a symlink/junction cycle).
-                    if (isRecursive && depth < MaxScanDepth)
+                    if (isRecursive && depth < ScanTargets.MaxFolderDepth)
                         pending.Enqueue((childFolder, entryPath, depth + 1));
                 }
                 else
@@ -234,7 +284,7 @@ public sealed class ScanService : IScanService
                     observedFiles.Add(NormalizeKey(fileNameWithoutExtension, extension));
 
                     var fileInfo = new FileInfo(entryPath);
-                    var fileModifiedUtc = TruncateToMicroseconds(fileInfo.LastWriteTimeUtc);
+                    var fileModifiedUtc = PostgresTimestamps.TruncateToMicroseconds(fileInfo.LastWriteTimeUtc);
                     var existingImage = await _imageRepository.GetByFolderAndFileNameAsync(folder.Id, fileNameWithoutExtension, extension, cancellationToken);
                     var decision = ImageReconciler.Decide(existingImage, fileInfo.Length, fileModifiedUtc);
 
@@ -310,20 +360,13 @@ public sealed class ScanService : IScanService
 
                 // Gone from disk (renamed, moved or deleted): mark it and its subtree missing. Nothing is
                 // deleted -- the user decides whether to remove it, and it's unmarked if it comes back.
-                if (child.IsActive && child.MissingSinceUtc is null && !observedFolders.Contains(FolderNameKey(child.Name)))
+                if (child.IsActive && child.MissingSinceUtc is null && !observedFolders.Contains(PathNormalizer.FolderNameKey(child.Name)))
                     await _folderRepository.MarkSubtreeMissingAsync(child.Id, _clock.UtcNow, cancellationToken);
             }
         }
 
         return (foldersScanned, filesFound);
     }
-
-    // A root whose folder is missing or has no entries at all is treated as an unmounted share.
-    private static bool IsRootAvailable(string mountPath) =>
-        Directory.Exists(mountPath) && Directory.EnumerateFileSystemEntries(mountPath).Any();
-
-    // Same folding as the scanner's path comparisons: NFC, case-insensitive.
-    private static string FolderNameKey(string name) => PathNormalizer.Normalize(name).ToLowerInvariant();
 
     private async Task<Folder> GetOrCreateFolderAsync(int rootId, int? parentId, string relativePath, string name, CancellationToken cancellationToken)
     {
@@ -348,10 +391,4 @@ public sealed class ScanService : IScanService
     // FileName) gets reconciled correctly yet still stamped MissingSinceUtc in the same pass.
     private static (string FileName, string Extension) NormalizeKey(string fileName, string extension) =>
         (PathNormalizer.Normalize(fileName).ToLowerInvariant(), PathNormalizer.Normalize(extension).ToLowerInvariant());
-
-    // Postgres timestamptz stores microsecond precision; FileInfo.LastWriteTimeUtc carries NTFS's
-    // 100ns tick resolution. Truncate before comparing/storing so a round-tripped value compares
-    // equal to itself on the next scan instead of looking "Modified" forever.
-    private static DateTime TruncateToMicroseconds(DateTime value) =>
-        new(value.Ticks - (value.Ticks % 10), value.Kind);
 }

@@ -34,4 +34,10 @@ public class PathNormalizerTests
     {
         PathNormalizer.NormalizedEquals(a, b).Should().Be(expected);
     }
+
+    [Fact]
+    public void FolderNameKey_FoldsCaseAndUnicodeNormalization()
+    {
+        PathNormalizer.FolderNameKey("Café").Should().Be(PathNormalizer.FolderNameKey("CAFÉ"));
+    }
 }

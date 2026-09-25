@@ -19,7 +19,7 @@ public class ScanEndpointsTests
     public async Task StartScanAsync_CallsScanService_AndReturnsScanJobId()
     {
         var scanService = Substitute.For<IScanService>();
-        scanService.QueueScanAsync(1, true, Arg.Any<CancellationToken>()).Returns(42);
+        scanService.QueueScanAsync(1, null, true, Arg.Any<CancellationToken>()).Returns(42);
 
         var result = await ScanEndpoints.StartScanAsync(new ScanRequest(1, true), scanService, CancellationToken.None);
 
@@ -30,7 +30,7 @@ public class ScanEndpointsTests
     public async Task StartScanAsync_UnavailableRoot_ReturnsValidationProblem()
     {
         var scanService = Substitute.For<IScanService>();
-        scanService.QueueScanAsync(2, true, Arg.Any<CancellationToken>())
+        scanService.QueueScanAsync(2, null, true, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ScanRootUnavailableException(2)));
 
         var result = await ScanEndpoints.StartScanAsync(new ScanRequest(2, true), scanService, CancellationToken.None);
