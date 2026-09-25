@@ -1,4 +1,4 @@
-# Folder Discovery — Design
+# Folder Discovery and Folder-Scoped Scanning — Design
 
 ## 1. Context and scope
 
@@ -8,19 +8,21 @@ concerns that are entangled in today's scanner:
 | Concern | What it does | Cost | Trigger |
 |---|---|---|---|
 | **Folder discovery** | Walks directory names only, builds the folder tree | Cheap | User-triggered, per root or folder |
-| **Image scanning** | Enumerates and processes files | Expensive | User-chosen scope (unchanged by this spec) |
+| **Image scanning** | Enumerates and processes files | Expensive | User-chosen scope: all roots, one root, or one folder |
 
 That source document covers five things: folder discovery, folder-scoped image scanning, a
 persisted job queue (pause/cancel/reorder), a Scan Queue admin page, and folder tree status
 icons. They were decomposed into separate sub-projects, each with its own spec/plan cycle. **This
-spec covers folder discovery only** (the first, foundational piece — nothing else in the source
-document works until folders can be discovered independently of scanning).
+spec covers folder discovery plus basic folder-scoped scanning** — the two foundational pieces:
+folders can be discovered independently of scanning, and any folder (not just a whole root) can
+be chosen as the target of an image scan.
 
 **Backend only.** No frontend UI ships with this spec — no tree icons, no "not discovered yet"
-badge, no discovery trigger button. Those land with the later folder-tree-icons sub-project. This
-spec delivers the job type, the data model, and an admin API (`POST /api/discovery` +
-SSE progress), tested via xUnit and curl — the same way the original scanning pipeline (phase 3)
-shipped backend-first, ahead of phase 6's frontend.
+badge, no discovery or scan trigger button. Those land with the later folder-tree-icons
+sub-project. This spec delivers the job type, the data model, and an admin API
+(`POST /api/discovery` + SSE progress, and `POST /api/scans` accepting a `folderId`), tested via
+xUnit and curl — the same way the original scanning pipeline (phase 3) shipped backend-first,
+ahead of phase 6's frontend.
 
 **Explicitly deferred, not part of this spec:**
 - Bounded-parallel walking (4–8 concurrent workers). The source document wants this for
@@ -30,9 +32,10 @@ shipped backend-first, ahead of phase 6's frontend.
   `FailInterruptedJobsAsync` startup cleanup marks it `Failed`; the user re-triggers discovery,
   which naturally only re-walks what's still undiscovered (already-known folders are already in
   the DB).
-- Folder-scoped **image** scanning (`POST /api/scans` keeps its existing `rootId`-only contract).
-  The data model below is shaped so that sub-project can extend it without another migration, but
-  wiring it up is out of scope here.
+- The source document's folder-unit scan execution: processing one folder per unit with
+  `FoldersProcessed`/`LastProcessedPath` checkpoints, batch commits (e.g. 500), and
+  cancel/pause/resume between units. A folder-scoped scan here reuses today's scan walk
+  unchanged, just started from a different folder (§5).
 - Exclusion-rule editing UI, `ScanStatus`/`LastScannedAt` display fields, the "possibly outdated"
   hint, the Scan Queue page, pause/cancel/reorder. All later sub-projects.
 
@@ -85,10 +88,11 @@ repository methods keep their shape (`GetByIdAsync`, `AddAsync`, `SetEnumeration
 on `Job` rows regardless of `Kind`, since discovery reuses the same status machine and the same
 progress-counter pattern (just never touching `FilesFound`/`FilesEnriched`).
 
-`IScanService` → keeps its name and its existing methods (`QueueScanAsync`, `RunScanAsync`,
-`FailInterruptedJobsAsync`) unchanged in behavior; internally it now creates `Job` rows with
-`Kind = Scan`. A new sibling `IDiscoveryService` (`QueueDiscoveryAsync`, `RunDiscoveryAsync`)
-creates `Kind = Discovery` rows and implements the walk in §4.
+`IScanService` keeps its name and its methods (`QueueScanAsync`, `RunScanAsync`,
+`FailInterruptedJobsAsync`); it now creates `Job` rows with `Kind = Scan`, and `QueueScanAsync`
+gains a `folderId` parameter for folder-scoped scans (§5). A new sibling `IDiscoveryService`
+(`QueueDiscoveryAsync`, `RunDiscoveryAsync`) creates `Kind = Discovery` rows and implements the
+walk in §4.
 
 ### `Folder` additions
 
@@ -158,7 +162,52 @@ BFS-with-`Queue` shape as `ScanService.ScanRootAsync`, stripped to folders:
 Progress (`FoldersProcessed`) is written every `ProgressInterval` folders, same pattern and
 constant as scanning's `SetEnumerationResultAsync` calls.
 
-## 5. API
+## 5. Folder-scoped scanning
+
+An image scan can target any folder, not just a whole root. The scan walk itself is unchanged —
+`ScanService.ScanRootAsync`'s loop (files reconciled, images enqueued for enrichment, missing
+files and folders marked, excluded names pruned) is generalized to start from a given folder
+instead of always the root's top folder.
+
+**Scope resolution at queue time** (`QueueScanAsync(int? rootId, int? folderId, bool isRecursive)`):
+
+| Request | Stored `Job.FolderId` | Walk starts at |
+|---|---|---|
+| neither `rootId` nor `folderId` | `null` | every active root's top folder (today's behavior) |
+| `rootId` only | that root's top-level `Folder.Id` (exists per §3) | that root's top folder (today's behavior) |
+| `folderId` only | `folderId` | that folder |
+| both | — | refused, `400` |
+
+A `folderId` is accepted only if the folder is visible under the existing visibility rules
+(`IFolderRepository.IsVisibleAsync`: it exists, isn't tombstoned, and its root is active) **and**
+isn't marked missing (`MissingSinceUtc == null`). Otherwise `400` keyed `folderId`. A missing
+folder is refused because the scan couldn't reach it; scanning or discovering its parent is what
+notices it's back.
+
+A folder-scoped scan doesn't require the folder to have been discovered first
+(`ChildrenDiscoveredAt` may be null): scanning still creates `Folder` rows as it walks, as today.
+It never sets `ChildrenDiscoveredAt` either — that field belongs to discovery.
+
+**At run time** the folder is resolved again, since it can be tombstoned or its root deactivated
+while the job waits:
+1. Folder no longer visible → the job fails, with the same pattern as today's "explicit root no
+   longer active" case.
+2. The folder's root isn't available (unmounted share, per the existing `IsRootAvailable` check) →
+   the job fails with the existing unavailable-roots message; nothing is changed under it.
+3. The folder's own directory (`root.MountPath` + `folder.RelativePath`, with `RelativePath`'s `/`
+   separators mapped to the OS separator) no longer exists → the job fails with
+   `"Folder is no longer on disk: {root name}/{relative path}"`. Nothing is marked missing by this
+   job; a scan or discovery of the parent does that.
+4. Otherwise the walk runs from that folder. `IsRecursive` means the same as today:
+   `false` = that folder's own files only (its child `Folder` rows are still created and diffed,
+   as today); `true` = the folder and everything below it, with `MaxScanDepth` counted from the
+   starting folder.
+
+**Nothing outside the target subtree is touched.** Sibling and ancestor folders, and their
+images, are neither reconciled nor marked missing — only folders the walk actually visits are
+diffed, which is already how the per-folder diff in `ScanRootAsync` works.
+
+## 6. API
 
 Both endpoints live in the `admin` route group (existing `ApiSurfaceMetadata(ApiSurface.Admin)`
 seam), same as `/api/scans` today.
@@ -184,15 +233,22 @@ refers to a `Kind: Scan` job, `GET /api/discovery/{id}/events` returns `404` (us
 `/api/scans/{id}/events` for that job instead) — the two routes are kind-specific views over the
 same table, not interchangeable.
 
-**`POST /api/scans` is unchanged on the wire** — still `{ rootId?: int, isRecursive: bool }`.
-Internally, `ScanService.QueueScanAsync` resolves `rootId` to that root's top-level `Folder.Id`
-(guaranteed to exist per §3) and stores it as the new `Job.FolderId`; `rootId: null` still means
-"every active root." `GET /api/scans/{id}/events`'s response shape
-(`id, status, foldersScanned, filesFound, filesEnriched, errorMessage`) is also unchanged — the
-JSON field is still called `foldersScanned` there even though the underlying column is now
-`FoldersProcessed`; that's an endpoint-level DTO naming choice, independent of the storage rename.
+**`POST /api/scans`** `{ rootId?: int, folderId?: int, isRecursive: bool }` → `200`
+`{ scanJobId: int }` (response unchanged). `folderId` is new and optional, so existing callers
+are unaffected; scope resolution and validation are in §5.
+- Both `rootId` and `folderId` → `400` `ValidationProblem` keyed `folderId` ("Give rootId or
+  folderId, not both.").
+- Invalid `folderId` (not visible, or missing) → `400` keyed `folderId`.
+- Invalid `rootId` → `400` keyed `rootId` (existing behavior).
+- Active job of either kind → `409` (existing behavior).
 
-## 6. Concurrency and interrupted jobs
+`GET /api/scans/{id}/events`'s response shape
+(`id, status, foldersScanned, filesFound, filesEnriched, errorMessage`) is unchanged. The JSON
+field is still called `foldersScanned` even though the column is now `FoldersProcessed`; that's an
+endpoint-level DTO name, independent of the storage rename. If the id refers to a
+`Kind: Discovery` job, this route returns `404`, mirroring the discovery route.
+
+## 7. Concurrency and interrupted jobs
 
 Unifying the table means both generalize with no new logic:
 
@@ -204,7 +260,7 @@ Unifying the table means both generalize with no new logic:
   `Enumerating`/`Enriching` to `Failed` with "Interrupted by an application restart." on startup;
   this now covers Discovery jobs for free.
 
-## 7. Migration
+## 8. Migration
 
 One EF Core migration. Dev-only project, no production data to preserve, so this is a
 straightforward drop-and-recreate rather than a data-preserving rename:
@@ -217,7 +273,7 @@ straightforward drop-and-recreate rather than a data-preserving rename:
 - Index on `Status` (existing) carries over; `Kind` doesn't need its own index — `HasActiveJobAsync`
   filters on `Status` alone.
 
-## 8. Testing
+## 9. Testing
 
 - **`DiscoveryServiceTests`** (new; structure mirrors `ScanServiceTests`/`ScanServicePhase5Tests`):
   new folder found; folder gone → `MissingSinceUtc` set; missing folder reappears → cleared;
@@ -230,9 +286,20 @@ straightforward drop-and-recreate rather than a data-preserving rename:
 - **`JobRepositoryTests`** (renamed from `ScanJobRepositoryTests`, same coverage) plus one new
   case: a `Kind: Discovery` job in `Enumerating` makes `HasActiveJobAsync` true, and a queued
   `Kind: Scan` job is refused (`409`) while it's active, and vice versa.
+- **Folder-scoped scan tests** (new, alongside `ScanServicePhase5Tests`): a subfolder scan
+  reconciles only that subtree (new/modified images enqueued, missing images marked) while
+  sibling and ancestor folders' images are untouched and not marked missing; non-recursive
+  subfolder scan processes only its own files; `rootId` scan stores the root's top folder as
+  `Job.FolderId`; `folderId` scan stores that folder; both ids → refused; tombstoned, unknown,
+  inactive-root or missing folder → refused at queue time; folder tombstoned while queued → job
+  `Failed`; folder's root unavailable at run time → job `Failed` with the unavailable-roots
+  message and nothing changed; folder's directory gone at run time → job `Failed` with
+  "Folder is no longer on disk" and nothing marked missing.
 - **API tests** for `POST /api/discovery` and `GET /api/discovery/{id}/events`, mirroring
   `ScanEndpointsTests`'s structure (happy path, unknown/invalid `folderId` → `400`, active job →
   `409`, unknown job id on the events route → `error` event, wrong-`Kind` job id → `404`).
+  `ScanEndpointsTests` gains: `folderId` accepted and passed through, `rootId` + `folderId` →
+  `400`, invalid `folderId` → `400`, and a Discovery job id on `/api/scans/{id}/events` → `404`.
 - Existing `ScanService`/`ScanEndpoints`/`ScanJobRepository` tests are updated for the rename
   (`ScanJob` → `Job`, `RootId` → resolved `FolderId`) with their actual scan assertions otherwise
   unchanged — this is the regression net that the rename didn't change scan behavior.
@@ -244,8 +311,9 @@ straightforward drop-and-recreate rather than a data-preserving rename:
 
 - Bounded-parallel discovery workers.
 - True mid-walk crash resume.
-- Folder-scoped image scanning (`POST /api/scans` accepting `folderId` directly, folder-unit
-  cancel/pause/resume, batch commits).
+- Folder-unit scan execution: per-folder checkpoints (`LastProcessedPath`), batch commits, and
+  cancel/pause/resume between folder units. (Choosing a folder as a scan's target is in scope,
+  §5; changing how the walk executes is not.)
 - A real job queue: persisted queueing, pause, cancel, reorder, dedup of overlapping recursive
   jobs. Today (and after this spec) it remains strictly "one job running, everything else
   refused" — no queueing.
