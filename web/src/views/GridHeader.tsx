@@ -1,6 +1,7 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import { Box, Breadcrumbs, IconButton, Link, MenuItem, TextField, Typography } from '@mui/material'
+import type { ReactNode } from 'react'
 import { Link as RouterLink, useSearchParams } from 'react-router'
 import type { BreadcrumbItem } from '../api/types'
 import { withParams, type Order, type Sort } from '../routing/urlState'
@@ -11,9 +12,10 @@ type Props = {
   count?: number
   sort: Sort
   order: Order
+  actions?: ReactNode
 }
 
-export function GridHeader({ title, path, count, sort, order }: Props) {
+export function GridHeader({ title, path, count, sort, order, actions }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
 
   return (
@@ -55,6 +57,7 @@ export function GridHeader({ title, path, count, sort, order }: Props) {
           {count === 1 ? '1 photo' : `${count} photos`}
         </Typography>
       )}
+      {actions}
       <TextField
         select
         size="small"

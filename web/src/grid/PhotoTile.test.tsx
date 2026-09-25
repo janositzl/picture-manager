@@ -67,4 +67,45 @@ describe('PhotoTile', () => {
     await userEvent.keyboard('{Enter}')
     expect(onOpen).toHaveBeenCalledWith(7)
   })
+
+  it('shows a placeholder when the file is missing', () => {
+    render(
+      <PhotoTile
+        item={image(1, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        missing
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    expect(screen.getByText('File missing')).toBeInTheDocument()
+  })
+
+  it('Ctrl-click selects instead of opening, and the checkbox reports Shift', async () => {
+    const onOpen = vi.fn()
+    const onSelect = vi.fn()
+    render(
+      <PhotoTile
+        item={image(7, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        selection={{ selecting: false, selected: false, onSelect }}
+        onOpen={onOpen}
+        onToggleFavorite={noop}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.keyboard('{Control>}')
+    await user.click(screen.getByRole('button', { name: 'IMG_0007.jpg' }))
+    await user.keyboard('{/Control}')
+    expect(onSelect).toHaveBeenLastCalledWith(7, { shift: false })
+    await user.keyboard('{Shift>}')
+    await user.click(screen.getByRole('checkbox', { name: 'Select IMG_0007.jpg' }))
+    await user.keyboard('{/Shift}')
+    expect(onSelect).toHaveBeenLastCalledWith(7, { shift: true })
+    expect(onOpen).not.toHaveBeenCalled()
+  })
 })
