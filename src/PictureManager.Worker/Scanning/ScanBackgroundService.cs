@@ -74,7 +74,7 @@ public sealed class ScanBackgroundService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var jobs = scope.ServiceProvider.GetRequiredService<IScanJobRepository>();
+                var jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
                 // Only one job can be Enumerating/Enriching at a time (QueueScanAsync refuses a second while
                 // one is active), so this targets exactly the job that just failed to record itself.
                 await jobs.FailActiveJobsAsync(ex.Message, _clock.UtcNow, CancellationToken.None);

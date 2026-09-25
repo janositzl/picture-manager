@@ -32,7 +32,7 @@ public class ScanBackgroundServiceTests
                 return Task.CompletedTask;
             });
 
-        var jobs = Substitute.For<IScanJobRepository>();
+        var jobs = Substitute.For<IJobRepository>();
         jobs.FailActiveJobsAsync(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(1);
         var clock = Substitute.For<IClock>();
         var provider = new ServiceCollection().AddScoped(_ => scanService).AddScoped(_ => jobs).BuildServiceProvider();
@@ -59,7 +59,7 @@ public class ScanBackgroundServiceTests
         scanService.RunScanAsync(new QueuedScan(5, null, true), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException("boom")));
 
-        var jobs = Substitute.For<IScanJobRepository>();
+        var jobs = Substitute.For<IJobRepository>();
         var attempts = 0;
         var marked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         jobs.FailActiveJobsAsync(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())

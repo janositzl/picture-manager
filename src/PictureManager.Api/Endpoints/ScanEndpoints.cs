@@ -33,7 +33,7 @@ public static class ScanEndpoints
         }
     }
 
-    public static async Task StreamScanEventsAsync(HttpContext context, int id, IScanJobRepository scanJobRepository, CancellationToken cancellationToken)
+    public static async Task StreamScanEventsAsync(HttpContext context, int id, IJobRepository scanJobRepository, CancellationToken cancellationToken)
     {
         context.Response.Headers.ContentType = "text/event-stream";
         context.Response.Headers.CacheControl = "no-cache";
@@ -48,11 +48,11 @@ public static class ScanEndpoints
             }
 
             var payload = JsonSerializer.Serialize(new ScanProgress(
-                scanJob.Id, scanJob.Status.ToString(), scanJob.FoldersScanned, scanJob.FilesFound, scanJob.FilesEnriched, scanJob.ErrorMessage));
+                scanJob.Id, scanJob.Status.ToString(), scanJob.FoldersProcessed, scanJob.FilesFound, scanJob.FilesEnriched, scanJob.ErrorMessage));
             await context.Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
             await context.Response.Body.FlushAsync(cancellationToken);
 
-            if (scanJob.Status is ScanJobStatus.Completed or ScanJobStatus.Failed or ScanJobStatus.Cancelled)
+            if (scanJob.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
                 return;
 
             await Task.Delay(1000, cancellationToken);

@@ -16,7 +16,7 @@ public sealed class PictureManagerDbContext : DbContext
     public DbSet<Album> Albums => Set<Album>();
     public DbSet<AlbumImage> AlbumImages => Set<AlbumImage>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
-    public DbSet<ScanJob> ScanJobs => Set<ScanJob>();
+    public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AppSettings> Settings => Set<AppSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

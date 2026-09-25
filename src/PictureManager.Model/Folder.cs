@@ -15,6 +15,12 @@ public class Folder
     /// <summary>Set when the scanner finds the folder gone from disk (with its whole subtree); cleared when it's back.</summary>
     public DateTime? MissingSinceUtc { get; set; }
 
+    /// <summary>When a discovery last diffed this folder's subfolders; null = never discovered.</summary>
+    public DateTime? ChildrenDiscoveredAt { get; set; }
+
+    /// <summary>The directory's last-write time as of the last discovery; for a later "possibly outdated" hint.</summary>
+    public DateTime? LastWriteTimeUtc { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime ModifiedUtc { get; set; }
 

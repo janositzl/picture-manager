@@ -20,7 +20,7 @@ public sealed class ScanServiceQueueTests : IDisposable
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IImageRepository _images = Substitute.For<IImageRepository>();
     private readonly IAppSettingsRepository _settings = Substitute.For<IAppSettingsRepository>();
-    private readonly IScanJobRepository _jobs = Substitute.For<IScanJobRepository>();
+    private readonly IJobRepository _jobs = Substitute.For<IJobRepository>();
     private readonly IScanQueue _scanQueue = Substitute.For<IScanQueue>();
     private readonly IClock _clock = Substitute.For<IClock>();
 
@@ -30,9 +30,9 @@ public sealed class ScanServiceQueueTests : IDisposable
         _roots.GetByIdAsync(1, Arg.Any<CancellationToken>())
             .Returns(new ImageRoot { Id = 1, Name = "dev", MountPath = _tempRoot.FullName, IsActive = true });
         _settings.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
-        _jobs.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(call =>
+        _jobs.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            var job = call.Arg<ScanJob>();
+            var job = call.Arg<Job>();
             job.Id = 999;
             return job;
         });
@@ -51,7 +51,7 @@ public sealed class ScanServiceQueueTests : IDisposable
         var scanJobId = await CreateService().QueueScanAsync(rootId: 1, isRecursive: true);
 
         scanJobId.Should().Be(999);
-        await _jobs.Received(1).AddAsync(Arg.Is<ScanJob>(j => j.Status == ScanJobStatus.Enumerating && j.IsRecursive), Arg.Any<CancellationToken>());
+        await _jobs.Received(1).AddAsync(Arg.Is<Job>(j => j.Status == JobStatus.Enumerating && j.IsRecursive), Arg.Any<CancellationToken>());
         _scanQueue.Received(1).Enqueue(new QueuedScan(999, 1, true));
         await _folders.DidNotReceive().GetByRootAndRelativePathAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -77,7 +77,7 @@ public sealed class ScanServiceQueueTests : IDisposable
 
         await act.Should().ThrowAsync<ScanRootUnavailableException>();
         await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, "Image root 1 does not exist or is inactive.",
-            ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
+            JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -21,7 +21,7 @@ public sealed class ScanService : IScanService
     private readonly IFolderRepository _folderRepository;
     private readonly IImageRepository _imageRepository;
     private readonly IAppSettingsRepository _appSettingsRepository;
-    private readonly IScanJobRepository _scanJobRepository;
+    private readonly IJobRepository _scanJobRepository;
     private readonly IEnrichmentQueue _enrichmentQueue;
     private readonly IScanQueue _scanQueue;
     private readonly IClock _clock;
@@ -32,7 +32,7 @@ public sealed class ScanService : IScanService
         IFolderRepository folderRepository,
         IImageRepository imageRepository,
         IAppSettingsRepository appSettingsRepository,
-        IScanJobRepository scanJobRepository,
+        IJobRepository scanJobRepository,
         IEnrichmentQueue enrichmentQueue,
         IScanQueue scanQueue,
         IClock clock,
@@ -59,10 +59,10 @@ public sealed class ScanService : IScanService
 
         // Created as Enumerating (not Pending) so HasActiveJobAsync refuses a second scan while this one waits
         // in the queue.
-        var scanJob = await _scanJobRepository.AddAsync(new ScanJob
+        var scanJob = await _scanJobRepository.AddAsync(new Job
         {
             IsRecursive = isRecursive,
-            Status = ScanJobStatus.Enumerating,
+            Status = JobStatus.Enumerating,
             StartedUtc = _clock.UtcNow
         }, cancellationToken);
 
@@ -141,7 +141,7 @@ public sealed class ScanService : IScanService
     private async Task FinalizeFailureAsync(int scanJobId, Exception ex, int foldersScanned, int filesFound)
     {
         var isCancellation = ex is OperationCanceledException;
-        var status = isCancellation ? ScanJobStatus.Cancelled : ScanJobStatus.Failed;
+        var status = isCancellation ? JobStatus.Cancelled : JobStatus.Failed;
         var errorMessage = isCancellation ? null : TruncateErrorMessage(ex.Message);
 
         // CancellationToken.None: if the scan failed because its own token was cancelled, reusing

@@ -9,10 +9,10 @@ namespace PictureManager.Application.Folders;
 public sealed class FolderService : IFolderService
 {
     private readonly IFolderRepository _folders;
-    private readonly IScanJobRepository _scanJobs;
+    private readonly IJobRepository _scanJobs;
     private readonly IClock _clock;
 
-    public FolderService(IFolderRepository folders, IScanJobRepository scanJobs, IClock clock)
+    public FolderService(IFolderRepository folders, IJobRepository scanJobs, IClock clock)
     {
         _folders = folders;
         _scanJobs = scanJobs;

@@ -33,7 +33,7 @@ public sealed class EnrichmentBackgroundService : BackgroundService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var enrichmentService = scope.ServiceProvider.GetRequiredService<IImageEnrichmentService>();
-                var scanJobRepository = scope.ServiceProvider.GetRequiredService<IScanJobRepository>();
+                var scanJobRepository = scope.ServiceProvider.GetRequiredService<IJobRepository>();
 
                 try
                 {
@@ -58,7 +58,7 @@ public sealed class EnrichmentBackgroundService : BackgroundService
         }
     }
 
-    private async Task MarkOneEnrichedAsync(IScanJobRepository scanJobRepository, int scanJobId, CancellationToken cancellationToken)
+    private async Task MarkOneEnrichedAsync(IJobRepository scanJobRepository, int scanJobId, CancellationToken cancellationToken)
     {
         await scanJobRepository.IncrementFilesEnrichedAsync(scanJobId, cancellationToken);
         await scanJobRepository.TryMarkCompletedIfEnrichedAsync(scanJobId, _clock.UtcNow, cancellationToken);

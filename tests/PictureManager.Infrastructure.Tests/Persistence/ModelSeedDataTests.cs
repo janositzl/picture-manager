@@ -45,7 +45,7 @@ public class ModelSeedDataTests
         context.Model.GetEntityTypes().Select(e => e.ClrType).Should().BeEquivalentTo(new[]
         {
             typeof(ImageRoot), typeof(Folder), typeof(Image), typeof(Album),
-            typeof(AlbumImage), typeof(AppUser), typeof(ScanJob), typeof(AppSettings)
+            typeof(AlbumImage), typeof(AppUser), typeof(Job), typeof(AppSettings)
         });
     }
 }

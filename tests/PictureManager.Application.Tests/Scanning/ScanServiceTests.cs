@@ -48,10 +48,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -107,10 +107,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -170,10 +170,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings { ExcludedExtensions = new List<string> { ".txt" } });
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -254,10 +254,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings { ExcludedExtensions = new List<string> { ".txt" } });
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -349,10 +349,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -413,10 +413,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -483,10 +483,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -539,10 +539,10 @@ public class ScanServiceTests
             var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
             appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
 
-            var scanJobRepository = Substitute.For<IScanJobRepository>();
-            scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
             {
-                var job = callInfo.Arg<ScanJob>();
+                var job = callInfo.Arg<Job>();
                 job.Id = 999;
                 return job;
             });
@@ -590,10 +590,10 @@ public class ScanServiceTests
         appSettingsRepository.GetAsync(Arg.Any<CancellationToken>())
             .Returns<Task<AppSettings>>(_ => throw new InvalidOperationException("boom"));
 
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
-        scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
         {
-            var job = callInfo.Arg<ScanJob>();
+            var job = callInfo.Arg<Job>();
             job.Id = 999;
             return job;
         });
@@ -610,7 +610,7 @@ public class ScanServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>();
 
         await scanJobRepository.Received(1).SetFailureResultAsync(
-            999, foldersScanned: 0, filesFound: 0, errorMessage: "boom", status: ScanJobStatus.Failed,
+            999, foldersScanned: 0, filesFound: 0, errorMessage: "boom", status: JobStatus.Failed,
             completedUtc: clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
@@ -626,10 +626,10 @@ public class ScanServiceTests
         appSettingsRepository.GetAsync(Arg.Any<CancellationToken>())
             .Returns<Task<AppSettings>>(_ => throw new OperationCanceledException());
 
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
-        scanJobRepository.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
         {
-            var job = callInfo.Arg<ScanJob>();
+            var job = callInfo.Arg<Job>();
             job.Id = 999;
             return job;
         });
@@ -646,14 +646,14 @@ public class ScanServiceTests
         await act.Should().ThrowAsync<OperationCanceledException>();
 
         await scanJobRepository.Received(1).SetFailureResultAsync(
-            999, foldersScanned: 0, filesFound: 0, errorMessage: null, status: ScanJobStatus.Cancelled,
+            999, foldersScanned: 0, filesFound: 0, errorMessage: null, status: JobStatus.Cancelled,
             completedUtc: clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task StartScanAsync_WhenAScanIsAlreadyActive_ThrowsAndNeverCreatesAJob()
     {
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        var scanJobRepository = Substitute.For<IJobRepository>();
         scanJobRepository.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
 
         var scanService = new ScanService(
@@ -664,7 +664,7 @@ public class ScanServiceTests
 
         await act.Should().ThrowAsync<ScanAlreadyInProgressException>();
 
-        await scanJobRepository.DidNotReceive().AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>());
+        await scanJobRepository.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
     }
 
     private static DateTime TruncateToMicroseconds(DateTime value) =>

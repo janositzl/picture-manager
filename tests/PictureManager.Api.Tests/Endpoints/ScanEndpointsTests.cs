@@ -41,12 +41,12 @@ public class ScanEndpointsTests
     [Fact]
     public async Task StreamScanEventsAsync_JobAlreadyCompleted_WritesOneEventThenStops()
     {
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
-        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ScanJob
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Job
         {
             Id = 1,
-            Status = ScanJobStatus.Completed,
-            FoldersScanned = 3,
+            Status = JobStatus.Completed,
+            FoldersProcessed = 3,
             FilesFound = 5,
             FilesEnriched = 5
         });
@@ -65,11 +65,11 @@ public class ScanEndpointsTests
     [Fact]
     public async Task StreamScanEventsAsync_FailedJob_IncludesTheErrorMessage()
     {
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
-        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ScanJob
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Job
         {
             Id = 1,
-            Status = ScanJobStatus.Failed,
+            Status = JobStatus.Failed,
             ErrorMessage = "Root 'dev' is unavailable: its folder is missing or empty. Check that the share is mounted."
         });
 
@@ -88,8 +88,8 @@ public class ScanEndpointsTests
     [Fact]
     public async Task StreamScanEventsAsync_UnknownJob_WritesErrorEvent()
     {
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
-        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns((ScanJob?)null);
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns((Job?)null);
 
         var context = new DefaultHttpContext();
         var body = new MemoryStream();

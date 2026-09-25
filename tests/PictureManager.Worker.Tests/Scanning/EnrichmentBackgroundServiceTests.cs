@@ -28,7 +28,7 @@ public class EnrichmentBackgroundServiceTests
     public async Task ProcessesQueuedItems_UpdatesScanJobCounters_AndCompletesWhenAllDone()
     {
         var enrichmentService = Substitute.For<IImageEnrichmentService>();
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        var scanJobRepository = Substitute.For<IJobRepository>();
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Simulates the real DB state this item's increment/completion check would see: a job
@@ -68,7 +68,7 @@ public class EnrichmentBackgroundServiceTests
         // Enriching) must refuse to flip the job -- that was the premature-completion bug this
         // guard fixes. Stub it to return false, mirroring what a real DB would evaluate.
         var enrichmentService = Substitute.For<IImageEnrichmentService>();
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        var scanJobRepository = Substitute.For<IJobRepository>();
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         scanJobRepository.TryMarkCompletedIfEnrichedAsync(1, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
@@ -100,12 +100,12 @@ public class EnrichmentBackgroundServiceTests
     public async Task UnhandledExceptionOutsideEnrichAsync_DoesNotFaultTheBackgroundService()
     {
         // Regression test for Important finding #4: a failure in scope creation, DI resolution,
-        // or the ScanJobRepository calls themselves (i.e. anything OUTSIDE EnrichAsync's own
+        // or the JobRepository calls themselves (i.e. anything OUTSIDE EnrichAsync's own
         // try/catch) used to propagate out of ExecuteAsync, faulting the whole BackgroundService
         // (and, under the default BackgroundServiceExceptionBehavior, the host with it) --
         // silently stopping enrichment for every scan for the rest of the process lifetime.
         var enrichmentService = Substitute.For<IImageEnrichmentService>();
-        var scanJobRepository = Substitute.For<IScanJobRepository>();
+        var scanJobRepository = Substitute.For<IJobRepository>();
         var reachedFailure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         scanJobRepository.IncrementFilesEnrichedAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())

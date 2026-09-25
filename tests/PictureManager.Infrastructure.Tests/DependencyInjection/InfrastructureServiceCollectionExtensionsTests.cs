@@ -83,7 +83,7 @@ public class InfrastructureServiceCollectionExtensionsTests
         services.AddInfrastructure(configuration);
         var provider = services.BuildServiceProvider();
 
-        provider.GetService<IScanJobRepository>().Should().NotBeNull();
+        provider.GetService<IJobRepository>().Should().NotBeNull();
         provider.GetService<IAppSettingsRepository>().Should().NotBeNull();
     }
 

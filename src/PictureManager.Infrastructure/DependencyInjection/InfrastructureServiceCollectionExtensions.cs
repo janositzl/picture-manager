@@ -29,7 +29,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAlbumRepository, AlbumRepository>();
         services.AddScoped<IAppUserRepository, AppUserRepository>();
         services.AddScoped<IImageRootRepository, ImageRootRepository>();
-        services.AddScoped<IScanJobRepository, ScanJobRepository>();
+        services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
         services.AddScoped<IImageQueryRepository, ImageQueryRepository>();
 

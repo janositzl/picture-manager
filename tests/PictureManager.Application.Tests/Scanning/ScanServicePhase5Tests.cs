@@ -20,7 +20,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IImageRepository _images = Substitute.For<IImageRepository>();
     private readonly IAppSettingsRepository _settings = Substitute.For<IAppSettingsRepository>();
-    private readonly IScanJobRepository _jobs = Substitute.For<IScanJobRepository>();
+    private readonly IJobRepository _jobs = Substitute.For<IJobRepository>();
     private readonly IEnrichmentQueue _queue = Substitute.For<IEnrichmentQueue>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly Folder _rootFolder = new() { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
@@ -34,9 +34,9 @@ public sealed class ScanServicePhase5Tests : IDisposable
         _folders.GetChildrenAsync(Arg.Any<int?>(), Arg.Any<CancellationToken>()).Returns(new List<Folder>());
         _images.GetByFolderIdAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new List<Image>());
         _settings.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
-        _jobs.AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>()).Returns(call =>
+        _jobs.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            var job = call.Arg<ScanJob>();
+            var job = call.Arg<Job>();
             job.Id = 999;
             return job;
         });
@@ -68,7 +68,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         var act = () => CreateService().ScanNowAsync(rootId: 2, isRecursive: true);
 
         (await act.Should().ThrowAsync<ScanRootUnavailableException>()).Which.RootId.Should().Be(2);
-        await _jobs.DidNotReceive().AddAsync(Arg.Any<ScanJob>(), Arg.Any<CancellationToken>());
+        await _jobs.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         var act = () => CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("dev");
-        await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
+        await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().GetByRootAndRelativePathAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().MarkSubtreeMissingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _images.DidNotReceive().GetByFolderIdAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
@@ -158,7 +158,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         var act = () => CreateService().ScanNowAsync(rootId: 1, isRecursive: true);
 
         await act.Should().ThrowAsync<ScanRootsUnavailableException>();
-        await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
+        await _jobs.Received(1).SetFailureResultAsync(999, 0, 0, DevUnavailable, JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
         await _folders.DidNotReceive().GetByRootAndRelativePathAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _images.DidNotReceive().GetByFolderIdAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
@@ -180,7 +180,7 @@ public sealed class ScanServicePhase5Tests : IDisposable
         await _folders.DidNotReceive().GetByRootAndRelativePathAsync(2, Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _jobs.Received(1).SetFailureResultAsync(999, 1, 1,
             "Root 'nas' is unavailable: its folder is missing or empty. Check that the share is mounted.",
-            ScanJobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
+            JobStatus.Failed, _clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using PictureManager.Infrastructure.Persistence;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Model;
+using PictureManager.Tests.Support;
 using Xunit;
 
 namespace PictureManager.Infrastructure.Tests.Persistence.Repositories;
@@ -102,5 +103,22 @@ public class FolderRepositoryTests
 
         var fetched = await repository.GetByIdAsync(folder.Id);
         fetched!.ModifiedUtc.Should().Be(folder.ModifiedUtc);
+    }
+
+    [Fact]
+    public async Task DiscoveryTimestamps_RoundTripThroughPostgres()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("discovery-columns");
+        var top = TestData.Folder(root, "");
+        top.ChildrenDiscoveredAt = TestData.Utc;
+        top.LastWriteTimeUtc = TestData.Utc.AddDays(-1);
+        db.Context.Folders.Add(top);
+        await db.Context.SaveChangesAsync();
+
+        await using var verify = db.CreateContext();
+        var fetched = await verify.Folders.AsNoTracking().SingleAsync(f => f.Id == top.Id);
+        fetched.ChildrenDiscoveredAt.Should().Be(TestData.Utc);
+        fetched.LastWriteTimeUtc.Should().Be(TestData.Utc.AddDays(-1));
     }
 }

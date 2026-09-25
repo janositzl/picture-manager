@@ -4,11 +4,11 @@ using PictureManager.Model;
 
 namespace PictureManager.Infrastructure.Persistence.Configurations;
 
-public class ScanJobConfiguration : IEntityTypeConfiguration<ScanJob>
+public class JobConfiguration : IEntityTypeConfiguration<Job>
 {
-    public void Configure(EntityTypeBuilder<ScanJob> builder)
+    public void Configure(EntityTypeBuilder<Job> builder)
     {
-        builder.ToTable("ScanJobs");
+        builder.ToTable("Jobs");
 
         builder.HasKey(x => x.Id);
 
@@ -22,9 +22,9 @@ public class ScanJobConfiguration : IEntityTypeConfiguration<ScanJob>
         builder.Property(x => x.CompletedUtc)
             .HasColumnType("timestamp with time zone");
 
-        builder.HasOne(x => x.RootFolder)
+        builder.HasOne(x => x.Folder)
             .WithMany()
-            .HasForeignKey(x => x.RootFolderId)
+            .HasForeignKey(x => x.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.Status);

@@ -15,7 +15,7 @@ public class FolderServiceTests
 {
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IClock _clock = Substitute.For<IClock>();
-    private readonly IScanJobRepository _scanJobs = Substitute.For<IScanJobRepository>();
+    private readonly IJobRepository _scanJobs = Substitute.For<IJobRepository>();
 
     public FolderServiceTests()
     {
