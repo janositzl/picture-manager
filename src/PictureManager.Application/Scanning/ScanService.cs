@@ -12,7 +12,6 @@ namespace PictureManager.Application.Scanning;
 
 public sealed class ScanService : IScanService
 {
-    private const int MaxErrorMessageLength = 4000;
     private const int ProgressInterval = 50;
     private const string InterruptedMessage = "Interrupted by an application restart.";
 
@@ -66,7 +65,7 @@ public sealed class ScanService : IScanService
         }
         else if (rootId.HasValue)
         {
-            await GetActiveRootAsync(rootId.Value, cancellationToken);
+            await ScanTargets.GetActiveRootAsync(_imageRootRepository, rootId.Value, cancellationToken);
 
             // Every root has a top folder (ImageRootSeeder); it's the job's recorded scope.
             jobFolderId = (await _folderRepository.GetByRootAndRelativePathAsync(rootId.Value, string.Empty, cancellationToken))?.Id;
@@ -104,7 +103,7 @@ public sealed class ScanService : IScanService
             {
                 // Resolved again here: an explicit root can be deactivated or deleted while the scan waits in the queue.
                 var roots = scan.RootId.HasValue
-                    ? new[] { await GetActiveRootAsync(scan.RootId.Value, cancellationToken) }
+                    ? new[] { await ScanTargets.GetActiveRootAsync(_imageRootRepository, scan.RootId.Value, cancellationToken) }
                     : (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToArray();
 
                 var settings = await _appSettingsRepository.GetAsync(cancellationToken);
@@ -185,7 +184,7 @@ public sealed class ScanService : IScanService
     {
         var isCancellation = ex is OperationCanceledException;
         var status = isCancellation ? JobStatus.Cancelled : JobStatus.Failed;
-        var errorMessage = isCancellation ? null : TruncateErrorMessage(ex.Message);
+        var errorMessage = isCancellation ? null : ScanTargets.TruncateErrorMessage(ex.Message);
 
         // CancellationToken.None: if the scan failed because its own token was cancelled, reusing
         // that (now-cancelled) token for this write would itself throw immediately, leaving the job
@@ -194,20 +193,11 @@ public sealed class ScanService : IScanService
             scanJobId, foldersScanned, filesFound, errorMessage, status, _clock.UtcNow, CancellationToken.None);
     }
 
-    private static string? TruncateErrorMessage(string? message) =>
-        message is { Length: > MaxErrorMessageLength } ? message[..MaxErrorMessageLength] : message;
-
-    private async Task<ImageRoot> GetActiveRootAsync(int rootId, CancellationToken cancellationToken)
-    {
-        var root = await _imageRootRepository.GetByIdAsync(rootId, cancellationToken);
-        return root is { IsActive: true } ? root : throw new ScanRootUnavailableException(rootId);
-    }
-
     private async Task<(int FoldersScanned, int FilesFound)> ScanRootAsync(
         ImageRoot root, bool isRecursive, ScanExcludeRules excludeRules, int scanJobId,
         int foldersBefore, int filesBefore, CancellationToken cancellationToken)
     {
-        var rootFolder = await GetOrCreateFolderAsync(root.Id, parentId: null, relativePath: string.Empty, name: root.Name, cancellationToken);
+        var rootFolder = await ScanTargets.GetOrCreateFolderAsync(_folderRepository, _clock, root.Id, parentId: null, relativePath: string.Empty, name: root.Name, cancellationToken);
         return await ScanTreeAsync(root, rootFolder, root.MountPath, isRecursive, excludeRules, scanJobId, foldersBefore, filesBefore, cancellationToken);
     }
 
@@ -252,7 +242,7 @@ public sealed class ScanService : IScanService
                         continue;
 
                     var childRelativePath = PathNormalizer.Combine(folder.RelativePath, name);
-                    var childFolder = await GetOrCreateFolderAsync(root.Id, folder.Id, childRelativePath, name, cancellationToken);
+                    var childFolder = await ScanTargets.GetOrCreateFolderAsync(_folderRepository, _clock, root.Id, folder.Id, childRelativePath, name, cancellationToken);
 
                     // Removed from the collection (tombstone): never descend into it or re-index it.
                     if (!childFolder.IsActive)
@@ -366,23 +356,6 @@ public sealed class ScanService : IScanService
         }
 
         return (foldersScanned, filesFound);
-    }
-
-    private async Task<Folder> GetOrCreateFolderAsync(int rootId, int? parentId, string relativePath, string name, CancellationToken cancellationToken)
-    {
-        var existing = await _folderRepository.GetByRootAndRelativePathAsync(rootId, relativePath, cancellationToken);
-        if (existing is not null)
-            return existing;
-
-        return await _folderRepository.AddAsync(new Folder
-        {
-            RootId = rootId,
-            ParentId = parentId,
-            Name = name,
-            RelativePath = relativePath,
-            CreatedUtc = _clock.UtcNow,
-            ModifiedUtc = _clock.UtcNow
-        }, cancellationToken);
     }
 
     // Case- and normalization-insensitive key so the missing-file diff agrees with

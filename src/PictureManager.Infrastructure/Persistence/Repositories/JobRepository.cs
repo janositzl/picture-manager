@@ -80,6 +80,16 @@ public sealed class JobRepository : IJobRepository
         return rows > 0;
     }
 
+    public async Task TryMarkCompletedFromEnumeratingAsync(int discoveryJobId, DateTime completedUtc, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Jobs
+            .Where(j => j.Id == discoveryJobId && j.Status == JobStatus.Enumerating)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(j => j.Status, JobStatus.Completed)
+                .SetProperty(j => j.CompletedUtc, completedUtc),
+                cancellationToken);
+    }
+
     public async Task IncrementFilesEnrichedAsync(int scanJobId, CancellationToken cancellationToken = default)
     {
         await _dbContext.Jobs

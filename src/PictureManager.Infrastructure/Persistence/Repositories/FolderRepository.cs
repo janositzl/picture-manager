@@ -150,6 +150,12 @@ public sealed class FolderRepository : IFolderRepository
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.Name, name), cancellationToken);
     }
 
+    public async Task<bool> HasUndiscoveredFoldersAsync(int rootId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Folders.AsNoTracking()
+            .AnyAsync(f => f.RootId == rootId && f.IsActive && f.ChildrenDiscoveredAt == null, cancellationToken);
+    }
+
     private static IQueryable<FolderNode> ToNodes(IQueryable<Folder> folders) =>
         folders
             .OrderBy(f => f.Name.ToLower()).ThenBy(f => f.Id)

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
+using PictureManager.Application.Discovery;
 using PictureManager.Application.Duplicates;
 using PictureManager.Application.Folders;
 using PictureManager.Application.Images;
@@ -18,6 +19,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ICurrentUser, SystemCurrentUser>();
         services.AddScoped<IImageEnrichmentService, ImageEnrichmentService>();
         services.AddScoped<IScanService, ScanService>();
+        services.AddScoped<IDiscoveryService, DiscoveryService>();
         services.AddScoped<IImageRootSeeder, ImageRootSeeder>();
         services.AddScoped<IRootService, RootService>();
         services.AddScoped<IImageQueryService, ImageQueryService>();

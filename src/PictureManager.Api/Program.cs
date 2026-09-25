@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using PictureManager.Api.Endpoints;
 using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
+using PictureManager.Application.Discovery;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Roots;
 using PictureManager.Application.Scanning;
@@ -74,6 +75,28 @@ try
         var interrupted = await scope.ServiceProvider.GetRequiredService<IScanService>().FailInterruptedJobsAsync();
         if (interrupted > 0)
             Log.Warning("Marked {Count} scan job(s) interrupted by a restart as failed", interrupted);
+
+        // Discovery is cheap and takes priority over any queued scan (HasActiveJobAsync refuses a second job,
+        // so this only fires when nothing else is running): a brand-new root, or one a previous discovery never
+        // finished walking, gets queued here rather than waiting for a manual "Refresh structure".
+        var folderRepository = scope.ServiceProvider.GetRequiredService<IFolderRepository>();
+        var discoveryService = scope.ServiceProvider.GetRequiredService<IDiscoveryService>();
+        foreach (var root in await scope.ServiceProvider.GetRequiredService<IImageRootRepository>().GetAllAsync())
+        {
+            if (!root.IsActive || !await folderRepository.HasUndiscoveredFoldersAsync(root.Id))
+                continue;
+
+            try
+            {
+                await discoveryService.QueueDiscoveryAsync(root.Id, null);
+            }
+            catch (DiscoveryAlreadyInProgressException)
+            {
+                // Another root's discovery (or a resumed scan) is already queued; the next restart or a manual
+                // "Refresh structure" picks this root up.
+                break;
+            }
+        }
     }
 
     app.UseMiddleware<ImageCacheControlMiddleware>();
@@ -89,6 +112,7 @@ try
     user.MapAlbumEndpoints();
     user.MapDuplicateEndpoints();
     admin.MapScanEndpoints();
+    admin.MapDiscoveryEndpoints();
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();
 

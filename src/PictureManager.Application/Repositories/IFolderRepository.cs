@@ -46,4 +46,7 @@ public interface IFolderRepository
 
     /// <summary>Renames the root's top folder (the tree node that shows the root's name).</summary>
     Task RenameRootFolderAsync(int rootId, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>True if the root has any active folder whose children were never discovered (new root, or a discovery interrupted before finishing).</summary>
+    Task<bool> HasUndiscoveredFoldersAsync(int rootId, CancellationToken cancellationToken = default);
 }

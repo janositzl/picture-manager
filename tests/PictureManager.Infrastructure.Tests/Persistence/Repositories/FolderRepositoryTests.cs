@@ -121,4 +121,54 @@ public class FolderRepositoryTests
         fetched.ChildrenDiscoveredAt.Should().Be(TestData.Utc);
         fetched.LastWriteTimeUtc.Should().Be(TestData.Utc.AddDays(-1));
     }
+
+    [Fact]
+    public async Task HasUndiscoveredFoldersAsync_NewRoot_IsTrue_UntilItsTopFolderIsMarkedDiscovered()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("undiscovered");
+        var top = TestData.Folder(root, "");
+        db.Context.Folders.Add(top);
+        await db.Context.SaveChangesAsync();
+
+        var repository = new FolderRepository(db.Context);
+        (await repository.HasUndiscoveredFoldersAsync(root.Id)).Should().BeTrue();
+
+        top.ChildrenDiscoveredAt = TestData.Utc;
+        await db.Context.SaveChangesAsync();
+
+        (await repository.HasUndiscoveredFoldersAsync(root.Id)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HasUndiscoveredFoldersAsync_UndiscoveredDescendant_IsTrue()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("deep-undiscovered");
+        var top = TestData.Folder(root, "");
+        top.ChildrenDiscoveredAt = TestData.Utc;
+        var child = TestData.Folder(root, "2025", top);
+        db.Context.AddRange(top, child);
+        await db.Context.SaveChangesAsync();
+
+        var repository = new FolderRepository(db.Context);
+
+        (await repository.HasUndiscoveredFoldersAsync(root.Id)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HasUndiscoveredFoldersAsync_TombstonedChild_IsIgnored()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("tombstoned-undiscovered");
+        var top = TestData.Folder(root, "");
+        top.ChildrenDiscoveredAt = TestData.Utc;
+        var removed = TestData.Folder(root, "gone", top, isActive: false);
+        db.Context.AddRange(top, removed);
+        await db.Context.SaveChangesAsync();
+
+        var repository = new FolderRepository(db.Context);
+
+        (await repository.HasUndiscoveredFoldersAsync(root.Id)).Should().BeFalse();
+    }
 }
