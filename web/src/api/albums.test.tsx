@@ -85,4 +85,32 @@ describe('album mutations', () => {
     expect(albumStore.get(5)!.imageIds).toEqual([22, 21, 20])
     expect(ids(queryClient.getQueryData(queryKeys.albumImages(5)))).toEqual([22, 21, 20])
   })
+
+  it('when the first of two quick moves fails, the cache ends up matching the server', async () => {
+    albumStore.get(5)!.imageIds = [20, 21, 22]
+    server.use(
+      http.post('/api/albums/:id/images/:imageId/move', ({ params }) => {
+        if (Number(params.imageId) !== 22) return
+        return HttpResponse.json({ title: 'boom' }, { status: 500 })
+      }),
+    )
+    const { queryClient, wrapper } = setup()
+    const { result } = renderHook(() => ({ images: useAlbumImages(5), move: useMoveInAlbum(5) }), {
+      wrapper,
+    })
+    await waitFor(() => expect(ids(result.current.images.data)).toEqual([20, 21, 22]))
+
+    act(() => {
+      // Move 1 (22 to the front) fails; move 2 (21 after 22) is planned against move 1's
+      // optimistic result but actually lands on the server's real, still-unmoved order.
+      result.current.move.mutate({ imageId: 22, afterImageId: null, order: [22, 20, 21] })
+      result.current.move.mutate({ imageId: 21, afterImageId: 22, order: [22, 21, 20] })
+    })
+
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    expect(albumStore.get(5)!.imageIds).toEqual([20, 22, 21])
+    await waitFor(() =>
+      expect(ids(queryClient.getQueryData(queryKeys.albumImages(5)))).toEqual([20, 22, 21]),
+    )
+  })
 })

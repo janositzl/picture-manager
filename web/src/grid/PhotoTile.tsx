@@ -18,6 +18,8 @@ export type TileSelection = {
 export type TileActivator = {
   ref: (element: HTMLElement | null) => void
   props: HTMLAttributes<HTMLElement>
+  /** True while this tile is being dragged, including the Space that drops it. */
+  dragging?: boolean
 }
 
 type Props = {
@@ -96,6 +98,10 @@ export function PhotoTile({
         // dnd-kit picks the tile up on Space (and marks the event handled); Enter still opens it.
         activator?.props.onKeyDown?.(event)
         if (event.defaultPrevented) return
+        // The drop Space reaches here too: dnd-kit's own end handler runs on a later, document-level
+        // listener, so `defaultPrevented` isn't set yet by the time this fires. Read the drag state
+        // captured at render instead of trusting that this key was already handled.
+        if (activator?.dragging) return
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           activate(event.shiftKey)

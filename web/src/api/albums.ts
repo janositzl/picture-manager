@@ -99,6 +99,11 @@ export function useMoveInAlbum(albumId: number) {
       }
       notify("Couldn't save the new order.")
     },
+    // `scope` only blocks a queued move while this one is *pending*, not through onError/onSuccess,
+    // so a queued move's own request can land before or after this one's rollback settles either
+    // way. Whichever move settles last corrects the cache here, so the final state always matches
+    // what the server actually has, however the two responses interleaved.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.albumImages(albumId) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.albums() }),
   })
 }

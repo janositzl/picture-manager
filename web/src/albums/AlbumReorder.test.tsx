@@ -39,14 +39,15 @@ async function pickUp(name: string) {
 }
 
 describe('reordering an album', () => {
-  it('keyboard drag moves a photo and saves its new place', async () => {
-    const { user } = renderApp('/albums/5')
+  it('keyboard drag moves a photo and saves its new place, without opening the viewer', async () => {
+    const { user, router } = renderApp('/albums/5')
     await pickUp('IMG_0001.jpg')
     await user.keyboard('[Space]')
     await user.keyboard('[ArrowRight]')
     await user.keyboard('[Space]')
     await waitFor(() => expect(tileIds()).toEqual(['tile-21', 'tile-20', 'tile-22']))
     await waitFor(() => expect(albumStore.get(5)!.imageIds).toEqual([21, 20, 22]))
+    expect(router.state.location.search).toBe('')
   })
 
   it('moving to the front saves it there', async () => {
@@ -78,6 +79,14 @@ describe('reordering an album', () => {
     const { user } = renderApp('/albums/5')
     await user.click(await screen.findByRole('button', { name: 'IMG_0002.jpg' }))
     expect(await screen.findByRole('img', { name: 'IMG_0002.jpg' })).toBeInTheDocument()
+  })
+
+  it('Enter opens the viewer when the tile is not being dragged', async () => {
+    const { user } = renderApp('/albums/5')
+    const tile = await screen.findByRole('button', { name: 'IMG_0003.jpg' })
+    tile.focus()
+    await user.keyboard('[Enter]')
+    expect(await screen.findByRole('img', { name: 'IMG_0003.jpg' })).toBeInTheDocument()
   })
 
   it('dragging is off while photos are selected', async () => {

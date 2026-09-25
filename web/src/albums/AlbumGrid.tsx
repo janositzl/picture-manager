@@ -149,6 +149,7 @@ function SortableTile({
     >
       {children({
         ref: setActivatorNodeRef,
+        dragging: isDragging,
         props: { ...attributes, ...(listeners as HTMLAttributes<HTMLElement> | undefined) },
       })}
     </div>
