@@ -2,15 +2,21 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import CloseIcon from '@mui/icons-material/Close'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { AlbumPicker } from '../albums/AlbumPicker'
+import { readLastUsedAlbum, writeLastUsedAlbum } from '../albums/preferences'
+import { useAlbumAdder } from '../albums/useAlbumAdder'
 import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
-import { useImage } from '../api/queries'
+import { albumsQuery, useImage } from '../api/queries'
 import type { ImageListItem } from '../api/types'
+import { useNotify } from '../app/notify'
 import { parseGridParams, withParams } from '../routing/urlState'
 import { InfoPanel } from './InfoPanel'
 
@@ -55,6 +61,10 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   const [infoOpen, setInfoOpen] = useState(readInfoOpen)
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const pendingNext = useRef(false)
+  const queryClient = useQueryClient()
+  const notify = useNotify()
+  const { addTo } = useAlbumAdder()
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const items = list.items
   const index = imageId === null ? -1 : items.findIndex((item) => item.id === imageId)
@@ -65,6 +75,28 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   const canGoPrev = prev !== undefined
   const canGoNext = inList && (next !== undefined || list.hasNextPage)
   const notFound = !inList && isNotFound(detail.error)
+
+  const canAdd = current !== undefined && !isMissingItem(current)
+
+  // Shift+A: straight into the last used album; without one (or if it's gone), fall back to the picker.
+  const quickAdd = async () => {
+    if (current === undefined || !canAdd) return
+    const lastId = readLastUsedAlbum()
+    const albums = lastId === null ? [] : await queryClient.ensureQueryData(albumsQuery)
+    const album = albums.find((a) => a.id === lastId)
+    if (album === undefined) {
+      if (lastId !== null) writeLastUsedAlbum(null)
+      setPickerOpen(true)
+      return
+    }
+    const outcome = await addTo(album, { imageIds: [current.id] })
+    if (outcome === 'gone') {
+      notify('That album no longer exists.')
+      setPickerOpen(true)
+    } else if (outcome === 'failed') {
+      notify("Couldn't add photos.")
+    }
+  }
 
   // Stepping replaces the entry, so Back closes the viewer instead of replaying every photo.
   const show = (id: number) =>
@@ -112,6 +144,7 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   }, [next])
 
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (pickerOpen) return
     if (event.altKey || event.ctrlKey || event.metaKey) return
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea')) return
     switch (event.key) {
@@ -134,6 +167,14 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
       case 'i':
       case 'I':
         toggleInfo()
+        break
+      case 'a':
+      case 'A':
+        // preventDefault: without it, the keystroke that opens the picker also lands in its
+        // auto-focused filter field once focus moves there, filtering out every album.
+        event.preventDefault()
+        if (event.shiftKey) void quickAdd()
+        else if (canAdd) setPickerOpen(true)
         break
     }
   })
@@ -194,75 +235,89 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   }
 
   return (
-    <Dialog
-      open
-      fullScreen
-      slotProps={{
-        paper: { 'aria-label': name, sx: { bgcolor: 'common.black', color: 'common.white' } },
-      }}
-    >
-      <Box sx={{ display: 'flex', height: '100%' }}>
-        <Box
-          sx={{
-            position: 'relative',
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {stage}
-          {canGoPrev && (
-            <IconButton
-              aria-label="Previous photo"
-              onClick={goPrev}
-              sx={{ position: 'absolute', left: 8, color: 'common.white' }}
-            >
-              <ChevronLeftIcon fontSize="large" />
-            </IconButton>
-          )}
-          {canGoNext && (
-            <IconButton
-              aria-label="Next photo"
-              onClick={goNext}
-              sx={{ position: 'absolute', right: 8, color: 'common.white' }}
-            >
-              <ChevronRightIcon fontSize="large" />
-            </IconButton>
-          )}
-          <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
-            {current !== undefined && (
+    <>
+      <Dialog
+        open
+        fullScreen
+        slotProps={{
+          paper: { 'aria-label': name, sx: { bgcolor: 'common.black', color: 'common.white' } },
+        }}
+      >
+        <Box sx={{ display: 'flex', height: '100%' }}>
+          <Box
+            sx={{
+              position: 'relative',
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {stage}
+            {canGoPrev && (
               <IconButton
-                aria-label={current.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                aria-pressed={current.isFavorite}
-                onClick={toggleFavorite}
-                sx={{ color: 'warning.main' }}
+                aria-label="Previous photo"
+                onClick={goPrev}
+                sx={{ position: 'absolute', left: 8, color: 'common.white' }}
               >
-                {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                <ChevronLeftIcon fontSize="large" />
               </IconButton>
             )}
-            <IconButton
-              aria-label={infoOpen ? 'Hide info' : 'Show info'}
-              onClick={toggleInfo}
-              sx={{ color: 'common.white' }}
-            >
-              <InfoOutlinedIcon />
-            </IconButton>
-            <IconButton aria-label="Close viewer" onClick={close} sx={{ color: 'common.white' }}>
-              <CloseIcon />
-            </IconButton>
+            {canGoNext && (
+              <IconButton
+                aria-label="Next photo"
+                onClick={goNext}
+                sx={{ position: 'absolute', right: 8, color: 'common.white' }}
+              >
+                <ChevronRightIcon fontSize="large" />
+              </IconButton>
+            )}
+            <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+              {current !== undefined && (
+                <IconButton
+                  aria-label={current.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-pressed={current.isFavorite}
+                  onClick={toggleFavorite}
+                  sx={{ color: 'warning.main' }}
+                >
+                  {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                </IconButton>
+              )}
+              {canAdd && (
+                <IconButton
+                  aria-label="Add to album"
+                  onClick={() => setPickerOpen(true)}
+                  sx={{ color: 'common.white' }}
+                >
+                  <PlaylistAddIcon />
+                </IconButton>
+              )}
+              <IconButton
+                aria-label={infoOpen ? 'Hide info' : 'Show info'}
+                onClick={toggleInfo}
+                sx={{ color: 'common.white' }}
+              >
+                <InfoOutlinedIcon />
+              </IconButton>
+              <IconButton aria-label="Close viewer" onClick={close} sx={{ color: 'common.white' }}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
+          {infoOpen && !notFound && (
+            <InfoPanel
+              detail={detail.data}
+              isLoading={detail.isPending}
+              isError={detail.isError}
+              onRetry={() => void detail.refetch()}
+            />
+          )}
         </Box>
-        {infoOpen && !notFound && (
-          <InfoPanel
-            detail={detail.data}
-            isLoading={detail.isPending}
-            isError={detail.isError}
-            onRetry={() => void detail.refetch()}
-          />
-        )}
-      </Box>
-    </Dialog>
+      </Dialog>
+      {pickerOpen && current !== undefined && (
+        <AlbumPicker target={{ imageIds: [current.id] }} onClose={() => setPickerOpen(false)} />
+      )}
+    </>
   )
 }
