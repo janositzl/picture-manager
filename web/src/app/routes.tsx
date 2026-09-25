@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { AlbumsPage } from '../albums/AlbumsPage'
 import { AlbumView } from '../albums/AlbumView'
+import { DuplicatesView } from '../views/DuplicatesView'
 import { FavoritesView } from '../views/FavoritesView'
 import { FolderView } from '../views/FolderView'
 import { RootRedirect } from '../views/RootRedirect'
@@ -17,6 +18,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'favorites', element: <FavoritesView /> },
       { path: 'albums', element: <AlbumsPage /> },
       { path: 'albums/:albumId', element: <AlbumView /> },
+      { path: 'duplicates', element: <DuplicatesView /> },
       { path: 'search', element: <SearchView /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
