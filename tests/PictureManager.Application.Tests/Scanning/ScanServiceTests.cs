@@ -667,6 +667,182 @@ public class ScanServiceTests
         await scanJobRepository.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task QueueScanAsync_FolderScoped_MarksTheFolderScanning()
+    {
+        var folder = new Folder { Id = 10, RootId = 1, IsActive = true };
+
+        var imageRootRepository = Substitute.For<IImageRootRepository>();
+        imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>())
+            .Returns(new ImageRoot { Id = 1, Name = "dev", MountPath = "/mnt/dev", IsActive = true });
+
+        var folderRepository = Substitute.For<IFolderRepository>();
+        folderRepository.GetByIdAsync(10, Arg.Any<CancellationToken>()).Returns(folder);
+
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        {
+            var job = callInfo.Arg<Job>();
+            job.Id = 999;
+            return job;
+        });
+
+        var scanService = new ScanService(
+            imageRootRepository, folderRepository, Substitute.For<IImageRepository>(),
+            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(),
+            Substitute.For<IScanQueue>(), Substitute.For<IClock>(), new ScanningOptions());
+
+        await scanService.QueueScanAsync(rootId: null, folderId: 10, isRecursive: false);
+
+        await folderRepository.Received(1).SetScanStatusAsync(10, FolderScanStatus.Scanning, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ScanFolderNowAsync_Success_MarksTheFoldersSubtreeScanned()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, "photo.jpg"), new byte[] { 1, 2, 3 });
+
+            var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
+            var folder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev", IsActive = true };
+
+            var imageRootRepository = Substitute.For<IImageRootRepository>();
+            imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+            var folderRepository = Substitute.For<IFolderRepository>();
+            folderRepository.GetByIdAsync(10, Arg.Any<CancellationToken>()).Returns(folder);
+            folderRepository.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>()).Returns(folder);
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image>());
+            imageRepository.AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var image = callInfo.Arg<Image>();
+                image.Id = 100;
+                return image;
+            });
+
+            var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var job = callInfo.Arg<Job>();
+                job.Id = 999;
+                return job;
+            });
+
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var scanService = new ScanService(
+                imageRootRepository, folderRepository, imageRepository,
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock,
+                new ScanningOptions { SupportedExtensions = new List<string> { ".jpg" } });
+
+            await scanService.ScanFolderNowAsync(folderId: 10, isRecursive: false);
+
+            await folderRepository.Received(1).MarkSubtreeScannedAsync(10, clock.UtcNow, Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanNowAsync_RootScoped_MarksTheRootFoldersSubtreeScanned()
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(tempRoot.FullName, "photo.jpg"), new byte[] { 1, 2, 3 });
+
+            var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
+            var rootFolder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
+
+            var imageRootRepository = Substitute.For<IImageRootRepository>();
+            imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+            var folderRepository = Substitute.For<IFolderRepository>();
+            folderRepository.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>()).Returns(rootFolder);
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image>());
+            imageRepository.AddAsync(Arg.Any<Image>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var image = callInfo.Arg<Image>();
+                image.Id = 100;
+                return image;
+            });
+
+            var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var job = callInfo.Arg<Job>();
+                job.Id = 999;
+                return job;
+            });
+
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var scanService = new ScanService(
+                imageRootRepository, folderRepository, imageRepository,
+                appSettingsRepository, scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock,
+                new ScanningOptions { SupportedExtensions = new List<string> { ".jpg" } });
+
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
+
+            await folderRepository.Received(1).MarkSubtreeScannedAsync(10, clock.UtcNow, Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFolderNowAsync_Failure_MarksTheFolderError()
+    {
+        var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = "/nonexistent-xyz", IsActive = true };
+        var folder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev", IsActive = true };
+
+        var imageRootRepository = Substitute.For<IImageRootRepository>();
+        imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+
+        var folderRepository = Substitute.For<IFolderRepository>();
+        folderRepository.GetByIdAsync(10, Arg.Any<CancellationToken>()).Returns(folder);
+
+        var scanJobRepository = Substitute.For<IJobRepository>();
+        scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        {
+            var job = callInfo.Arg<Job>();
+            job.Id = 999;
+            return job;
+        });
+
+        var clock = Substitute.For<IClock>();
+        clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var scanService = new ScanService(
+            imageRootRepository, folderRepository, Substitute.For<IImageRepository>(),
+            Substitute.For<IAppSettingsRepository>(), scanJobRepository, Substitute.For<IEnrichmentQueue>(), Substitute.For<IScanQueue>(), clock,
+            new ScanningOptions());
+
+        var act = () => scanService.ScanFolderNowAsync(folderId: 10, isRecursive: false);
+
+        await act.Should().ThrowAsync<ScanRootsUnavailableException>();
+
+        await folderRepository.Received(1).SetScanStatusAsync(10, FolderScanStatus.Error, Arg.Any<CancellationToken>());
+    }
+
     private static DateTime TruncateToMicroseconds(DateTime value) =>
         new(value.Ticks - (value.Ticks % 10), value.Kind);
 }

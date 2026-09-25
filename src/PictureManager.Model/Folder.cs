@@ -21,6 +21,17 @@ public class Folder
     /// <summary>The directory's last-write time as of the last discovery; for a later "possibly outdated" hint.</summary>
     public DateTime? LastWriteTimeUtc { get; set; }
 
+    public FolderScanStatus ScanStatus { get; set; } = FolderScanStatus.Idle;
+
+    /// <summary>When a scan of this folder last completed successfully; null = never scanned.</summary>
+    public DateTime? LastScannedAt { get; set; }
+
+    /// <summary>This folder's own (non-missing) image count as of LastScannedAt.</summary>
+    public int? LastScanFileCount { get; set; }
+
+    /// <summary>Excludes the folder from future scans/discovery walks (not yet enforced -- column only for now).</summary>
+    public bool IsExcluded { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime ModifiedUtc { get; set; }
 

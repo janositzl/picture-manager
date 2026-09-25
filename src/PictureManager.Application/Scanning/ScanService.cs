@@ -71,6 +71,9 @@ public sealed class ScanService : IScanService
             jobFolderId = (await _folderRepository.GetByRootAndRelativePathAsync(rootId.Value, string.Empty, cancellationToken))?.Id;
         }
 
+        if (jobFolderId.HasValue)
+            await _folderRepository.SetScanStatusAsync(jobFolderId.Value, FolderScanStatus.Scanning, cancellationToken);
+
         // Created as Enumerating (not Pending) so HasActiveJobAsync refuses any other job while this one waits
         // in the queue.
         var scanJob = await _scanJobRepository.AddAsync(new Job
@@ -134,7 +137,7 @@ public sealed class ScanService : IScanService
         }
         catch (Exception ex)
         {
-            await FinalizeFailureAsync(scan.ScanJobId, ex, foldersScanned, filesFound);
+            await FinalizeFailureAsync(scan.ScanJobId, ex, foldersScanned, filesFound, scan.FolderId);
             throw;
         }
     }
@@ -158,7 +161,10 @@ public sealed class ScanService : IScanService
 
         var settings = await _appSettingsRepository.GetAsync(cancellationToken);
         var excludeRules = new ScanExcludeRules(settings, _scanningOptions.SupportedExtensions);
-        return await ScanTreeAsync(root, folder, folderPath, scan.IsRecursive, excludeRules, scan.ScanJobId, 0, 0, cancellationToken);
+        var result = await ScanTreeAsync(root, folder, folderPath, scan.IsRecursive, excludeRules, scan.ScanJobId, 0, 0, cancellationToken);
+
+        await _folderRepository.MarkSubtreeScannedAsync(folder.Id, _clock.UtcNow, cancellationToken);
+        return result;
     }
 
     private async Task FinalizeSuccessAsync(int scanJobId, int foldersScanned, int filesFound, CancellationToken cancellationToken)
@@ -180,7 +186,7 @@ public sealed class ScanService : IScanService
         await _scanJobRepository.TryMarkCompletedIfEnrichedAsync(scanJobId, _clock.UtcNow, cancellationToken);
     }
 
-    private async Task FinalizeFailureAsync(int scanJobId, Exception ex, int foldersScanned, int filesFound)
+    private async Task FinalizeFailureAsync(int scanJobId, Exception ex, int foldersScanned, int filesFound, int? folderId)
     {
         var isCancellation = ex is OperationCanceledException;
         var status = isCancellation ? JobStatus.Cancelled : JobStatus.Failed;
@@ -191,6 +197,10 @@ public sealed class ScanService : IScanService
         // stuck instead of ever recording its terminal status.
         await _scanJobRepository.SetFailureResultAsync(
             scanJobId, foldersScanned, filesFound, errorMessage, status, _clock.UtcNow, CancellationToken.None);
+
+        // Cancellation isn't an error; the folder is left however the (interrupted) walk left it.
+        if (folderId.HasValue && !isCancellation)
+            await _folderRepository.SetScanStatusAsync(folderId.Value, FolderScanStatus.Error, CancellationToken.None);
     }
 
     private async Task<(int FoldersScanned, int FilesFound)> ScanRootAsync(
@@ -198,7 +208,10 @@ public sealed class ScanService : IScanService
         int foldersBefore, int filesBefore, CancellationToken cancellationToken)
     {
         var rootFolder = await ScanTargets.GetOrCreateFolderAsync(_folderRepository, _clock, root.Id, parentId: null, relativePath: string.Empty, name: root.Name, cancellationToken);
-        return await ScanTreeAsync(root, rootFolder, root.MountPath, isRecursive, excludeRules, scanJobId, foldersBefore, filesBefore, cancellationToken);
+        var result = await ScanTreeAsync(root, rootFolder, root.MountPath, isRecursive, excludeRules, scanJobId, foldersBefore, filesBefore, cancellationToken);
+
+        await _folderRepository.MarkSubtreeScannedAsync(rootFolder.Id, _clock.UtcNow, cancellationToken);
+        return result;
     }
 
     private async Task<(int FoldersScanned, int FilesFound)> ScanTreeAsync(

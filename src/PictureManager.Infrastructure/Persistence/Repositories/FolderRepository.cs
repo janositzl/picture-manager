@@ -156,6 +156,33 @@ public sealed class FolderRepository : IFolderRepository
             .AnyAsync(f => f.RootId == rootId && f.IsActive && f.ChildrenDiscoveredAt == null, cancellationToken);
     }
 
+    public async Task SetScanStatusAsync(int folderId, FolderScanStatus status, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Folders.Where(f => f.Id == folderId)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.ScanStatus, status), cancellationToken);
+    }
+
+    public async Task MarkSubtreeScannedAsync(int folderId, DateTime scannedAtUtc, CancellationToken cancellationToken = default)
+    {
+        // One statement for the whole subtree, each folder stamped with its own current present-image
+        // count (a correlated subquery per row, same shape as MarkSubtreeMissingAsync's subtree CTE).
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH RECURSIVE subtree AS (
+                SELECT "Id" FROM "Folders" WHERE "Id" = {folderId}
+                UNION ALL
+                SELECT f."Id" FROM "Folders" f JOIN subtree s ON f."ParentId" = s."Id"
+            )
+            UPDATE "Folders" SET
+                "ScanStatus" = {(int)FolderScanStatus.Idle},
+                "LastScannedAt" = {scannedAtUtc},
+                "LastScanFileCount" = (
+                    SELECT COUNT(*) FROM "Images" i
+                    WHERE i."FolderId" = "Folders"."Id" AND i."MissingSinceUtc" IS NULL
+                )
+            WHERE "Id" IN (SELECT "Id" FROM subtree) AND "IsActive"
+            """, cancellationToken);
+    }
+
     private static IQueryable<FolderNode> ToNodes(IQueryable<Folder> folders) =>
         folders
             .OrderBy(f => f.Name.ToLower()).ThenBy(f => f.Id)

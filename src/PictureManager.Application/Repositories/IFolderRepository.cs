@@ -49,4 +49,13 @@ public interface IFolderRepository
 
     /// <summary>True if the root has any active folder whose children were never discovered (new root, or a discovery interrupted before finishing).</summary>
     Task<bool> HasUndiscoveredFoldersAsync(int rootId, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the folder's own ScanStatus (not its subtree).</summary>
+    Task SetScanStatusAsync(int folderId, FolderScanStatus status, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// One statement for the whole subtree: sets ScanStatus = Idle, LastScannedAt = scannedAtUtc, and
+    /// LastScanFileCount = each folder's own current (non-missing) image count.
+    /// </summary>
+    Task MarkSubtreeScannedAsync(int folderId, DateTime scannedAtUtc, CancellationToken cancellationToken = default);
 }

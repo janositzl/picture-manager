@@ -37,6 +37,11 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
         builder.Property(x => x.LastWriteTimeUtc)
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(x => x.LastScannedAt)
+            .HasColumnType("timestamp with time zone");
+
+        builder.HasIndex(x => x.ScanStatus);
+
         builder.HasOne(x => x.Root)
             .WithMany()
             .HasForeignKey(x => x.RootId)
