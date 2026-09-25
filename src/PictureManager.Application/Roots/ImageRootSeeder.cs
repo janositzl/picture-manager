@@ -18,13 +18,15 @@ namespace PictureManager.Application.Roots;
 public sealed class ImageRootSeeder : IImageRootSeeder
 {
     private readonly IImageRootRepository _roots;
+    private readonly IFolderRepository _folders;
     private readonly IClock _clock;
     private readonly ImageRootsOptions _options;
     private readonly ILogger<ImageRootSeeder> _logger;
 
-    public ImageRootSeeder(IImageRootRepository roots, IClock clock, ImageRootsOptions options, ILogger<ImageRootSeeder> logger)
+    public ImageRootSeeder(IImageRootRepository roots, IFolderRepository folders, IClock clock, ImageRootsOptions options, ILogger<ImageRootSeeder> logger)
     {
         _roots = roots;
+        _folders = folders;
         _clock = clock;
         _options = options;
         _logger = logger;
@@ -78,6 +80,24 @@ public sealed class ImageRootSeeder : IImageRootSeeder
                 CreatedUtc = _clock.UtcNow
             }, cancellationToken);
             roots.Add(created);
+        }
+
+        // Every root gets its top folder now, so it shows in the tree (not yet discovered) before any discovery
+        // or scan. Inactive roots too: their folders are hidden anyway, and re-activating one then needs no restart.
+        foreach (var root in roots)
+        {
+            if (await _folders.GetByRootAndRelativePathAsync(root.Id, string.Empty, cancellationToken) is not null)
+                continue;
+
+            await _folders.AddAsync(new Folder
+            {
+                RootId = root.Id,
+                ParentId = null,
+                Name = root.Name,
+                RelativePath = string.Empty,
+                CreatedUtc = _clock.UtcNow,
+                ModifiedUtc = _clock.UtcNow
+            }, cancellationToken);
         }
 
         foreach (var root in roots.Where(r => !configuredMountPaths.Contains(r.MountPath)))

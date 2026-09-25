@@ -16,6 +16,7 @@ namespace PictureManager.Application.Tests.Roots;
 public class ImageRootSeederTests
 {
     private readonly IImageRootRepository _roots = Substitute.For<IImageRootRepository>();
+    private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly List<ImageRoot> _existing = new();
 
@@ -27,7 +28,7 @@ public class ImageRootSeederTests
     }
 
     private Task SeedAsync(params ImageRootConfigEntry[] entries) =>
-        new ImageRootSeeder(_roots, _clock, new ImageRootsOptions { Entries = new List<ImageRootConfigEntry>(entries) },
+        new ImageRootSeeder(_roots, _folders, _clock, new ImageRootsOptions { Entries = new List<ImageRootConfigEntry>(entries) },
             NullLogger<ImageRootSeeder>.Instance).SeedAsync();
 
     private static ImageRootConfigEntry Entry(string? name, string? mountPath, string? alias = null) =>
@@ -122,5 +123,47 @@ public class ImageRootSeederTests
 
         await act.Should().NotThrowAsync();
         await _roots.DidNotReceive().AddAsync(Arg.Any<ImageRoot>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SeedAsync_NewRoot_CreatesItsTopFolder_NotYetDiscovered()
+    {
+        _roots.AddAsync(Arg.Any<ImageRoot>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var root = call.Arg<ImageRoot>();
+            root.Id = 5;
+            return root;
+        });
+
+        await SeedAsync(Entry("nas-photos", "/images/photos"));
+
+        await _folders.Received(1).AddAsync(
+            Arg.Is<Folder>(f => f.RootId == 5 && f.ParentId == null && f.RelativePath == "" && f.Name == "nas-photos"
+                                && f.ChildrenDiscoveredAt == null && f.CreatedUtc == _clock.UtcNow),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SeedAsync_ExistingAndInactiveRootsWithoutTopFolder_GetOne()
+    {
+        _existing.Add(new ImageRoot { Id = 1, Name = "active", MountPath = "/a", IsActive = true });
+        _existing.Add(new ImageRoot { Id = 2, Name = "off", MountPath = "/b", IsActive = false });
+
+        await SeedAsync(Entry("active", "/a"), Entry("off", "/b"));
+
+        await _folders.Received(1).AddAsync(Arg.Is<Folder>(f => f.RootId == 1 && f.Name == "active"), Arg.Any<CancellationToken>());
+        await _folders.Received(1).AddAsync(Arg.Is<Folder>(f => f.RootId == 2 && f.Name == "off"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SeedAsync_RootThatHasItsTopFolder_CreatesNoDuplicate()
+    {
+        _existing.Add(new ImageRoot { Id = 1, Name = "dev", MountPath = "/a", IsActive = true });
+        _folders.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>())
+            .Returns(new Folder { Id = 10, RootId = 1, Name = "dev", RelativePath = string.Empty });
+
+        await SeedAsync(Entry("dev", "/a"));
+
+        await _folders.DidNotReceive().AddAsync(Arg.Any<Folder>(), Arg.Any<CancellationToken>());
     }
 }
