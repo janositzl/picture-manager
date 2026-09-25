@@ -38,6 +38,7 @@ desktop.ini
 # =========== IDE ===========
 .idea/
 *.swp
+.tokensave/
 
 # =========== Worktrees (superpowers subagent-driven-development scratch) ===========
 .worktrees/
