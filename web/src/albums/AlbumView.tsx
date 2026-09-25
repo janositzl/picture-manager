@@ -15,6 +15,7 @@ import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { PhotoViewer } from '../viewer/PhotoViewer'
 import { GridSkeleton } from '../views/GridSkeleton'
 import { AlbumFormDialog } from './AlbumFormDialog'
+import { ExportDialog } from './ExportDialog'
 import { AlbumGrid } from './AlbumGrid'
 import { AlbumPicker } from './AlbumPicker'
 import { photoCount } from './messages'
@@ -23,7 +24,7 @@ import { planMove } from './reorder'
 
 const LARGE_ALBUM = 2000
 
-type OpenDialog = 'edit' | 'delete' | 'remove' | null
+type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | null
 type PickerState = { target: AddTarget; unavailable: number }
 
 export function AlbumView() {
@@ -191,6 +192,9 @@ export function AlbumView() {
       <Button size="small" onClick={() => setDialog('edit')}>
         Edit…
       </Button>
+      <Button size="small" onClick={() => setDialog('export')}>
+        Export…
+      </Button>
       <Button size="small" color="error" onClick={() => setDialog('delete')}>
         Delete…
       </Button>
@@ -224,6 +228,13 @@ export function AlbumView() {
           album={detail}
           onClose={() => setDialog(null)}
           onSaved={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'export' && (
+        <ExportDialog
+          album={detail}
+          missingCount={items.filter((item) => item.isMissing).length}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog === 'delete' && (
