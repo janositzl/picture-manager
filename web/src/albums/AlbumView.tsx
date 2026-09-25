@@ -1,7 +1,7 @@
 import { Alert, Box, Button, FormControlLabel, Link, Switch, Typography } from '@mui/material'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
-import { useDeleteAlbum, useRemoveFromAlbum, type AddTarget } from '../api/albums'
+import { useDeleteAlbum, useMoveInAlbum, useRemoveFromAlbum, type AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
 import { useAlbum, useAlbumImages } from '../api/queries'
@@ -19,6 +19,7 @@ import { AlbumGrid } from './AlbumGrid'
 import { AlbumPicker } from './AlbumPicker'
 import { photoCount } from './messages'
 import { readShowFolders, writeShowFolders } from './preferences'
+import { planMove } from './reorder'
 
 const LARGE_ALBUM = 2000
 
@@ -36,6 +37,7 @@ export function AlbumView() {
   const images = useAlbumImages(albumId)
   const setFavorite = useSetFavorite()
   const removeImages = useRemoveFromAlbum(albumId ?? 0)
+  const moveImage = useMoveInAlbum(albumId ?? 0)
   const deleteAlbum = useDeleteAlbum(albumId ?? 0)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
@@ -140,6 +142,10 @@ export function AlbumView() {
           onToggleFavorite={(item) =>
             setFavorite.mutate({ id: item.id, isFavorite: !item.isFavorite })
           }
+          onMove={(activeId, overId) => {
+            const plan = planMove(ids, activeId, overId)
+            if (plan !== null) moveImage.mutate({ imageId: activeId, ...plan })
+          }}
         />
       </>
     )

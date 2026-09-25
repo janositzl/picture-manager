@@ -1,7 +1,23 @@
-import { useCallback, useState } from 'react'
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useCallback, useState, type HTMLAttributes, type ReactNode } from 'react'
 import type { AlbumImageItem } from '../api/types'
 import { columnCount, GRID_PADDING, TILE_GAP, tileSize } from '../grid/columns'
-import { PhotoTile } from '../grid/PhotoTile'
+import { PhotoTile, type TileActivator } from '../grid/PhotoTile'
 import type { Selection } from '../grid/useSelection'
 
 type Props = {
@@ -10,11 +26,27 @@ type Props = {
   selection: Selection
   onOpen: (id: number) => void
   onToggleFavorite: (item: AlbumImageItem) => void
+  onMove: (activeId: number, overId: number) => void
 }
 
 /** The whole album in one plain grid (not virtualized), so any tile can be dragged anywhere. */
-export function AlbumGrid({ items, showFolders, selection, onOpen, onToggleFavorite }: Props) {
+export function AlbumGrid({
+  items,
+  showFolders,
+  selection,
+  onOpen,
+  onToggleFavorite,
+  onMove,
+}: Props) {
   const [width, setWidth] = useState(0)
+  const sensors = useSensors(
+    // A few pixels of travel before a drag starts, so a click still opens the photo.
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
+    }),
+  )
 
   const attach = useCallback((element: HTMLDivElement | null) => {
     if (element === null) return
@@ -28,6 +60,11 @@ export function AlbumGrid({ items, showFolders, selection, onOpen, onToggleFavor
 
   const columns = columnCount(width)
   const size = tileSize(width, columns)
+  const ids = items.map((item) => item.id)
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over !== null && active.id !== over.id) onMove(Number(active.id), Number(over.id))
+  }
 
   return (
     <div
@@ -37,32 +74,83 @@ export function AlbumGrid({ items, showFolders, selection, onOpen, onToggleFavor
       style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}
     >
       {width > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${columns}, ${size}px)`,
-            gap: TILE_GAP,
-          }}
-        >
-          {items.map((item) => (
-            <PhotoTile
-              key={item.id}
-              item={item}
-              size={size}
-              caption={showFolders ? item.folderPath : null}
-              dimmed={false}
-              missing={item.isMissing}
-              selection={{
-                selecting: selection.isSelecting,
-                selected: selection.selected.has(item.id),
-                onSelect: selection.toggle,
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          {/* A click must mean "toggle" while selecting, so dragging is off then. */}
+          <SortableContext
+            items={ids}
+            strategy={rectSortingStrategy}
+            disabled={selection.isSelecting}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${columns}, ${size}px)`,
+                gap: TILE_GAP,
               }}
-              onOpen={onOpen}
-              onToggleFavorite={() => onToggleFavorite(item)}
-            />
-          ))}
-        </div>
+            >
+              {items.map((item, index) => (
+                <SortableTile key={item.id} id={item.id} index={index}>
+                  {(activator) => (
+                    <PhotoTile
+                      item={item}
+                      size={size}
+                      caption={showFolders ? item.folderPath : null}
+                      dimmed={false}
+                      missing={item.isMissing}
+                      selection={{
+                        selecting: selection.isSelecting,
+                        selected: selection.selected.has(item.id),
+                        onSelect: selection.toggle,
+                      }}
+                      activator={activator}
+                      onOpen={onOpen}
+                      onToggleFavorite={() => onToggleFavorite(item)}
+                    />
+                  )}
+                </SortableTile>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
+    </div>
+  )
+}
+
+function SortableTile({
+  id,
+  index,
+  children,
+}: {
+  id: number
+  index: number
+  children: (activator: TileActivator) => ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      data-sort-index={index}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        position: 'relative',
+        zIndex: isDragging ? 1 : undefined,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+    >
+      {children({
+        ref: setActivatorNodeRef,
+        props: { ...attributes, ...(listeners as HTMLAttributes<HTMLElement> | undefined) },
+      })}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Checkbox, IconButton, Typography } from '@mui/material'
-import { useState, type ReactNode } from 'react'
+import { useState, type HTMLAttributes, type ReactNode } from 'react'
 import type { ImageListItem } from '../api/types'
 import type { SelectMods } from './useSelection'
 
@@ -14,6 +14,12 @@ export type TileSelection = {
   onSelect: (id: number, mods: SelectMods) => void
 }
 
+/** dnd-kit's drag handle wiring for a sortable tile (the tile itself is the handle). */
+export type TileActivator = {
+  ref: (element: HTMLElement | null) => void
+  props: HTMLAttributes<HTMLElement>
+}
+
 type Props = {
   item: ImageListItem
   size: number
@@ -21,6 +27,7 @@ type Props = {
   dimmed: boolean
   missing?: boolean
   selection?: TileSelection
+  activator?: TileActivator
   onOpen: (id: number) => void
   onToggleFavorite: (item: ImageListItem) => void
 }
@@ -32,6 +39,7 @@ export function PhotoTile({
   dimmed,
   missing = false,
   selection,
+  activator,
   onOpen,
   onToggleFavorite,
 }: Props) {
@@ -68,6 +76,8 @@ export function PhotoTile({
 
   return (
     <Box
+      ref={activator?.ref}
+      {...activator?.props}
       role="button"
       tabIndex={0}
       aria-label={name}
@@ -83,6 +93,9 @@ export function PhotoTile({
         activate(event.shiftKey)
       }}
       onKeyDown={(event) => {
+        // dnd-kit picks the tile up on Space (and marks the event handled); Enter still opens it.
+        activator?.props.onKeyDown?.(event)
+        if (event.defaultPrevented) return
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           activate(event.shiftKey)
