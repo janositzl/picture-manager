@@ -18,4 +18,6 @@ public interface IFolderService
     Task<Result> RemoveAsync(int id, CancellationToken cancellationToken = default);
 
     Task<Result> RestoreAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<Result> SetExcludedAsync(int id, bool isExcluded, CancellationToken cancellationToken = default);
 }

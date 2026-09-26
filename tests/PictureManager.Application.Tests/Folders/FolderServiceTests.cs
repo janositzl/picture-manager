@@ -35,7 +35,7 @@ public class FolderServiceTests
     [Fact]
     public async Task GetChildrenAsync_ParentVisible_ReturnsChildren()
     {
-        var children = new[] { new FolderNode(5, "a", false, 3, false) };
+        var children = new[] { new FolderNode(5, "a", false, 3, false, false) };
         _folders.IsVisibleAsync(4, Arg.Any<CancellationToken>()).Returns(true);
         _folders.GetVisibleChildrenAsync(4, Arg.Any<CancellationToken>()).Returns(children);
 
@@ -122,5 +122,76 @@ public class FolderServiceTests
         _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns((Folder?)null);
 
         (await CreateService().RestoreAsync(4)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_Unknown_ReturnsNotFound()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns((Folder?)null);
+
+        (await CreateService().SetExcludedAsync(4, true)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_Tombstoned_ReturnsNotFound()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = false });
+
+        (await CreateService().SetExcludedAsync(4, true)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_RootTopFolder_ReturnsInvalid()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = null, IsActive = true });
+
+        (await CreateService().SetExcludedAsync(4, true)).Status.Should().Be(ResultStatus.Invalid);
+        await _folders.DidNotReceive().UpdateAsync(Arg.Any<Folder>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_WhileScanIsActive_ReturnsConflict_AndChangesNothing()
+    {
+        // A running scan or discovery writes whole Folder rows back from objects it loaded earlier,
+        // which would silently overwrite whatever this call sets.
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = true });
+        _scanJobs.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().SetExcludedAsync(4, true)).Status.Should().Be(ResultStatus.Conflict);
+        await _folders.DidNotReceive().UpdateAsync(Arg.Any<Folder>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_Exclude_SetsTheFlag()
+    {
+        var folder = new Folder { Id = 4, ParentId = 1, IsActive = true, IsExcluded = false };
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(folder);
+
+        (await CreateService().SetExcludedAsync(4, true)).IsSuccess.Should().BeTrue();
+        await _folders.Received(1).UpdateAsync(
+            Arg.Is<Folder>(f => f.Id == 4 && f.IsExcluded && f.ModifiedUtc == _clock.UtcNow), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_IncludeUnderAnExcludedAncestor_ReturnsInvalid()
+    {
+        var folder = new Folder { Id = 4, ParentId = 1, IsActive = true, IsExcluded = true };
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(folder);
+        _folders.HasExcludedAncestorAsync(4, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().SetExcludedAsync(4, false)).Status.Should().Be(ResultStatus.Invalid);
+        await _folders.DidNotReceive().UpdateAsync(Arg.Any<Folder>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_IncludeWithNoExcludedAncestor_ClearsTheFlag()
+    {
+        var folder = new Folder { Id = 4, ParentId = 1, IsActive = true, IsExcluded = true };
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(folder);
+        _folders.HasExcludedAncestorAsync(4, Arg.Any<CancellationToken>()).Returns(false);
+
+        (await CreateService().SetExcludedAsync(4, false)).IsSuccess.Should().BeTrue();
+        await _folders.Received(1).UpdateAsync(
+            Arg.Is<Folder>(f => f.Id == 4 && !f.IsExcluded && f.ModifiedUtc == _clock.UtcNow), Arg.Any<CancellationToken>());
     }
 }

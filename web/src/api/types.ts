@@ -4,6 +4,7 @@ export type FolderNode = {
   hasChildren: boolean
   imageCount: number
   isMissing: boolean
+  isExcluded: boolean
 }
 
 export type BreadcrumbItem = { id: number; name: string }

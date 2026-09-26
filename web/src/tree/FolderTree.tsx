@@ -44,6 +44,7 @@ export function FolderTree() {
             selectedId={selectedId}
             isExpanded={isExpanded}
             onToggle={toggle}
+            ancestorExcluded={false}
           />
         ))}
       </List>

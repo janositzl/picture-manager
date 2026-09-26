@@ -17,7 +17,7 @@ public static class TestData
         CreatedUtc = Utc
     };
 
-    public static Folder Folder(ImageRoot root, string relativePath, Folder? parent = null, bool isActive = true, DateTime? missingSinceUtc = null) => new()
+    public static Folder Folder(ImageRoot root, string relativePath, Folder? parent = null, bool isActive = true, DateTime? missingSinceUtc = null, bool isExcluded = false) => new()
     {
         Root = root,
         Parent = parent,
@@ -25,6 +25,7 @@ public static class TestData
         RelativePath = relativePath,
         IsActive = isActive,
         MissingSinceUtc = missingSinceUtc,
+        IsExcluded = isExcluded,
         CreatedUtc = Utc,
         ModifiedUtc = Utc
     };

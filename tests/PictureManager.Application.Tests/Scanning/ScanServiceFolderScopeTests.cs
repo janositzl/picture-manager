@@ -95,6 +95,48 @@ public sealed class ScanServiceFolderScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task FolderScan_SkipsAnExcludedChild_AndDoesNotDescendOrMarkMissing()
+    {
+        var excludedDir = Path.Combine(_tempRoot.FullName, "Trips", "Excluded");
+        Directory.CreateDirectory(Path.Combine(excludedDir, "Deeper"));
+        File.WriteAllBytes(Path.Combine(excludedDir, "d.jpg"), new byte[] { 4 });
+        File.WriteAllBytes(Path.Combine(excludedDir, "Deeper", "e.jpg"), new byte[] { 5 });
+
+        var excluded = new Folder { Id = 22, RootId = 1, ParentId = 20, Name = "Excluded", RelativePath = "Trips/Excluded", IsExcluded = true };
+        _folders.GetByRootAndRelativePathAsync(1, "Trips/Excluded", Arg.Any<CancellationToken>()).Returns(excluded);
+        _folders.GetChildrenAsync(20, Arg.Any<CancellationToken>()).Returns(new List<Folder> { _madeira, excluded });
+
+        await CreateService().ScanFolderNowAsync(folderId: 20, isRecursive: true);
+
+        await _images.DidNotReceive().AddAsync(Arg.Is<Image>(i => i.FolderId == 22), Arg.Any<CancellationToken>());
+        await _folders.DidNotReceive().MarkSubtreeMissingAsync(22, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        // Only Trips and Madeira are actually walked; the excluded folder and its subtree are never enqueued.
+        await _jobs.Received(1).SetEnumerationResultAsync(999, foldersScanned: 2, filesFound: 2, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task QueueScanAsync_ExcludedFolder_Throws_AndCreatesNoJob()
+    {
+        _trips.IsExcluded = true;
+
+        var act = () => CreateService().QueueScanAsync(rootId: null, folderId: 20, isRecursive: true);
+
+        (await act.Should().ThrowAsync<FolderUnavailableException>()).Which.FolderId.Should().Be(20);
+        await _jobs.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task QueueScanAsync_FolderUnderAnExcludedAncestor_Throws_AndCreatesNoJob()
+    {
+        _folders.HasExcludedAncestorAsync(20, Arg.Any<CancellationToken>()).Returns(true);
+
+        var act = () => CreateService().QueueScanAsync(rootId: null, folderId: 20, isRecursive: true);
+
+        await act.Should().ThrowAsync<FolderUnavailableException>();
+        await _jobs.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task QueueScanAsync_Folder_StoresItAsTheJobScope()
     {
         await CreateService().QueueScanAsync(rootId: null, folderId: 20, isRecursive: true);

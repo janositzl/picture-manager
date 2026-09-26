@@ -171,4 +171,58 @@ public class FolderRepositoryTests
 
         (await repository.HasUndiscoveredFoldersAsync(root.Id)).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task HasExcludedAncestorAsync_ExcludedParent_IsTrue()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("excluded-parent");
+        var top = TestData.Folder(root, "");
+        var parent = TestData.Folder(root, "Trip", top, isExcluded: true);
+        var child = TestData.Folder(root, "Trip/Day1", parent);
+        db.Context.AddRange(top, parent, child);
+        await db.Context.SaveChangesAsync();
+
+        (await new FolderRepository(db.Context).HasExcludedAncestorAsync(child.Id)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HasExcludedAncestorAsync_ExcludedGrandparent_IsTrue()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("excluded-grandparent");
+        var top = TestData.Folder(root, "", isExcluded: true);
+        var parent = TestData.Folder(root, "Trip", top);
+        var child = TestData.Folder(root, "Trip/Day1", parent);
+        db.Context.AddRange(top, parent, child);
+        await db.Context.SaveChangesAsync();
+
+        (await new FolderRepository(db.Context).HasExcludedAncestorAsync(child.Id)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HasExcludedAncestorAsync_OnlyTheFolderItselfIsExcluded_IsFalse()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("excluded-self");
+        var top = TestData.Folder(root, "");
+        var child = TestData.Folder(root, "Trip", top, isExcluded: true);
+        db.Context.AddRange(top, child);
+        await db.Context.SaveChangesAsync();
+
+        (await new FolderRepository(db.Context).HasExcludedAncestorAsync(child.Id)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HasExcludedAncestorAsync_NothingExcluded_IsFalse()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("no-exclusions");
+        var top = TestData.Folder(root, "");
+        var child = TestData.Folder(root, "Trip", top);
+        db.Context.AddRange(top, child);
+        await db.Context.SaveChangesAsync();
+
+        (await new FolderRepository(db.Context).HasExcludedAncestorAsync(child.Id)).Should().BeFalse();
+    }
 }

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 using PictureManager.Api.Endpoints;
 using PictureManager.Application.Common;
@@ -19,7 +20,7 @@ public class FolderEndpointsTests
     [Fact]
     public async Task GetRootsAsync_ReturnsOk()
     {
-        _service.GetRootsAsync(Arg.Any<CancellationToken>()).Returns(new[] { new FolderNode(1, "nas", true, 0, false) });
+        _service.GetRootsAsync(Arg.Any<CancellationToken>()).Returns(new[] { new FolderNode(1, "nas", true, 0, false, false) });
 
         var result = await FolderEndpoints.GetRootsAsync(_service, CancellationToken.None);
 
@@ -48,5 +49,32 @@ public class FolderEndpointsTests
         _service.RestoreAsync(4, Arg.Any<CancellationToken>()).Returns(Result.Ok());
 
         (await FolderEndpoints.RestoreAsync(4, _service, CancellationToken.None)).Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_Success_ReturnsNoContent()
+    {
+        _service.SetExcludedAsync(4, true, Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        (await FolderEndpoints.SetExcludedAsync(4, new FolderExclusionRequest(true), _service, CancellationToken.None))
+            .Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_ParentExcluded_ReturnsValidationProblem()
+    {
+        _service.SetExcludedAsync(4, false, Arg.Any<CancellationToken>()).Returns(Result.Invalid("id", "nope"));
+
+        (await FolderEndpoints.SetExcludedAsync(4, new FolderExclusionRequest(false), _service, CancellationToken.None))
+            .Result.Should().BeOfType<ValidationProblem>();
+    }
+
+    [Fact]
+    public async Task SetExcludedAsync_ScanRunning_ReturnsConflict()
+    {
+        _service.SetExcludedAsync(4, true, Arg.Any<CancellationToken>()).Returns(Result.Conflict("busy"));
+
+        (await FolderEndpoints.SetExcludedAsync(4, new FolderExclusionRequest(true), _service, CancellationToken.None))
+            .Result.Should().BeOfType<Conflict<ProblemDetails>>();
     }
 }

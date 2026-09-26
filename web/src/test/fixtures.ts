@@ -12,6 +12,7 @@ export const devRoot: FolderNode = {
   hasChildren: true,
   imageCount: 0,
   isMissing: false,
+  isExcluded: false,
 }
 export const holidays: FolderNode = {
   id: 2,
@@ -19,6 +20,7 @@ export const holidays: FolderNode = {
   hasChildren: true,
   imageCount: 2,
   isMissing: false,
+  isExcluded: false,
 }
 export const madeira: FolderNode = {
   id: 3,
@@ -26,6 +28,7 @@ export const madeira: FolderNode = {
   hasChildren: false,
   imageCount: 3,
   isMissing: false,
+  isExcluded: false,
 }
 export const old: FolderNode = {
   id: 4,
@@ -33,6 +36,23 @@ export const old: FolderNode = {
   hasChildren: false,
   imageCount: 1,
   isMissing: true,
+  isExcluded: false,
+}
+export const excludedFolder: FolderNode = {
+  id: 5,
+  name: 'Excluded',
+  hasChildren: true,
+  imageCount: 0,
+  isMissing: false,
+  isExcluded: true,
+}
+export const excludedChild: FolderNode = {
+  id: 6,
+  name: 'Nested',
+  hasChildren: false,
+  imageCount: 0,
+  isMissing: false,
+  isExcluded: false,
 }
 
 export const rootFolders: FolderNode[] = [devRoot]
@@ -42,6 +62,8 @@ export const childrenById: Record<number, FolderNode[]> = {
   2: [madeira, old],
   3: [],
   4: [],
+  5: [excludedChild],
+  6: [],
 }
 
 const crumb = (node: FolderNode) => ({ id: node.id, name: node.name })

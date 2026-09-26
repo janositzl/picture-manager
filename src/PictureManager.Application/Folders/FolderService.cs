@@ -69,4 +69,26 @@ public sealed class FolderService : IFolderService
         await _folders.UpdateAsync(folder, cancellationToken);
         return Result.Ok();
     }
+
+    public async Task<Result> SetExcludedAsync(int id, bool isExcluded, CancellationToken cancellationToken = default)
+    {
+        var folder = await _folders.GetByIdAsync(id, cancellationToken);
+        if (folder is null || !folder.IsActive)
+            return Result.NotFound();
+        if (folder.ParentId is null)
+            return Result.Invalid("id", "A root's top folder cannot be excluded; deactivate the root instead.");
+
+        // A running scan or discovery writes whole Folder rows back through UpdateAsync from Folder
+        // objects it loaded earlier, which would silently overwrite whatever this call sets.
+        if (await _scanJobs.HasActiveJobAsync(cancellationToken))
+            return Result.Conflict("A scan is running; change exclusion after it finishes.");
+
+        if (!isExcluded && await _folders.HasExcludedAncestorAsync(id, cancellationToken))
+            return Result.Invalid("id", "A parent folder is excluded; include it first.");
+
+        folder.IsExcluded = isExcluded;
+        folder.ModifiedUtc = _clock.UtcNow;
+        await _folders.UpdateAsync(folder, cancellationToken);
+        return Result.Ok();
+    }
 }

@@ -55,6 +55,9 @@ public sealed class DiscoveryService : IDiscoveryService
             if (folder.MissingSinceUtc is not null)
                 throw FolderUnavailableException.Missing(folderId.Value);
 
+            if (folder.IsExcluded || await _folderRepository.HasExcludedAncestorAsync(folder.Id, cancellationToken))
+                throw FolderUnavailableException.Excluded(folderId.Value);
+
             jobFolderId = folder.Id;
         }
         else if (rootId.HasValue)
@@ -175,6 +178,11 @@ public sealed class DiscoveryService : IDiscoveryService
 
                 // Removed from the collection (tombstone): never descend into it or re-index it.
                 if (!childFolder.IsActive)
+                    continue;
+
+                // Excluded: never descend into it. Its subtree is left exactly as it was, and it still
+                // counts as observed above, so it's never marked missing either.
+                if (childFolder.IsExcluded)
                     continue;
 
                 // Back on disk (remounted, or renamed back): clear the mark. Its descendants are cleared as

@@ -1,12 +1,25 @@
+import CheckIcon from '@mui/icons-material/Check'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
-import { CircularProgress, IconButton, Menu, MenuItem, Typography } from '@mui/material'
+import {
+  CircularProgress,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Typography,
+} from '@mui/material'
 import { useState, type MouseEvent } from 'react'
+import { folderExclusionErrorMessage, useSetFolderExcluded } from '../api/folders'
+import { useNotify } from '../app/notify'
 import type { ActiveJob } from './FolderJobsContext'
 import { useFolderJobs } from './FolderJobsContext'
 
 type Props = {
   folderId: number
   folderName: string
+  isExcluded: boolean
+  ancestorExcluded: boolean
 }
 
 function progressLabel(activeJob: ActiveJob): string {
@@ -20,9 +33,13 @@ function progressLabel(activeJob: ActiveJob): string {
   return `Scanning… ${progress?.foldersScanned ?? 0} folders, ${progress?.filesFound ?? 0} files`
 }
 
-export function FolderActionsMenu({ folderId, folderName }: Props) {
+export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorExcluded }: Props) {
   const { activeJob, refreshFolder, scanFolder } = useFolderJobs()
+  const setExcluded = useSetFolderExcluded()
+  const notify = useNotify()
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const excluded = isExcluded || ancestorExcluded
+  const scanDisabled = activeJob !== null || excluded
 
   if (activeJob?.folderId === folderId) {
     return (
@@ -38,6 +55,13 @@ export function FolderActionsMenu({ folderId, folderName }: Props) {
   const close = () => setAnchorEl(null)
   const runAction = (action: () => void) => {
     action()
+    close()
+  }
+  const toggleExcluded = () => {
+    setExcluded.mutate(
+      { folderId, isExcluded: !isExcluded },
+      { onError: (error) => notify(folderExclusionErrorMessage(error)) },
+    )
     close()
   }
 
@@ -60,14 +84,29 @@ export function FolderActionsMenu({ folderId, folderName }: Props) {
         onClose={close}
         onClick={(event: MouseEvent) => event.stopPropagation()}
       >
-        <MenuItem onClick={() => runAction(() => refreshFolder(folderId))}>
+        <MenuItem onClick={() => runAction(() => refreshFolder(folderId))} disabled={scanDisabled}>
           Refresh structure
         </MenuItem>
-        <MenuItem onClick={() => runAction(() => scanFolder(folderId, false))}>
+        <MenuItem onClick={() => runAction(() => scanFolder(folderId, false))} disabled={scanDisabled}>
           Scan folder
         </MenuItem>
-        <MenuItem onClick={() => runAction(() => scanFolder(folderId, true))}>
+        <MenuItem
+          onClick={() => runAction(() => scanFolder(folderId, true))}
+          disabled={scanDisabled}
+        >
           Scan folder + subfolders
+        </MenuItem>
+        <MenuItem onClick={toggleExcluded} disabled={ancestorExcluded}>
+          {excluded && (
+            <ListItemIcon>
+              <CheckIcon fontSize="small" />
+            </ListItemIcon>
+          )}
+          <ListItemText
+            inset={!excluded}
+            primary="Exclude folder"
+            secondary={ancestorExcluded ? 'Excluded via parent folder' : undefined}
+          />
         </MenuItem>
       </Menu>
     </>

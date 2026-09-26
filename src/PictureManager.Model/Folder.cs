@@ -29,7 +29,7 @@ public class Folder
     /// <summary>This folder's own (non-missing) image count as of LastScannedAt.</summary>
     public int? LastScanFileCount { get; set; }
 
-    /// <summary>Excludes the folder from future scans/discovery walks (not yet enforced -- column only for now).</summary>
+    /// <summary>Excludes this folder (and, since walks never descend into it, its whole subtree) from future scans and discovery.</summary>
     public bool IsExcluded { get; set; }
 
     public DateTime CreatedUtc { get; set; }

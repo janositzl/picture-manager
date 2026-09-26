@@ -48,6 +48,28 @@ public class FolderScanStatusTests
     }
 
     [Fact]
+    public async Task MarkSubtreeScannedAsync_SkipsAnExcludedChild_AndItsDescendants()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("r-excluded");
+        var top = TestData.Folder(root, "");
+        var trip = TestData.Folder(root, "Trip", top);
+        var excluded = TestData.Folder(root, "Trip/Skip", trip, isExcluded: true);
+        var nested = TestData.Folder(root, "Trip/Skip/Deeper", excluded);
+        db.Context.Folders.AddRange(top, trip, excluded, nested);
+        await db.Context.SaveChangesAsync();
+
+        await using (var context = db.CreateContext())
+            await new FolderRepository(context).MarkSubtreeScannedAsync(trip.Id, ScannedAt);
+
+        await using var verify = db.CreateContext();
+        var folders = await verify.Folders.AsNoTracking().ToDictionaryAsync(f => f.Id);
+        folders[trip.Id].LastScannedAt.Should().Be(ScannedAt);
+        folders[excluded.Id].LastScannedAt.Should().BeNull();
+        folders[nested.Id].LastScannedAt.Should().BeNull();
+    }
+
+    [Fact]
     public async Task SetScanStatusAsync_SetsOnlyThatFoldersOwnStatus()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

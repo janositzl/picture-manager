@@ -1,7 +1,15 @@
+import BlockIcon from '@mui/icons-material/Block'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import { CircularProgress, IconButton, List, ListItemButton, ListItemText } from '@mui/material'
+import {
+  CircularProgress,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
+  Tooltip,
+} from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { useFolderChildren } from '../api/queries'
@@ -15,25 +23,42 @@ type Props = {
   selectedId: number | null
   isExpanded: (id: number) => boolean
   onToggle: (id: number) => void
+  /** True when an ancestor (not this folder itself) is excluded from scans. */
+  ancestorExcluded: boolean
 }
 
-export function FolderTreeNode({ node, depth, selectedId, isExpanded, onToggle }: Props) {
+export function FolderTreeNode({
+  node,
+  depth,
+  selectedId,
+  isExpanded,
+  onToggle,
+  ancestorExcluded,
+}: Props) {
   const navigate = useNavigate()
   const expanded = node.hasChildren && isExpanded(node.id)
   const children = useFolderChildren(node.id, expanded)
   const selected = node.id === selectedId
   const ref = useRef<HTMLDivElement>(null)
+  const excluded = node.isExcluded || ancestorExcluded
+  const dimmed = node.isMissing || excluded
 
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest' })
   }, [selected])
+
+  const statusLabels = [node.isMissing && 'missing', excluded && 'excluded'].filter(
+    (label): label is string => label !== false,
+  )
+  const ariaLabel =
+    statusLabels.length > 0 ? `${node.name} (${statusLabels.join(', ')})` : node.name
 
   return (
     <>
       <ListItemButton
         ref={ref}
         role="treeitem"
-        aria-label={node.isMissing ? `${node.name} (missing)` : node.name}
+        aria-label={ariaLabel}
         aria-level={depth + 1}
         aria-selected={selected}
         aria-expanded={node.hasChildren ? expanded : undefined}
@@ -54,14 +79,30 @@ export function FolderTreeNode({ node, depth, selectedId, isExpanded, onToggle }
           {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
         </IconButton>
         {node.isMissing && <WarningAmberIcon fontSize="small" color="warning" sx={{ mr: 0.5 }} />}
+        {excluded && (
+          <Tooltip
+            title={
+              node.isExcluded
+                ? 'Excluded from scan'
+                : 'Excluded from scan (parent folder is excluded)'
+            }
+          >
+            <BlockIcon fontSize="small" color="disabled" sx={{ mr: 0.5 }} />
+          </Tooltip>
+        )}
         <ListItemText
           primary={node.name}
           slotProps={{
-            primary: { noWrap: true, color: node.isMissing ? 'text.secondary' : undefined },
+            primary: { noWrap: true, color: dimmed ? 'text.secondary' : undefined },
           }}
         />
         {expanded && children.isFetching && <CircularProgress size={14} />}
-        <FolderActionsMenu folderId={node.id} folderName={node.name} />
+        <FolderActionsMenu
+          folderId={node.id}
+          folderName={node.name}
+          isExcluded={node.isExcluded}
+          ancestorExcluded={ancestorExcluded}
+        />
       </ListItemButton>
       {expanded && children.isError && (
         <QueryErrorAlert
@@ -79,6 +120,7 @@ export function FolderTreeNode({ node, depth, selectedId, isExpanded, onToggle }
               selectedId={selectedId}
               isExpanded={isExpanded}
               onToggle={onToggle}
+              ancestorExcluded={excluded}
             />
           ))}
         </List>

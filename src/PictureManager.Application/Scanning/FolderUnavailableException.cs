@@ -18,4 +18,7 @@ public sealed class FolderUnavailableException : Exception
 
     public static FolderUnavailableException Missing(int folderId) =>
         new(folderId, $"Folder {folderId} is missing on disk. Scan or discover its parent folder instead.");
+
+    public static FolderUnavailableException Excluded(int folderId) =>
+        new(folderId, $"Folder {folderId} is excluded from scans, directly or through a parent folder.");
 }

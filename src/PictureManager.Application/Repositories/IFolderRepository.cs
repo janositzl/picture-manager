@@ -50,6 +50,9 @@ public interface IFolderRepository
     /// <summary>True if the root has any active folder whose children were never discovered (new root, or a discovery interrupted before finishing).</summary>
     Task<bool> HasUndiscoveredFoldersAsync(int rootId, CancellationToken cancellationToken = default);
 
+    /// <summary>True when any ancestor of the folder (not the folder itself) has IsExcluded set. False if the folder doesn't exist.</summary>
+    Task<bool> HasExcludedAncestorAsync(int folderId, CancellationToken cancellationToken = default);
+
     /// <summary>Sets the folder's own ScanStatus (not its subtree).</summary>
     Task SetScanStatusAsync(int folderId, FolderScanStatus status, CancellationToken cancellationToken = default);
 

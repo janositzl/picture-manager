@@ -18,6 +18,7 @@ public static class FolderEndpoints
         admin.MapGet("/folders/removed", GetRemovedAsync);
         admin.MapDelete("/folders/{id:int}", RemoveAsync);
         admin.MapPost("/folders/{id:int}/restore", RestoreAsync);
+        admin.MapPut("/folders/{id:int}/exclusion", SetExcludedAsync);
     }
 
     public static async Task<Ok<IReadOnlyList<FolderNode>>> GetRootsAsync(IFolderService service, CancellationToken cancellationToken) =>
@@ -41,4 +42,10 @@ public static class FolderEndpoints
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> RestoreAsync(
         int id, IFolderService service, CancellationToken cancellationToken) =>
         (await service.RestoreAsync(id, cancellationToken)).ToNoContent();
+
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetExcludedAsync(
+        int id, FolderExclusionRequest request, IFolderService service, CancellationToken cancellationToken) =>
+        (await service.SetExcludedAsync(id, request.IsExcluded, cancellationToken)).ToNoContent();
 }
+
+public sealed record FolderExclusionRequest(bool IsExcluded);

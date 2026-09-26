@@ -92,8 +92,8 @@ public class MissingFolderTests
 
         var nodes = await repository.GetVisibleChildrenAsync(top.Id);
         nodes.Should().Equal(
-            new FolderNode(home.Id, "Home", HasChildren: false, ImageCount: 1, IsMissing: false),
-            new FolderNode(trip.Id, "Trip", HasChildren: false, ImageCount: 1, IsMissing: true));
+            new FolderNode(home.Id, "Home", HasChildren: false, ImageCount: 1, IsMissing: false, IsExcluded: false),
+            new FolderNode(trip.Id, "Trip", HasChildren: false, ImageCount: 1, IsMissing: true, IsExcluded: false));
 
         var detail = await repository.GetVisibleDetailAsync(trip.Id);
         detail!.IsMissing.Should().BeTrue();

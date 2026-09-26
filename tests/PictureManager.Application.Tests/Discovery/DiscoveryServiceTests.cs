@@ -126,6 +126,43 @@ public sealed class DiscoveryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunDiscoveryAsync_ExcludedChildFolder_IsNotDescendedIntoOrReindexed()
+    {
+        var excludedDir = Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "excluded"));
+        Directory.CreateDirectory(Path.Combine(excludedDir.FullName, "inner"));
+        _folders.GetByRootAndRelativePathAsync(1, "excluded", Arg.Any<CancellationToken>())
+            .Returns(new Folder { Id = 25, RootId = 1, ParentId = 10, RelativePath = "excluded", Name = "excluded", IsExcluded = true });
+
+        await CreateService().DiscoverNowAsync(rootId: 1);
+
+        await _folders.DidNotReceive().AddAsync(Arg.Is<Folder>(f => f.Name == "inner"), Arg.Any<CancellationToken>());
+        await _jobs.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 0, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task QueueDiscoveryAsync_ExcludedFolder_Throws()
+    {
+        var folder = new Folder { Id = 15, RootId = 1, ParentId = 10, RelativePath = "sub", Name = "sub", IsExcluded = true };
+        _folders.GetByIdAsync(15, Arg.Any<CancellationToken>()).Returns(folder);
+
+        var act = () => CreateService().QueueDiscoveryAsync(rootId: null, folderId: 15);
+
+        (await act.Should().ThrowAsync<FolderUnavailableException>()).Which.FolderId.Should().Be(15);
+    }
+
+    [Fact]
+    public async Task QueueDiscoveryAsync_FolderUnderAnExcludedAncestor_Throws()
+    {
+        var folder = new Folder { Id = 15, RootId = 1, ParentId = 10, RelativePath = "sub", Name = "sub" };
+        _folders.GetByIdAsync(15, Arg.Any<CancellationToken>()).Returns(folder);
+        _folders.HasExcludedAncestorAsync(15, Arg.Any<CancellationToken>()).Returns(true);
+
+        var act = () => CreateService().QueueDiscoveryAsync(rootId: null, folderId: 15);
+
+        await act.Should().ThrowAsync<FolderUnavailableException>();
+    }
+
+    [Fact]
     public async Task RunDiscoveryAsync_ExistingChildFolderWithNowExcludedName_IsDeletedWithSubtree()
     {
         Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "Raw"));

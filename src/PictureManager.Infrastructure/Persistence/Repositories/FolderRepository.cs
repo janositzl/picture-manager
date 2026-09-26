@@ -150,6 +150,22 @@ public sealed class FolderRepository : IFolderRepository
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.Name, name), cancellationToken);
     }
 
+    public async Task<bool> HasExcludedAncestorAsync(int folderId, CancellationToken cancellationToken = default)
+    {
+        var folder = await _dbContext.Folders.AsNoTracking()
+            .Where(f => f.Id == folderId)
+            .Select(f => new { f.RootId, f.RelativePath })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (folder is null)
+            return false;
+
+        var ancestorPaths = AncestorPaths(folder.RelativePath);
+        ancestorPaths.Remove(folder.RelativePath);
+
+        return await _dbContext.Folders.AsNoTracking()
+            .AnyAsync(f => f.RootId == folder.RootId && ancestorPaths.Contains(f.RelativePath) && f.IsExcluded, cancellationToken);
+    }
+
     public async Task<bool> HasUndiscoveredFoldersAsync(int rootId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Folders.AsNoTracking()
@@ -170,7 +186,7 @@ public sealed class FolderRepository : IFolderRepository
             WITH RECURSIVE subtree AS (
                 SELECT "Id" FROM "Folders" WHERE "Id" = {folderId}
                 UNION ALL
-                SELECT f."Id" FROM "Folders" f JOIN subtree s ON f."ParentId" = s."Id"
+                SELECT f."Id" FROM "Folders" f JOIN subtree s ON f."ParentId" = s."Id" WHERE NOT f."IsExcluded"
             )
             UPDATE "Folders" SET
                 "ScanStatus" = {(int)FolderScanStatus.Idle},
@@ -191,7 +207,8 @@ public sealed class FolderRepository : IFolderRepository
                 f.Name,
                 f.Children.Any(c => c.IsActive),
                 f.Images.Count(i => i.MissingSinceUtc == null),
-                f.MissingSinceUtc != null));
+                f.MissingSinceUtc != null,
+                f.IsExcluded));
 
     // "", "a", "a/b" for "a/b": the root's top folder plus every ancestor and the folder itself.
     private static List<string> AncestorPaths(string relativePath)
