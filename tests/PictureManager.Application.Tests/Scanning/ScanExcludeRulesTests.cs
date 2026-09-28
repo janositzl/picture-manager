@@ -21,6 +21,19 @@ public class ScanExcludeRulesTests
         rules.IsFolderExcluded("Vacation").Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("$RECYCLE.BIN")]
+    [InlineData("System Volume Information")]
+    [InlineData("@eaDir")]
+    [InlineData("#recycle")]
+    [InlineData(".snapshot")]
+    [InlineData("@EADIR")]
+    public void IsFolderExcluded_OsAndNasHousekeepingFolders_AreAlwaysExcluded(string name)
+    {
+        new ScanExcludeRules(new AppSettings { ExcludedFolderNames = new List<string>() }, Array.Empty<string>())
+            .IsFolderExcluded(name).Should().BeTrue();
+    }
+
     [Fact]
     public void IsExtensionAllowed_ExcludedExtension_IsAlwaysRejected()
     {

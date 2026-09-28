@@ -6,6 +6,14 @@ namespace PictureManager.Application.Scanning;
 
 public sealed class ScanExcludeRules
 {
+    /// <summary>
+    /// OS/NAS housekeeping folders excluded unconditionally, regardless of AppSettings.ExcludedFolderNames: a user
+    /// editing that (database-backed) list must not be able to accidentally let a scan or discovery index these.
+    /// </summary>
+    public static readonly IReadOnlySet<string> AlwaysExcludedFolderNames = new HashSet<string>(
+        new[] { "$RECYCLE.BIN", "System Volume Information", "@eaDir", "#recycle", ".snapshot" },
+        StringComparer.OrdinalIgnoreCase);
+
     private readonly HashSet<string> _excludedFolderNames;
     private readonly HashSet<string> _excludedExtensions;
     private readonly HashSet<string>? _includedExtensions;
@@ -14,6 +22,7 @@ public sealed class ScanExcludeRules
     public ScanExcludeRules(AppSettings settings, IReadOnlyCollection<string> supportedExtensions)
     {
         _excludedFolderNames = new HashSet<string>(settings.ExcludedFolderNames, StringComparer.OrdinalIgnoreCase);
+        _excludedFolderNames.UnionWith(AlwaysExcludedFolderNames);
         _excludedExtensions = new HashSet<string>(settings.ExcludedExtensions, StringComparer.OrdinalIgnoreCase);
         _includedExtensions = settings.IncludedExtensions is { Count: > 0 }
             ? new HashSet<string>(settings.IncludedExtensions, StringComparer.OrdinalIgnoreCase)
