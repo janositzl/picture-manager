@@ -1,6 +1,8 @@
 import BlockIcon from '@mui/icons-material/Block'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined'
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
   CircularProgress,
@@ -14,6 +16,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { useFolderChildren } from '../api/queries'
 import type { FolderNode } from '../api/types'
+import { ACCENT, ACCENT_SOFT, ACCENT_TEXT } from '../design/accent'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { FolderActionsMenu } from './FolderActionsMenu'
 
@@ -70,8 +73,8 @@ export function FolderTreeNode({
           py: 0.4,
           borderRadius: '8px',
           mx: 0.5,
-          '&.Mui-selected': { bgcolor: 'action.selected' },
-          '&.Mui-selected:hover': { bgcolor: 'action.selected' },
+          '&.Mui-selected': { bgcolor: ACCENT_SOFT, color: ACCENT_TEXT },
+          '&.Mui-selected:hover': { bgcolor: ACCENT_SOFT },
         }}
       >
         <IconButton
@@ -87,8 +90,7 @@ export function FolderTreeNode({
         >
           {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
         </IconButton>
-        {node.isMissing && <WarningAmberIcon fontSize="small" color="warning" sx={{ mr: 0.5 }} />}
-        {excluded && (
+        {excluded ? (
           <Tooltip
             title={
               node.isExcluded
@@ -96,16 +98,29 @@ export function FolderTreeNode({
                 : 'Excluded from scan (parent folder is excluded)'
             }
           >
-            <BlockIcon fontSize="small" color="disabled" sx={{ mr: 0.5 }} />
+            <BlockIcon fontSize="small" color="disabled" sx={{ mr: 0.75 }} />
           </Tooltip>
+        ) : expanded ? (
+          <FolderOpenOutlinedIcon
+            fontSize="small"
+            sx={{ mr: 0.75, color: selected ? ACCENT : 'text.secondary' }}
+          />
+        ) : (
+          <FolderOutlinedIcon
+            fontSize="small"
+            sx={{ mr: 0.75, color: selected ? ACCENT : 'text.secondary' }}
+          />
         )}
+        {node.isMissing && <WarningAmberIcon fontSize="small" color="warning" sx={{ mr: 0.5 }} />}
         <ListItemText
           primary={node.name}
           slotProps={{
             primary: {
               noWrap: true,
-              color: dimmed ? 'text.secondary' : undefined,
-              sx: { fontWeight: selected ? 600 : 400 },
+              sx: {
+                fontWeight: selected ? 600 : 400,
+                color: dimmed ? 'text.secondary' : selected ? ACCENT_TEXT : 'text.primary',
+              },
             },
           }}
         />

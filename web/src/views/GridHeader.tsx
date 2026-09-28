@@ -1,10 +1,12 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import SyncAltIcon from '@mui/icons-material/SyncAlt'
 import { Box, Breadcrumbs, IconButton, Link, MenuItem, TextField, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
 import { Link as RouterLink, useSearchParams } from 'react-router'
 import type { BreadcrumbItem } from '../api/types'
+import { BORDER } from '../design/accent'
 import { withParams, type Order, type Sort } from '../routing/urlState'
 
 type Props = {
@@ -75,8 +77,8 @@ export function GridHeader({ title, path, count, sort, order, actions }: Props) 
                 bgcolor: '#edeef3',
               }}
             >
-              <ImageOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
+              <ImageOutlinedIcon sx={{ fontSize: 16, color: '#6B7180' }} />
+              <Typography sx={{ fontSize: '12px', color: '#6B7180' }}>
                 {count === 1 ? '1 photo' : `${count} photos`}
               </Typography>
             </Box>
@@ -85,30 +87,73 @@ export function GridHeader({ title, path, count, sort, order, actions }: Props) 
       </Box>
       <Box sx={{ flex: 1 }} />
       {actions}
-      <TextField
-        select
-        size="small"
-        label="Sort"
-        value={sort}
-        onChange={(event) =>
-          setSearchParams(withParams(searchParams, { sort: event.target.value, order: null }))
-        }
-        sx={{ minWidth: 110, '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'stretch',
+          border: `1px solid ${BORDER}`,
+          borderRadius: '10px',
+          bgcolor: 'background.paper',
+          overflow: 'hidden',
+        }}
       >
-        <MenuItem value="date">Date</MenuItem>
-        <MenuItem value="name">Name</MenuItem>
-      </TextField>
-      <IconButton
-        aria-label={
-          order === 'asc' ? 'Ascending, switch to descending' : 'Descending, switch to ascending'
-        }
-        onClick={() =>
-          setSearchParams(withParams(searchParams, { order: order === 'asc' ? 'desc' : 'asc' }))
-        }
-        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-      >
-        {order === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
-      </IconButton>
+        <TextField
+          select
+          size="small"
+          variant="standard"
+          value={sort}
+          onChange={(event) =>
+            setSearchParams(withParams(searchParams, { sort: event.target.value, order: null }))
+          }
+          slotProps={{
+            input: { disableUnderline: true },
+            select: {
+              'aria-label': 'Sort',
+              renderValue: () => (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <SyncAltIcon
+                    fontSize="small"
+                    sx={{ transform: 'rotate(90deg)', color: 'text.secondary' }}
+                  />
+                  <Typography variant="body2" color="text.secondary" component="span">
+                    Sort
+                  </Typography>
+                  <Typography variant="body2" component="span" sx={{ fontWeight: 500 }}>
+                    {sort === 'name' ? 'Name' : 'Date'}
+                  </Typography>
+                </Box>
+              ),
+            },
+          }}
+          sx={{
+            minWidth: 150,
+            px: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            '& .MuiSelect-select': { display: 'flex', alignItems: 'center', py: '8px' },
+          }}
+        >
+          <MenuItem value="date">Date</MenuItem>
+          <MenuItem value="name">Name</MenuItem>
+        </TextField>
+        <Box sx={{ width: '1px', bgcolor: BORDER }} />
+        <IconButton
+          aria-label={
+            order === 'asc' ? 'Ascending, switch to descending' : 'Descending, switch to ascending'
+          }
+          onClick={() =>
+            setSearchParams(withParams(searchParams, { order: order === 'asc' ? 'desc' : 'asc' }))
+          }
+          className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+          sx={{ borderRadius: 0 }}
+        >
+          {order === 'asc' ? (
+            <ArrowUpwardIcon fontSize="small" />
+          ) : (
+            <ArrowDownwardIcon fontSize="small" />
+          )}
+        </IconButton>
+      </Box>
     </Box>
   )
 }

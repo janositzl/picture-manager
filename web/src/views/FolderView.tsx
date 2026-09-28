@@ -1,15 +1,18 @@
+import CreateNewFolderOutlinedIcon from '@mui/icons-material/CreateNewFolderOutlined'
 import { Alert, Box, Button, Link, Typography } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useFolder } from '../api/queries'
+import { BORDER } from '../design/accent'
 import { parseGridParams, parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { GridHeader } from './GridHeader'
 import { GridSkeleton } from './GridSkeleton'
 import { ImageBrowser } from './ImageBrowser'
+import { writeLastFolderId } from './preferences'
 
 export function FolderView() {
   const params = useParams()
@@ -18,6 +21,11 @@ export function FolderView() {
   const { sort, order } = parseGridParams(searchParams)
   const folder = useFolder(folderId)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
+
+  // Only once the folder is confirmed to exist, so a dead/typo'd id in the URL isn't remembered.
+  useEffect(() => {
+    if (folderId !== null && folder.data !== undefined) writeLastFolderId(folderId)
+  }, [folderId, folder.data])
 
   if (folderId === null || isNotFound(folder.error)) {
     return (
@@ -73,8 +81,18 @@ export function FolderView() {
               !detail.isMissing && detail.imageCount > 0 ? (
                 <Button
                   size="small"
+                  startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
                   onClick={() => setPickerTarget({ folderId })}
-                  sx={{ borderRadius: '8px', textTransform: 'none' }}
+                  sx={{
+                    color: 'text.primary',
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    px: 1.5,
+                    py: '7px',
+                    '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
+                  }}
                 >
                   Add folder to album…
                 </Button>

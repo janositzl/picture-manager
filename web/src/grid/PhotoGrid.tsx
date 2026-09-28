@@ -28,8 +28,8 @@ export function PhotoGrid({
   const attach = useCallback((element: HTMLDivElement | null) => {
     setScrollElement(element)
     if (element === null) return
-    // clientWidth includes the padding but not the (always reserved) scrollbar gutter.
-    const measure = () => setWidth(Math.max(0, element.clientWidth - GRID_PADDING))
+    // clientWidth includes the (now symmetric left/right) padding but not the scrollbar gutter.
+    const measure = () => setWidth(Math.max(0, element.clientWidth - GRID_PADDING * 2))
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
@@ -66,7 +66,13 @@ export function PhotoGrid({
       className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/60 dark:bg-transparent"
       data-testid="photo-grid"
       // A stable gutter stops the scrollbar appearing/disappearing from resizing the tiles in a loop.
-      style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}
+      style={{
+        scrollbarGutter: 'stable',
+        paddingLeft: GRID_PADDING,
+        paddingRight: GRID_PADDING,
+        paddingTop: GRID_PADDING,
+        paddingBottom: GRID_PADDING,
+      }}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {width > 0 &&

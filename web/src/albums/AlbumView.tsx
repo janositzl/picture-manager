@@ -6,6 +6,7 @@ import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
 import { useAlbum, useAlbumImages } from '../api/queries'
 import { useNotify } from '../app/notify'
+import { BORDER } from '../design/accent'
 import { SelectionBar } from '../grid/SelectionBar'
 import { useSelection } from '../grid/useSelection'
 import { parseGridParams, parseId, withParams } from '../routing/urlState'
@@ -23,6 +24,17 @@ import { readShowFolders, writeShowFolders } from './preferences'
 import { planMove } from './reorder'
 
 const LARGE_ALBUM = 2000
+
+/** Matches the "Add folder to album…" button's chrome (FolderView.tsx); text color stays per-button. */
+const HEADER_BUTTON_SX = {
+  border: `1px solid ${BORDER}`,
+  borderRadius: '10px',
+  textTransform: 'none' as const,
+  fontWeight: 700,
+  px: 1.5,
+  py: '7px',
+  '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
+}
 
 type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | null
 type PickerState = { target: AddTarget; unavailable: number }
@@ -200,18 +212,13 @@ export function AlbumView() {
         control={<Switch size="small" checked={showFolders} onChange={toggleShowFolders} />}
         label="Show folders"
       />
-      <Button size="small" onClick={() => setDialog('edit')} sx={{ borderRadius: '8px', textTransform: 'none' }}>
+      <Button size="small" onClick={() => setDialog('edit')} sx={HEADER_BUTTON_SX}>
         Edit…
       </Button>
-      <Button size="small" onClick={() => setDialog('export')} sx={{ borderRadius: '8px', textTransform: 'none' }}>
+      <Button size="small" onClick={() => setDialog('export')} sx={HEADER_BUTTON_SX}>
         Export…
       </Button>
-      <Button
-        size="small"
-        color="error"
-        onClick={() => setDialog('delete')}
-        sx={{ borderRadius: '8px', textTransform: 'none' }}
-      >
+      <Button size="small" color="error" onClick={() => setDialog('delete')} sx={HEADER_BUTTON_SX}>
         Delete…
       </Button>
     </Box>

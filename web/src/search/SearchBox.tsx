@@ -1,8 +1,9 @@
 import SearchIcon from '@mui/icons-material/Search'
-import { Box, Chip, InputAdornment, TextField } from '@mui/material'
+import { Box, Chip, TextField } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useMatch, useNavigate } from 'react-router'
 import { useFolder } from '../api/queries'
+import { ACCENT, BORDER, SURFACE_MUTED } from '../design/accent'
 import { parseId, parseSearchState } from '../routing/urlState'
 
 export const SEARCH_DEBOUNCE_MS = 300
@@ -48,8 +49,30 @@ export function SearchBox() {
   }
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, maxWidth: 560 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.75,
+        flex: 1,
+        maxWidth: 560,
+        pl: 1.5,
+        pr: 0.5,
+        py: 0.25,
+        borderRadius: '999px',
+        border: `1px solid ${BORDER}`,
+        bgcolor: 'action.hover',
+        transition: 'background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+        '&:focus-within': {
+          bgcolor: 'background.paper',
+          boxShadow: `0 0 0 4px ${ACCENT}1a`,
+          borderColor: ACCENT,
+        },
+      }}
+    >
+      <SearchIcon fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0, lineHeight: 0 }} />
       <TextField
+        variant="standard"
         size="small"
         fullWidth
         placeholder="Search file names…"
@@ -57,29 +80,42 @@ export function SearchBox() {
         onChange={(event) => changeText(event.target.value)}
         slotProps={{
           htmlInput: { 'aria-label': 'Search file names' },
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-            sx: { bgcolor: 'background.paper' },
-          },
+          input: { disableUnderline: true },
+        }}
+        sx={{
+          '& .MuiInputBase-root': { alignItems: 'center' },
+          '& .MuiInputBase-input': { py: 0, lineHeight: '20px' },
         }}
       />
       {scopeId !== null ? (
         <Chip
+          size="small"
           label={`in: ${scopeFolder.data?.name ?? '…'}`}
           onDelete={() => changeScope(null)}
-          color="secondary"
+          sx={{
+            flexShrink: 0,
+            borderRadius: '999px',
+            bgcolor: ACCENT,
+            color: 'common.white',
+            '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.8)' },
+            '& .MuiChip-deleteIcon:hover': { color: 'common.white' },
+          }}
         />
       ) : (
         currentFolderId !== null && (
           <Chip
+            size="small"
             label="In this folder"
             variant="outlined"
             onClick={() => changeScope(currentFolderId)}
-            sx={{ color: 'inherit', borderColor: 'currentColor' }}
+            sx={{
+              flexShrink: 0,
+              color: 'text.secondary',
+              bgcolor: 'transparent',
+              borderColor: 'transparent',
+              borderRadius: '999px',
+              '&:hover': { bgcolor: SURFACE_MUTED, color: 'text.primary' },
+            }}
           />
         )
       )}

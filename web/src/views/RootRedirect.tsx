@@ -2,8 +2,9 @@ import { Box, CircularProgress, Typography } from '@mui/material'
 import { Navigate } from 'react-router'
 import { useRootFolders } from '../api/queries'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { readLastFolderId } from './preferences'
 
-/** "/" opens the first root's top folder. */
+/** "/" reopens the last folder that was browsed, or the first root if there's none remembered yet. */
 export function RootRedirect() {
   const roots = useRootFolders()
 
@@ -28,5 +29,6 @@ export function RootRedirect() {
     )
   }
 
-  return <Navigate to={`/folders/${first.id}`} replace />
+  const targetId = readLastFolderId() ?? first.id
+  return <Navigate to={`/folders/${targetId}`} replace />
 }

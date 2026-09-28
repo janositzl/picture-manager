@@ -50,8 +50,8 @@ export function AlbumGrid({
 
   const attach = useCallback((element: HTMLDivElement | null) => {
     if (element === null) return
-    // clientWidth includes the padding but not the (always reserved) scrollbar gutter.
-    const measure = () => setWidth(Math.max(0, element.clientWidth - GRID_PADDING))
+    // clientWidth includes the (symmetric left/right) padding but not the scrollbar gutter.
+    const measure = () => setWidth(Math.max(0, element.clientWidth - GRID_PADDING * 2))
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
@@ -71,7 +71,13 @@ export function AlbumGrid({
       ref={attach}
       className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/60 dark:bg-transparent"
       data-testid="album-grid"
-      style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}
+      style={{
+        scrollbarGutter: 'stable',
+        paddingLeft: GRID_PADDING,
+        paddingRight: GRID_PADDING,
+        paddingTop: GRID_PADDING,
+        paddingBottom: GRID_PADDING,
+      }}
     >
       {width > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -140,6 +146,7 @@ function SortableTile({
       ref={setNodeRef}
       data-sort-index={index}
       style={{
+        // Other tiles slide aside to preview where the drop would land.
         transform: CSS.Transform.toString(transform),
         transition,
         position: 'relative',
