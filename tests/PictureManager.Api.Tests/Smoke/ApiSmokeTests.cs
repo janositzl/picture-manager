@@ -42,7 +42,9 @@ public class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
 
     [Theory]
     [InlineData("GET", "/api/roots", ApiSurface.Admin)]
+    [InlineData("POST", "/api/roots", ApiSurface.Admin)]
     [InlineData("PATCH", "/api/roots/{id:int}", ApiSurface.Admin)]
+    [InlineData("DELETE", "/api/roots/{id:int}", ApiSurface.Admin)]
     [InlineData("GET", "/api/settings", ApiSurface.Admin)]
     [InlineData("PUT", "/api/settings", ApiSurface.Admin)]
     [InlineData("POST", "/api/scans", ApiSurface.Admin)]

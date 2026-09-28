@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { resetAdminStore } from './adminHandlers'
 import { resetAlbumStore } from './albumHandlers'
 import { server } from './server'
 
@@ -10,7 +11,10 @@ import { server } from './server'
 configure({ asyncUtilTimeout: 5000 })
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-beforeEach(() => resetAlbumStore())
+beforeEach(() => {
+  resetAlbumStore()
+  resetAdminStore()
+})
 afterEach(() => {
   server.resetHandlers()
   cleanup()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,11 @@ public sealed class DiscoveryBackgroundService : BackgroundService
     private readonly IClock _clock;
     private readonly ILogger<DiscoveryBackgroundService> _logger;
 
+    // Roots whose auto-chained discovery has failed this process's lifetime: skipped by
+    // QueueNextUndiscoveredRootAsync so an unavailable root can't spin it in a tight fail/requeue loop.
+    // A restart, or a manual "Refresh structure" from the tree, gives a root another chance.
+    private readonly HashSet<int> _failedRootIds = [];
+
     public DiscoveryBackgroundService(IDiscoveryQueue queue, IServiceScopeFactory scopeFactory, IClock clock, ILogger<DiscoveryBackgroundService> logger)
     {
         _queue = queue;
@@ -37,6 +43,8 @@ public sealed class DiscoveryBackgroundService : BackgroundService
     {
         await foreach (var discovery in _queue.ReadAllAsync(stoppingToken))
         {
+            var failed = false;
+
             try
             {
                 using var scope = _scopeFactory.CreateScope();
@@ -48,6 +56,7 @@ public sealed class DiscoveryBackgroundService : BackgroundService
             {
                 // Expected (share not mounted, root or folder removed while queued, folder gone from disk): the job
                 // already carries the message for the UI.
+                failed = true;
                 _logger.LogWarning("Discovery {DiscoveryJobId} failed: {Message}", discovery.DiscoveryJobId, ex.Message);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -60,9 +69,15 @@ public sealed class DiscoveryBackgroundService : BackgroundService
                 // RunDiscoveryAsync's own attempt to record this failure already ran (and may itself have failed) --
                 // so retry marking the job Failed instead of leaving it stuck Enumerating forever, which would
                 // otherwise 409 every later scan/discovery until the next restart.
+                failed = true;
                 _logger.LogError(ex, "Discovery {DiscoveryJobId} failed", discovery.DiscoveryJobId);
                 await MarkFailedWithRetryAsync(discovery.DiscoveryJobId, ex, stoppingToken);
             }
+
+            // A root-level discovery (no FolderId) that just failed never sets ChildrenDiscoveredAt, so it
+            // would otherwise still look "undiscovered" below and get chained right back to itself.
+            if (failed && discovery.RootId is { } failedRootId)
+                _failedRootIds.Add(failedRootId);
 
             // Only one job runs at a time, so a startup with several new/unfinished roots only gets the first one
             // queued directly; chain to the next one here rather than waiting for a restart. Runs whether the
@@ -81,7 +96,7 @@ public sealed class DiscoveryBackgroundService : BackgroundService
 
         foreach (var root in await roots.GetAllAsync(stoppingToken))
         {
-            if (!root.IsActive || !await folders.HasUndiscoveredFoldersAsync(root.Id, stoppingToken))
+            if (!root.IsActive || _failedRootIds.Contains(root.Id) || !await folders.HasUndiscoveredFoldersAsync(root.Id, stoppingToken))
                 continue;
 
             try

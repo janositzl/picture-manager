@@ -91,4 +91,36 @@ public class DiscoveryBackgroundServiceTests
 
         await discoveryService.Received(1).QueueDiscoveryAsync(11, null, Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task DiscoveryBackgroundService_RootUnavailable_DoesNotRequeueTheSameRoot()
+    {
+        var queue = new ChannelDiscoveryQueue();
+        var discoveryService = Substitute.For<IDiscoveryService>();
+        discoveryService.RunDiscoveryAsync(new QueuedDiscovery(1, 10, null), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new ScanRootsUnavailableException(new[] { "nas" })));
+
+        // Still "undiscovered" forever, since a failed root-level discovery never sets ChildrenDiscoveredAt --
+        // the only signal QueueNextUndiscoveredRootAsync would otherwise have that this root was already tried.
+        var folders = Substitute.For<IFolderRepository>();
+        folders.HasUndiscoveredFoldersAsync(10, Arg.Any<CancellationToken>()).Returns(true);
+        var roots = Substitute.For<IImageRootRepository>();
+        roots.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<ImageRoot> { new() { Id = 10, Name = "nas", IsActive = true } });
+
+        var provider = new ServiceCollection()
+            .AddScoped(_ => discoveryService).AddScoped(_ => folders).AddScoped(_ => roots)
+            .BuildServiceProvider();
+        var service = new DiscoveryBackgroundService(queue, provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<IClock>(), NullLogger<DiscoveryBackgroundService>.Instance);
+
+        await service.StartAsync(CancellationToken.None);
+        queue.Enqueue(new QueuedDiscovery(1, 10, null));
+        // No further queue activity should follow the failure -- give the (would-be looping) chain a moment
+        // to prove it stays quiet, rather than waiting on a signal that should never fire.
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await service.StopAsync(CancellationToken.None);
+
+        await discoveryService.DidNotReceive().QueueDiscoveryAsync(10, null, Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
 }

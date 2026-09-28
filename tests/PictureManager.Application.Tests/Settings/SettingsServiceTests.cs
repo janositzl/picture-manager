@@ -5,6 +5,7 @@ using FluentAssertions;
 using NSubstitute;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
 using PictureManager.Application.Settings;
 using PictureManager.Model;
 using Xunit;
@@ -14,6 +15,7 @@ namespace PictureManager.Application.Tests.Settings;
 public class SettingsServiceTests
 {
     private readonly IAppSettingsRepository _repository = Substitute.For<IAppSettingsRepository>();
+    private readonly ScanningOptions _scanningOptions = ScanningOptions.FromConfig(new[] { ".jpg", ".png" });
     private readonly AppSettings _current = new()
     {
         Id = 1,
@@ -27,7 +29,7 @@ public class SettingsServiceTests
         _repository.GetAsync(Arg.Any<CancellationToken>()).Returns(_current);
     }
 
-    private SettingsService CreateService() => new(_repository);
+    private SettingsService CreateService() => new(_repository, _scanningOptions);
 
     private static SettingsInput Input(string?[]? folders, string?[]? excluded, string?[]? included = null) =>
         new(folders, excluded, included);

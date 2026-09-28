@@ -1,4 +1,8 @@
 import { Navigate, type RouteObject } from 'react-router'
+import { AdminLayout } from '../admin/AdminLayout'
+import { RemovedFoldersPage } from '../admin/RemovedFoldersPage'
+import { RootsPage } from '../admin/RootsPage'
+import { SettingsPage } from '../admin/SettingsPage'
 import { AlbumsPage } from '../albums/AlbumsPage'
 import { AlbumView } from '../albums/AlbumView'
 import { DuplicatesView } from '../views/DuplicatesView'
@@ -21,6 +25,16 @@ export const appRoutes: RouteObject[] = [
       { path: 'duplicates', element: <DuplicatesView /> },
       { path: 'search', element: <SearchView /> },
       { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <Navigate to="settings" replace /> },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'roots', element: <RootsPage /> },
+      { path: 'removed-folders', element: <RemovedFoldersPage /> },
     ],
   },
 ]

@@ -39,4 +39,9 @@ public sealed class ImageRootRepository : IImageRootRepository
         _dbContext.ImageRoots.Update(imageRoot);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.ImageRoots.Where(r => r.Id == id).ExecuteDeleteAsync(cancellationToken);
+    }
 }

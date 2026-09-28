@@ -3,6 +3,7 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import KeyboardDoubleArrowLeftOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowLeftOutlined'
 import KeyboardDoubleArrowRightOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowRightOutlined'
 import PhotoLibraryOutlinedIcon from '@mui/icons-material/PhotoLibraryOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { AppBar, Box, Button, IconButton, Toolbar, Typography } from '@mui/material'
 import { Aperture } from 'lucide-react'
@@ -88,6 +89,15 @@ export function AppShell() {
                 {label}
               </Button>
             ))}
+            <IconButton
+              component={RouterLink}
+              to="/admin"
+              aria-label="Admin"
+              size="small"
+              sx={{ ml: 0.5, color: 'text.secondary' }}
+            >
+              <SettingsOutlinedIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Toolbar>
       </AppBar>

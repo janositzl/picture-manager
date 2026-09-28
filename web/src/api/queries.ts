@@ -12,6 +12,9 @@ import type {
   ImageDetail,
   ImageListItem,
   Page,
+  RemovedFolder,
+  RootSummary,
+  SettingsDto,
 } from './types'
 
 export const queryKeys = {
@@ -27,6 +30,9 @@ export const queryKeys = {
   // Under the photo-list prefix, so patchFavorite updates album tiles too.
   albumImages: (id: number) => ['images', 'list', { kind: 'album', albumId: id }] as const,
   duplicates: () => ['duplicates'] as const,
+  settings: () => ['settings'] as const,
+  roots: () => ['roots'] as const,
+  removedFolders: () => ['folders', 'removed'] as const,
 }
 
 export function useRootFolders() {
@@ -139,5 +145,26 @@ export function useDuplicates() {
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: Page<DuplicateGroup>) => lastPage.nextCursor,
+  })
+}
+
+export function useSettings() {
+  return useQuery({
+    queryKey: queryKeys.settings(),
+    queryFn: ({ signal }) => apiFetch<SettingsDto>('/api/settings', { signal }),
+  })
+}
+
+export function useRoots() {
+  return useQuery({
+    queryKey: queryKeys.roots(),
+    queryFn: ({ signal }) => apiFetch<RootSummary[]>('/api/roots', { signal }),
+  })
+}
+
+export function useRemovedFolders() {
+  return useQuery({
+    queryKey: queryKeys.removedFolders(),
+    queryFn: ({ signal }) => apiFetch<RemovedFolder[]>('/api/folders/removed', { signal }),
   })
 }

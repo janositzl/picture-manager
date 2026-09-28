@@ -88,6 +88,27 @@ export type DuplicateGroup = { contentHash: string; count: number; images: Image
 export type JobStatus =
   'Pending' | 'Enumerating' | 'Enriching' | 'Completed' | 'Failed' | 'Cancelled'
 
+export type SettingsDto = {
+  excludedFolderNames: string[]
+  excludedExtensions: string[]
+  includedExtensions: string[] | null
+  /** The config-level ceiling (Scanning:SupportedExtensions): read-only, not editable through this API. */
+  supportedExtensions: string[]
+}
+
+export type SettingsSaveResult = SettingsDto & { pruneOnNextScan: boolean }
+
+export type RootSummary = {
+  id: number
+  name: string
+  alias: string | null
+  mountPath: string
+  isActive: boolean
+  exportSegment: string
+}
+
+export type RemovedFolder = { id: number; name: string; rootName: string; relativePath: string }
+
 export type DiscoveryProgress = {
   id: number
   status: JobStatus

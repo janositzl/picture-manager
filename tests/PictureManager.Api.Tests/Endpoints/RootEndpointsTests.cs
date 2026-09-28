@@ -62,4 +62,59 @@ public class RootEndpointsTests
 
         result.Result.Should().BeOfType<Conflict<Microsoft.AspNetCore.Mvc.ProblemDetails>>();
     }
+
+    [Fact]
+    public async Task CreateAsync_Success_Returns201()
+    {
+        var summary = new RootSummary(3, "archive", null, "/m", true, "archive");
+        _service.CreateAsync(Arg.Any<RootCreate>(), Arg.Any<CancellationToken>()).Returns(Result<RootSummary>.Ok(summary));
+
+        var result = await RootEndpoints.CreateAsync(
+            new RootCreateRequest("archive", "/m", null), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<Created<RootSummary>>();
+        await _service.Received(1).CreateAsync(new RootCreate("archive", "/m", null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_Conflict_Returns409()
+    {
+        _service.CreateAsync(Arg.Any<RootCreate>(), Arg.Any<CancellationToken>()).Returns(Result.Conflict("taken"));
+
+        var result = await RootEndpoints.CreateAsync(
+            new RootCreateRequest("archive", "/m", null), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<Conflict<Microsoft.AspNetCore.Mvc.ProblemDetails>>();
+    }
+
+    [Fact]
+    public async Task CreateAsync_Invalid_ReturnsValidationProblem()
+    {
+        _service.CreateAsync(Arg.Any<RootCreate>(), Arg.Any<CancellationToken>()).Returns(Result.Invalid("name", "Must not be blank."));
+
+        var result = await RootEndpoints.CreateAsync(
+            new RootCreateRequest(null, "/m", null), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<ValidationProblem>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Success_Returns204()
+    {
+        _service.DeleteAsync(1, Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        var result = await RootEndpoints.DeleteAsync(1, _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_UnknownRoot_Returns404()
+    {
+        _service.DeleteAsync(99, Arg.Any<CancellationToken>()).Returns(Result.NotFound());
+
+        var result = await RootEndpoints.DeleteAsync(99, _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFound>();
+    }
 }

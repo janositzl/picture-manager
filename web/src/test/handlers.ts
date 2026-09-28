@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { ImageListItem } from '../api/types'
+import { adminHandlers } from './adminHandlers'
 import { albumHandlers, duplicateHandlers } from './albumHandlers'
 import {
   childrenById,
@@ -14,12 +15,16 @@ import { jobHandlers } from './jobHandlers'
 const allImages = (): ImageListItem[] => [...holidaysImages, ...madeiraImages]
 const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { status: 404 })
 
-/** A stateless fake of the phase 5 API over the fixtures. Order matters: /roots before /:id. */
+/**
+ * A stateless fake of the phase 5 API over the fixtures. Order matters: /roots and /removed before
+ * the generic /:id, which would otherwise treat "removed" as a folder id.
+ */
 export const handlers = [
   http.get('/api/folders/roots', () => HttpResponse.json(rootFolders)),
   http.get('/api/folders/:id/children', ({ params }) =>
     HttpResponse.json(childrenById[Number(params.id)] ?? []),
   ),
+  ...adminHandlers,
   http.get('/api/folders/:id', ({ params }) => {
     const detail = folderDetails[Number(params.id)]
     return detail ? HttpResponse.json(detail) : notFound()

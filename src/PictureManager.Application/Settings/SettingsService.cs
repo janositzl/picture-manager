@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
 using PictureManager.Model;
 
 namespace PictureManager.Application.Settings;
@@ -12,17 +13,20 @@ namespace PictureManager.Application.Settings;
 public sealed class SettingsService : ISettingsService
 {
     private readonly IAppSettingsRepository _repository;
+    private readonly ScanningOptions _scanningOptions;
 
-    public SettingsService(IAppSettingsRepository repository)
+    public SettingsService(IAppSettingsRepository repository, ScanningOptions scanningOptions)
     {
         _repository = repository;
+        _scanningOptions = scanningOptions;
     }
 
     public async Task<SettingsDto> GetAsync(CancellationToken cancellationToken = default)
     {
         var settings = await _repository.GetAsync(cancellationToken);
         return new SettingsDto(settings.ExcludedFolderNames, settings.ExcludedExtensions,
-            settings.IncludedExtensions is { Count: > 0 } ? settings.IncludedExtensions : null);
+            settings.IncludedExtensions is { Count: > 0 } ? settings.IncludedExtensions : null,
+            _scanningOptions.SupportedExtensions);
     }
 
     public async Task<Result<SettingsSaveResult>> UpdateAsync(SettingsInput input, CancellationToken cancellationToken = default)
@@ -48,7 +52,8 @@ public sealed class SettingsService : ISettingsService
         settings.IncludedExtensions = included;
         await _repository.UpdateAsync(settings, cancellationToken);
 
-        return Result<SettingsSaveResult>.Ok(new SettingsSaveResult(folderNames, excluded, included, prune));
+        return Result<SettingsSaveResult>.Ok(
+            new SettingsSaveResult(folderNames, excluded, included, _scanningOptions.SupportedExtensions, prune));
     }
 
     private static bool NewlyExcludesSomething(AppSettings old, List<string> folderNames, List<string> excluded, List<string>? included)

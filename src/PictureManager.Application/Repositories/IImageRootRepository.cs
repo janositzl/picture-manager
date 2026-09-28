@@ -11,4 +11,5 @@ public interface IImageRootRepository
     Task<IReadOnlyList<ImageRoot>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<ImageRoot> AddAsync(ImageRoot imageRoot, CancellationToken cancellationToken = default);
     Task UpdateAsync(ImageRoot imageRoot, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }
