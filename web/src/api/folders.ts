@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, ApiError } from './client'
+import { queryKeys } from './queries'
 
 type SetFolderExcludedArgs = { folderId: number; isExcluded: boolean }
 
@@ -29,4 +30,26 @@ export function folderExclusionErrorMessage(error: unknown): string {
     if (fieldError) return fieldError
   }
   return "Couldn't change exclusion."
+}
+
+export function useRemoveFolder() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (folderId: number) => apiFetch<void>(`/api/folders/${folderId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.removedFolders() })
+    },
+  })
+}
+
+/** Maps a failed folder removal to a message for the notification snackbar. */
+export function folderRemoveErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 409) return error.problem?.detail ?? 'A scan is running.'
+    const fieldError = Object.values(error.problem?.errors ?? {})[0]?.[0]
+    if (fieldError) return fieldError
+  }
+  return "Couldn't remove the folder."
 }

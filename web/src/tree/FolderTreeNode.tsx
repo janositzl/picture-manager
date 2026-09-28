@@ -28,6 +28,8 @@ type Props = {
   onToggle: (id: number) => void
   /** True when an ancestor (not this folder itself) is excluded from scans. */
   ancestorExcluded: boolean
+  /** Null for a root's top folder (depth 0), which has no parent. */
+  parentId: number | null
 }
 
 export function FolderTreeNode({
@@ -37,6 +39,7 @@ export function FolderTreeNode({
   isExpanded,
   onToggle,
   ancestorExcluded,
+  parentId,
 }: Props) {
   const navigate = useNavigate()
   const expanded = node.hasChildren && isExpanded(node.id)
@@ -130,6 +133,8 @@ export function FolderTreeNode({
           folderName={node.name}
           isExcluded={node.isExcluded}
           ancestorExcluded={ancestorExcluded}
+          isRootFolder={depth === 0}
+          parentId={parentId}
         />
       </ListItemButton>
       {expanded && children.isError && (
@@ -149,6 +154,7 @@ export function FolderTreeNode({
               isExpanded={isExpanded}
               onToggle={onToggle}
               ancestorExcluded={excluded}
+              parentId={node.id}
             />
           ))}
         </List>

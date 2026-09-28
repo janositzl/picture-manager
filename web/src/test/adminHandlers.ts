@@ -169,4 +169,5 @@ export const adminHandlers = [
     removedFolders = removedFolders.filter((f) => f.id !== id)
     return new HttpResponse(null, { status: 204 })
   }),
+  http.delete('/api/folders/:id', () => new HttpResponse(null, { status: 204 })),
 ]

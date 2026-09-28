@@ -282,3 +282,95 @@ describe('folder exclusion', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('folder removal', () => {
+  it("does not offer removal for a root's top folder", async () => {
+    const { user } = renderApp('/folders/1')
+    await openMenu(user, 'dev')
+    expect(screen.queryByRole('menuitem', { name: 'Remove from collection' })).not.toBeInTheDocument()
+  })
+
+  it('removes a folder after confirming, and refreshes the tree', async () => {
+    let deletedId: number | null = null
+    server.use(
+      http.delete('/api/folders/:id', ({ params }) => {
+        deletedId = Number(params.id)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const { user } = renderApp('/folders/1')
+    await openMenu(user, 'Holidays')
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from collection' }))
+
+    expect(await screen.findByRole('heading', { name: 'Remove folder' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(deletedId).toBe(2))
+    expect(screen.queryByRole('heading', { name: 'Remove folder' })).not.toBeInTheDocument()
+  })
+
+  it('cancels without removing the folder', async () => {
+    let called = false
+    server.use(
+      http.delete('/api/folders/:id', () => {
+        called = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const { user } = renderApp('/folders/1')
+    await openMenu(user, 'Holidays')
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from collection' }))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('heading', { name: 'Remove folder' })).not.toBeInTheDocument()
+    expect(called).toBe(false)
+  })
+
+  it('shows the error message when a scan is running', async () => {
+    server.use(
+      http.delete(
+        '/api/folders/:id',
+        () =>
+          HttpResponse.json(
+            { title: 'Conflict', status: 409, detail: 'A scan is running; remove the folder after it finishes.' },
+            { status: 409 },
+          ),
+      ),
+    )
+    const { user } = renderApp('/folders/1')
+    await openMenu(user, 'Holidays')
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from collection' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+
+    expect(
+      await screen.findByText('A scan is running; remove the folder after it finishes.'),
+    ).toBeInTheDocument()
+  })
+
+  it('navigates to the parent folder after removing the folder currently being viewed', async () => {
+    server.use(http.delete('/api/folders/:id', () => new HttpResponse(null, { status: 204 })))
+    const { user } = renderApp('/folders/3')
+    expect(await screen.findByRole('heading', { name: 'Madeira' })).toBeInTheDocument()
+
+    await openMenu(user, 'Madeira')
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from collection' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+
+    expect(await screen.findByRole('heading', { name: 'Holidays' })).toBeInTheDocument()
+  })
+
+  it('does not navigate away when removing a folder other than the one being viewed', async () => {
+    server.use(http.delete('/api/folders/:id', () => new HttpResponse(null, { status: 204 })))
+    const { user } = renderApp('/folders/3')
+    expect(await screen.findByRole('heading', { name: 'Madeira' })).toBeInTheDocument()
+
+    await openMenu(user, 'Holidays')
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from collection' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Remove folder' })).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByRole('heading', { name: 'Madeira' })).toBeInTheDocument()
+  })
+})

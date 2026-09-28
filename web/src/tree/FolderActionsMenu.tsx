@@ -10,8 +10,16 @@ import {
   Typography,
 } from '@mui/material'
 import { useState, type MouseEvent } from 'react'
-import { folderExclusionErrorMessage, useSetFolderExcluded } from '../api/folders'
+import { useNavigate, useParams } from 'react-router'
+import {
+  folderExclusionErrorMessage,
+  folderRemoveErrorMessage,
+  useRemoveFolder,
+  useSetFolderExcluded,
+} from '../api/folders'
 import { useNotify } from '../app/notify'
+import { parseId } from '../routing/urlState'
+import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { useFolderJobs } from './FolderJobsContext'
 import { progressLabel } from './JobStatusBanner'
 
@@ -20,13 +28,29 @@ type Props = {
   folderName: string
   isExcluded: boolean
   ancestorExcluded: boolean
+  /** A root's top folder; it can't be removed from the collection (deactivate the root instead). */
+  isRootFolder: boolean
+  /** Null only for a root's top folder, which can't be removed. */
+  parentId: number | null
 }
 
-export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorExcluded }: Props) {
+export function FolderActionsMenu({
+  folderId,
+  folderName,
+  isExcluded,
+  ancestorExcluded,
+  isRootFolder,
+  parentId,
+}: Props) {
   const { activeJob, refreshFolder, scanFolder } = useFolderJobs()
   const setExcluded = useSetFolderExcluded()
+  const removeFolder = useRemoveFolder()
   const notify = useNotify()
+  const navigate = useNavigate()
+  const params = useParams()
+  const viewedFolderId = parseId(params.folderId ?? null)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
   const excluded = isExcluded || ancestorExcluded
   const scanDisabled = activeJob !== null || excluded
 
@@ -52,6 +76,17 @@ export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorEx
       { onError: (error) => notify(folderExclusionErrorMessage(error)) },
     )
     close()
+  }
+  const confirmRemove = async () => {
+    try {
+      await removeFolder.mutateAsync(folderId)
+      // The removed folder's own detail page would otherwise 404; its parent still exists.
+      if (viewedFolderId === folderId && parentId !== null) navigate(`/folders/${parentId}`)
+    } catch (error) {
+      notify(folderRemoveErrorMessage(error))
+    } finally {
+      setConfirmingRemove(false)
+    }
   }
 
   return (
@@ -92,18 +127,40 @@ export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorEx
           Scan folder + subfolders
         </MenuItem>
         <MenuItem onClick={toggleExcluded} disabled={ancestorExcluded}>
-          {excluded && (
+          {isExcluded && (
             <ListItemIcon>
               <CheckIcon fontSize="small" />
             </ListItemIcon>
           )}
           <ListItemText
-            inset={!excluded}
             primary="Exclude folder"
             secondary={ancestorExcluded ? 'Excluded via parent folder' : undefined}
           />
         </MenuItem>
+        {!isRootFolder && (
+          <MenuItem
+            onClick={() => runAction(() => setConfirmingRemove(true))}
+            disabled={activeJob !== null}
+            sx={{ color: 'error.main' }}
+          >
+            Remove from collection
+          </MenuItem>
+        )}
       </Menu>
+      {confirmingRemove && (
+        // MUI's Dialog portals its DOM elsewhere, but synthetic events still bubble through the React
+        // tree; without this, confirming would also fire the tree row's onClick and navigate to it.
+        <div onClick={(event: MouseEvent) => event.stopPropagation()}>
+          <ConfirmDialog
+            title="Remove folder"
+            message={`Remove ${folderName} from the collection? This permanently deletes its images and subfolders from the database (the files on disk are untouched). The folder itself can be restored from Admin > Removed folders, but its deleted images and subfolders cannot.`}
+            confirmLabel="Remove"
+            busy={removeFolder.isPending}
+            onConfirm={confirmRemove}
+            onClose={() => setConfirmingRemove(false)}
+          />
+        </div>
+      )}
     </>
   )
 }
