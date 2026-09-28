@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
-import { startDiscovery, startScan, useJobEvents, type JobKind } from '../api/jobs'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { getActiveJob, startDiscovery, startScan, useJobEvents, type JobKind } from '../api/jobs'
 import { ApiError } from '../api/client'
+import { queryKeys } from '../api/queries'
 import type { DiscoveryProgress, ScanProgress } from '../api/types'
 import { useNotify } from '../app/notify'
 
@@ -31,12 +32,31 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   const [job, setJob] = useState<{ kind: JobKind; folderId: number; jobId: number } | null>(null)
   const queryClient = useQueryClient()
   const notify = useNotify()
+
+  // Restores a job that's still running server-side after a page load, so a reload mid-scan
+  // doesn't lose track of it (the backend is the source of truth, not this component's state).
+  useEffect(() => {
+    let cancelled = false
+    getActiveJob().then((active) => {
+      if (cancelled || active === null || active.folderId === null) return
+      setJob({ kind: active.kind === 'Discovery' ? 'discoveries' : 'scans', folderId: active.folderId, jobId: active.id })
+    }).catch(() => {
+      // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const progress = useJobEvents(job?.kind ?? 'discoveries', job?.jobId ?? null, (event) => {
     if (event.status === 'Failed') {
       notify(event.errorMessage ?? 'The job failed.')
       setJob(null)
     } else if (event.status === 'Completed' || event.status === 'Cancelled') {
       void queryClient.invalidateQueries({ queryKey: ['folders'] })
+      // A scan can add, remove or re-enrich images; every grid (and the viewer walking the same
+      // cached pages) needs to see that, not just the folder tree's counts.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.imageLists() })
       setJob(null)
     }
   })

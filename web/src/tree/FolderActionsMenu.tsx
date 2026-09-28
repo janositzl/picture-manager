@@ -12,25 +12,14 @@ import {
 import { useState, type MouseEvent } from 'react'
 import { folderExclusionErrorMessage, useSetFolderExcluded } from '../api/folders'
 import { useNotify } from '../app/notify'
-import type { ActiveJob } from './FolderJobsContext'
 import { useFolderJobs } from './FolderJobsContext'
+import { progressLabel } from './JobStatusBanner'
 
 type Props = {
   folderId: number
   folderName: string
   isExcluded: boolean
   ancestorExcluded: boolean
-}
-
-function progressLabel(activeJob: ActiveJob): string {
-  if (activeJob.kind === 'discoveries') {
-    return `Discovering… ${activeJob.progress?.foldersDiscovered ?? 0} folders found`
-  }
-  const progress = activeJob.progress
-  if (progress?.status === 'Enriching') {
-    return `Enriching… ${progress.filesEnriched}/${progress.filesFound} files`
-  }
-  return `Scanning… ${progress?.foldersScanned ?? 0} folders, ${progress?.filesFound ?? 0} files`
 }
 
 export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorExcluded }: Props) {

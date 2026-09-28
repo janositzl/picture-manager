@@ -88,6 +88,17 @@ export type DuplicateGroup = { contentHash: string; count: number; images: Image
 export type JobStatus =
   'Pending' | 'Enumerating' | 'Enriching' | 'Completed' | 'Failed' | 'Cancelled'
 
+export type ActiveJobDto = {
+  kind: 'Scan' | 'Discovery'
+  id: number
+  folderId: number | null
+  status: JobStatus
+  foldersProcessed: number
+  filesFound: number
+  filesEnriched: number
+  errorMessage: string | null
+}
+
 export type SettingsDto = {
   excludedFolderNames: string[]
   excludedExtensions: string[]

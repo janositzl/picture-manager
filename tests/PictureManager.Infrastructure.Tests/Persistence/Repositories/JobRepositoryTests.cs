@@ -171,6 +171,25 @@ public class JobRepositoryTests
     }
 
     [Fact]
+    public async Task GetActiveAsync_ReturnsTheEnumeratingOrEnrichingJob_OtherwiseNull()
+    {
+        await using var context = CreateContext();
+        var repository = new JobRepository(context);
+
+        (await repository.GetActiveAsync()).Should().BeNull();
+
+        var enumerating = await repository.AddAsync(new Job
+        {
+            Kind = JobKind.Discovery, FolderId = 20, Status = JobStatus.Enumerating, StartedUtc = DateTime.UtcNow
+        });
+        (await repository.GetActiveAsync())!.Id.Should().Be(enumerating.Id);
+
+        enumerating.Status = JobStatus.Completed;
+        await repository.UpdateAsync(enumerating);
+        (await repository.GetActiveAsync()).Should().BeNull();
+    }
+
+    [Fact]
     public async Task SetEnumerationResultAsync_UpdatesFoldersScannedAndFilesFound_ButNotStatus()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

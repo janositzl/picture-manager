@@ -2,6 +2,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { Box, IconButton, Tab, Tabs, Typography } from '@mui/material'
 import { Link as RouterLink, Outlet, useLocation } from 'react-router'
 import { HEADING_SX } from '../design/accent'
+import { JobStatusBanner } from '../tree/JobStatusBanner'
 
 const TABS = [
   { to: '/admin/settings', label: 'Settings' },
@@ -28,6 +29,7 @@ export function AdminLayout() {
           <Tab key={tab.to} value={tab.to} label={tab.label} component={RouterLink} to={tab.to} />
         ))}
       </Tabs>
+      <JobStatusBanner />
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <Outlet />
       </Box>

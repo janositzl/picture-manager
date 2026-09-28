@@ -20,7 +20,7 @@ public static class ScanEndpoints
     {
         try
         {
-            var scanJobId = await scanService.QueueScanAsync(request.RootId, null, request.IsRecursive, cancellationToken);
+            var scanJobId = await scanService.QueueScanAsync(request.RootId, request.FolderId, request.IsRecursive, cancellationToken);
             return Results.Ok(new ScanStartedResponse(scanJobId));
         }
         catch (ScanAlreadyInProgressException ex)
@@ -30,6 +30,10 @@ public static class ScanEndpoints
         catch (ScanRootUnavailableException ex)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["rootId"] = new[] { ex.Message } });
+        }
+        catch (FolderUnavailableException ex)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["folderId"] = new[] { ex.Message } });
         }
     }
 
@@ -60,6 +64,6 @@ public static class ScanEndpoints
     }
 }
 
-public sealed record ScanRequest(int? RootId, bool IsRecursive);
+public sealed record ScanRequest(int? RootId, int? FolderId, bool IsRecursive);
 public sealed record ScanStartedResponse(int ScanJobId);
 public sealed record ScanProgress(int Id, string Status, int FoldersScanned, int FilesFound, int FilesEnriched, string? ErrorMessage);

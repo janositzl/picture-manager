@@ -21,7 +21,7 @@ public class ScanEndpointsTests
         var scanService = Substitute.For<IScanService>();
         scanService.QueueScanAsync(1, null, true, Arg.Any<CancellationToken>()).Returns(42);
 
-        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(1, true), scanService, CancellationToken.None);
+        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(1, null, true), scanService, CancellationToken.None);
 
         result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.Ok<ScanStartedResponse>>();
     }
@@ -33,7 +33,31 @@ public class ScanEndpointsTests
         scanService.QueueScanAsync(2, null, true, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ScanRootUnavailableException(2)));
 
-        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(2, true), scanService, CancellationToken.None);
+        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(2, null, true), scanService, CancellationToken.None);
+
+        result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ValidationProblem>();
+    }
+
+    [Fact]
+    public async Task StartScanAsync_FolderId_IsPassedThrough()
+    {
+        var scanService = Substitute.For<IScanService>();
+        scanService.QueueScanAsync(null, 20, true, Arg.Any<CancellationToken>()).Returns(42);
+
+        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(null, 20, true), scanService, CancellationToken.None);
+
+        result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.Ok<ScanStartedResponse>>();
+        await scanService.Received(1).QueueScanAsync(null, 20, true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartScanAsync_UnavailableFolder_ReturnsValidationProblem()
+    {
+        var scanService = Substitute.For<IScanService>();
+        scanService.QueueScanAsync(null, 20, true, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(FolderUnavailableException.NotFound(20)));
+
+        var result = await ScanEndpoints.StartScanAsync(new ScanRequest(null, 20, true), scanService, CancellationToken.None);
 
         result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ValidationProblem>();
     }

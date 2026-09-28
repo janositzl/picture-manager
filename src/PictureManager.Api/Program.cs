@@ -113,6 +113,7 @@ try
     user.MapDuplicateEndpoints();
     admin.MapScanEndpoints();
     admin.MapDiscoveryEndpoints();
+    admin.MapJobEndpoints();
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();
 

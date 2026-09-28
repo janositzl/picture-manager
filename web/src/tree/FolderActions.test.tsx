@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { devRoot, excludedFolder } from '../test/fixtures'
-import { controllableEvents, discoveryEvents, scanEvents } from '../test/jobHandlers'
+import { devRoot, excludedFolder, image, madeiraImages } from '../test/fixtures'
+import { activeJob, controllableEvents, discoveryEvents, scanEvents } from '../test/jobHandlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
@@ -130,6 +130,54 @@ describe('folder actions', () => {
     expect(
       await screen.findByText('A discovery or scan is already in progress.'),
     ).toBeInTheDocument()
+  })
+
+  it('restores a job still running on the backend after a page load, disabling actions without any user action', async () => {
+    server.use(
+      activeJob({ kind: 'Scan', id: 1, folderId: 2, foldersProcessed: 3, filesFound: 40 }),
+      scanEvents(1, [
+        { Id: 1, Status: 'Enumerating', FoldersScanned: 3, FilesFound: 40, FilesEnriched: 0, ErrorMessage: null },
+      ]),
+    )
+    renderApp('/folders/1')
+
+    const holidays = await screen.findByRole('treeitem', { name: 'Holidays' })
+    expect(await within(holidays).findByText('Scanning… 3 folders, 40 files')).toBeInTheDocument()
+    const dev = screen.getByRole('treeitem', { name: 'dev' })
+    expect(within(dev).getByRole('button', { name: 'Actions for dev' })).toBeDisabled()
+  })
+
+  it('refreshes the grid when a folder scan completes, without navigating away or clicking again', async () => {
+    const events = controllableEvents('/api/scans', 1)
+    let includeNewImage = false
+    server.use(
+      events.handler,
+      http.get('/api/images', () =>
+        HttpResponse.json({
+          items: includeNewImage ? [...madeiraImages, image(30, 3)] : madeiraImages,
+          nextCursor: null,
+        }),
+      ),
+    )
+    const { user } = renderApp('/folders/3')
+    expect(await screen.findByRole('button', { name: 'IMG_0001.jpg' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'IMG_0030.jpg' })).not.toBeInTheDocument()
+
+    await openMenu(user, 'Madeira')
+    await user.click(await screen.findByRole('menuitem', { name: 'Scan folder' }))
+
+    includeNewImage = true
+    events.send({
+      Id: 1,
+      Status: 'Completed',
+      FoldersScanned: 1,
+      FilesFound: 4,
+      FilesEnriched: 4,
+      ErrorMessage: null,
+    })
+    events.close()
+
+    expect(await screen.findByRole('button', { name: 'IMG_0030.jpg' })).toBeInTheDocument()
   })
 
   it('shows the job error when a scan fails', async () => {

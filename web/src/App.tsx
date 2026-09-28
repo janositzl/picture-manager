@@ -5,6 +5,7 @@ import { NotifyProvider } from './app/notify'
 import { createQueryClient } from './app/queryClient'
 import { appRoutes } from './app/routes'
 import { theme } from './theme'
+import { FolderJobsProvider } from './tree/FolderJobsContext'
 
 const queryClient = createQueryClient()
 const router = createBrowserRouter(appRoutes)
@@ -16,7 +17,9 @@ function App() {
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
         <NotifyProvider>
-          <RouterProvider router={router} />
+          <FolderJobsProvider>
+            <RouterProvider router={router} />
+          </FolderJobsProvider>
         </NotifyProvider>
       </QueryClientProvider>
     </ThemeProvider>

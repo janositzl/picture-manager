@@ -24,6 +24,9 @@ public interface IJobRepository
     /// <summary>True if any Job is currently Enumerating or Enriching.</summary>
     Task<bool> HasActiveJobAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>The Job currently Enumerating or Enriching, if any.</summary>
+    Task<Job?> GetActiveAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Sets every Enumerating or Enriching job to Failed with the message and CompletedUtc. Returns how many changed.</summary>
     Task<int> FailActiveJobsAsync(string errorMessage, DateTime completedUtc, CancellationToken cancellationToken = default);
 

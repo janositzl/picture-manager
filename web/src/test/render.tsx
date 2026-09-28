@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
 import { NotifyProvider } from '../app/notify'
 import { appRoutes } from '../app/routes'
+import { FolderJobsProvider } from '../tree/FolderJobsContext'
 
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -19,7 +20,9 @@ export function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <NotifyProvider>{children}</NotifyProvider>
+        <NotifyProvider>
+          <FolderJobsProvider>{children}</FolderJobsProvider>
+        </NotifyProvider>
       </QueryClientProvider>
     )
   }

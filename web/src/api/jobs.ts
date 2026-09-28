@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './client'
-import type { DiscoveryProgress, JobStatus, ScanProgress } from './types'
+import type { ActiveJobDto, DiscoveryProgress, JobStatus, ScanProgress } from './types'
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set(['Completed', 'Failed', 'Cancelled'])
+
+/** The single discovery/scan job the backend has running right now, if any. */
+export function getActiveJob(): Promise<ActiveJobDto | null> {
+  return apiFetch<ActiveJobDto | undefined>('/api/jobs/active').then((job) => job ?? null)
+}
 
 export function startDiscovery(folderId: number): Promise<number> {
   return apiFetch<{ discoveryJobId: number }>('/api/discoveries', {

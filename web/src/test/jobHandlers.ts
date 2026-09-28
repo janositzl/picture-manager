@@ -62,8 +62,31 @@ export function controllableEvents(path: string, id: number) {
   }
 }
 
+/** Overrides GET /api/jobs/active to report `dto` as the currently running job. */
+export function activeJob(dto: {
+  kind: 'Scan' | 'Discovery'
+  id: number
+  folderId: number
+  status?: string
+  foldersProcessed?: number
+  filesFound?: number
+  filesEnriched?: number
+}) {
+  return http.get('/api/jobs/active', () =>
+    HttpResponse.json({
+      status: 'Enumerating',
+      foldersProcessed: 0,
+      filesFound: 0,
+      filesEnriched: 0,
+      errorMessage: null,
+      ...dto,
+    }),
+  )
+}
+
 /** Baseline: every discovery/scan starts as job 1 and immediately completes; override per test as needed. */
 export const jobHandlers = [
+  http.get('/api/jobs/active', () => new HttpResponse(null, { status: 204 })),
   http.post('/api/discoveries', () => HttpResponse.json({ discoveryJobId: 1 })),
   http.post('/api/scans', () => HttpResponse.json({ scanJobId: 1 })),
   discoveryEvents(1, [{ Id: 1, Status: 'Completed', FoldersDiscovered: 0, ErrorMessage: null }]),

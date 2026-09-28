@@ -13,6 +13,7 @@ import { ACCENT, ACCENT_SOFT, ACCENT_TEXT, HEADING_SX } from '../design/accent'
 import { SearchBox } from '../search/SearchBox'
 import { readStored, writeStored } from '../shared/storage'
 import { FolderTree } from '../tree/FolderTree'
+import { JobStatusBanner } from '../tree/JobStatusBanner'
 
 const TREE_COLLAPSED_KEY = 'pm.tree.collapsed'
 
@@ -101,6 +102,7 @@ export function AppShell() {
           </Box>
         </Toolbar>
       </AppBar>
+      <JobStatusBanner />
       <div className="flex min-h-0 flex-1">
         <Box
           component="nav"

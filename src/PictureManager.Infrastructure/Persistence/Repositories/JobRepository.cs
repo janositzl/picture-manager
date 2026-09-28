@@ -51,6 +51,13 @@ public sealed class JobRepository : IJobRepository
             cancellationToken);
     }
 
+    public async Task<Job?> GetActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Jobs.AsNoTracking().FirstOrDefaultAsync(
+            j => j.Status == JobStatus.Enumerating || j.Status == JobStatus.Enriching,
+            cancellationToken);
+    }
+
     public async Task<int> FailActiveJobsAsync(string errorMessage, DateTime completedUtc, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Jobs
