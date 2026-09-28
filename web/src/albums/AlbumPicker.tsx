@@ -84,7 +84,13 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
     list = (
       <List dense aria-label="Albums" sx={{ maxHeight: 320, overflowY: 'auto' }}>
         {visible.map((album) => (
-          <ListItemButton key={album.id} disabled={busy} onClick={() => void choose(album)}>
+          <ListItemButton
+            key={album.id}
+            disabled={busy}
+            onClick={() => void choose(album)}
+            className="transition-colors duration-200 ease-in-out"
+            sx={{ borderRadius: '8px', mb: 0.25 }}
+          >
             <ListItemText primary={album.name} secondary={photoCount(album.imageCount)} />
           </ListItemButton>
         ))}
@@ -93,8 +99,14 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
   }
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Add to album</DialogTitle>
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      slotProps={{ paper: { className: 'rounded-2xl' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 600 }}>Add to album</DialogTitle>
       <DialogContent>
         <TextField
           label="Filter albums"
@@ -104,15 +116,20 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
           fullWidth
           size="small"
           margin="dense"
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
         />
         {error !== null && (
-          <Alert severity="error" sx={{ my: 1 }}>
+          <Alert severity="error" sx={{ my: 1, borderRadius: '10px' }}>
             {error}
           </Alert>
         )}
         {list}
         {newName === null ? (
-          <Button startIcon={<AddIcon />} onClick={() => setNewName('')} sx={{ mt: 1 }}>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={() => setNewName('')}
+            sx={{ mt: 1, borderRadius: '8px', textTransform: 'none' }}
+          >
             New album
           </Button>
         ) : (
@@ -131,15 +148,24 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
               size="small"
               fullWidth
               autoFocus
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
             />
-            <Button type="submit" variant="contained" disabled={busy || newName.trim() === ''}>
+            <Button
+              type="submit"
+              variant="contained"
+              disableElevation
+              disabled={busy || newName.trim() === ''}
+              sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600, flexShrink: 0 }}
+            >
               Create and add
             </Button>
           </Box>
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>
+          Cancel
+        </Button>
       </DialogActions>
     </Dialog>
   )

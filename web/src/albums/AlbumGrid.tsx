@@ -69,7 +69,7 @@ export function AlbumGrid({
   return (
     <div
       ref={attach}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/60 dark:bg-transparent"
       data-testid="album-grid"
       style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}
     >

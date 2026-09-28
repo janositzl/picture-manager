@@ -40,9 +40,11 @@ export function InfoPanel({ detail, isLoading, isError, onRetry }: Props) {
         width: 320,
         flexShrink: 0,
         overflowY: 'auto',
-        p: 2,
+        p: 2.5,
         bgcolor: 'grey.900',
         color: 'grey.100',
+        borderLeft: '1px solid',
+        borderColor: 'rgba(255,255,255,0.08)',
       }}
     >
       {content}
@@ -81,7 +83,7 @@ function Details({ detail }: { detail: ImageDetail }) {
   return (
     <Stack spacing={2}>
       <div>
-        <Typography variant="subtitle1" sx={{ wordBreak: 'break-all' }}>
+        <Typography variant="subtitle1" sx={{ wordBreak: 'break-all', fontWeight: 600 }}>
           {detail.fileName}
           {detail.extension}
         </Typography>
@@ -99,8 +101,12 @@ function Details({ detail }: { detail: ImageDetail }) {
       </div>
       <Box component="dl" sx={{ m: 0 }}>
         {rows.map(([label, value]) => (
-          <Box key={label} sx={{ mb: 1 }}>
-            <Typography component="dt" variant="caption" sx={{ color: 'grey.400' }}>
+          <Box key={label} sx={{ mb: 1.25 }}>
+            <Typography
+              component="dt"
+              variant="caption"
+              sx={{ color: 'grey.400', textTransform: 'uppercase', letterSpacing: '0.04em' }}
+            >
               {label}
             </Typography>
             <Typography component="dd" variant="body2" sx={{ m: 0 }}>
@@ -122,7 +128,7 @@ function Details({ detail }: { detail: ImageDetail }) {
                 key={album.id}
                 size="small"
                 label={album.name}
-                sx={{ color: 'inherit' }}
+                sx={{ color: 'inherit', borderRadius: '6px', borderColor: 'rgba(255,255,255,0.2)' }}
                 variant="outlined"
               />
             ))

@@ -64,7 +64,15 @@ export function FolderTreeNode({
         aria-expanded={node.hasChildren ? expanded : undefined}
         selected={selected}
         onClick={() => navigate(`/folders/${node.id}`)}
-        sx={{ pl: 1 + depth * 2, py: 0.25 }}
+        className="transition-colors duration-200 ease-in-out"
+        sx={{
+          pl: 1 + depth * 2,
+          py: 0.4,
+          borderRadius: '8px',
+          mx: 0.5,
+          '&.Mui-selected': { bgcolor: 'action.selected' },
+          '&.Mui-selected:hover': { bgcolor: 'action.selected' },
+        }}
       >
         <IconButton
           size="small"
@@ -74,6 +82,7 @@ export function FolderTreeNode({
             event.stopPropagation()
             onToggle(node.id)
           }}
+          className="transition-transform duration-200 ease-in-out"
           sx={{ mr: 0.5, visibility: node.hasChildren ? 'visible' : 'hidden' }}
         >
           {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
@@ -93,7 +102,11 @@ export function FolderTreeNode({
         <ListItemText
           primary={node.name}
           slotProps={{
-            primary: { noWrap: true, color: dimmed ? 'text.secondary' : undefined },
+            primary: {
+              noWrap: true,
+              color: dimmed ? 'text.secondary' : undefined,
+              sx: { fontWeight: selected ? 600 : 400 },
+            },
           }}
         />
         {expanded && children.isFetching && <CircularProgress size={14} />}

@@ -62,14 +62,15 @@ export function DuplicatesView() {
       <Box
         ref={scrollRef}
         onScroll={loadMoreIfNearEnd}
+        className="bg-zinc-50/60 dark:bg-transparent"
         sx={{
           flex: 1,
           minHeight: 0,
           overflowY: 'auto',
-          p: 2,
+          p: 3,
           display: 'flex',
           flexDirection: 'column',
-          gap: 3,
+          gap: 4,
         }}
       >
         {all.map((group) => (
@@ -77,12 +78,14 @@ export function DuplicatesView() {
             component="section"
             key={group.contentHash}
             aria-labelledby={`dup-${group.contentHash}`}
+            className="rounded-xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
           >
             <Typography
               id={`dup-${group.contentHash}`}
               variant="subtitle1"
               component="h2"
               gutterBottom
+              sx={{ fontWeight: 600, letterSpacing: '-0.01em' }}
             >
               {group.count} copies
             </Typography>
@@ -124,8 +127,8 @@ export function DuplicatesView() {
           onClear={selection.clear}
         />
       ) : (
-        <Box sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6" component="h1">
+        <Box sx={{ px: 2.5, py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6" component="h1" sx={{ fontWeight: 600, letterSpacing: '-0.01em' }}>
             Duplicates
           </Typography>
           <Typography variant="body2" color="text.secondary">

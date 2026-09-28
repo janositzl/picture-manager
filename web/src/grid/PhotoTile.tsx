@@ -107,18 +107,21 @@ export function PhotoTile({
           activate(event.shiftKey)
         }
       }}
+      className="group transition-all duration-200 ease-in-out hover:brightness-[1.04]"
       sx={{
         position: 'relative',
         width: size,
         height: size,
         flexShrink: 0,
         overflow: 'hidden',
+        borderRadius: '10px',
         cursor: 'pointer',
         bgcolor: 'action.hover',
         opacity: dimmed ? 0.4 : 1,
         outline: selected ? '3px solid' : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -3,
+        boxShadow: selected ? 2 : 0,
         '& .tile-star': { opacity: item.isFavorite ? 1 : 0 },
         '& .tile-check': { opacity: selecting ? 1 : 0 },
         '&:hover .tile-star, &:focus-within .tile-star, &:hover .tile-check, &:focus-within .tile-check':
@@ -133,7 +136,7 @@ export function PhotoTile({
             position: 'absolute',
             inset: 0,
             bgcolor: 'primary.main',
-            opacity: 0.25,
+            opacity: 0.2,
             pointerEvents: 'none',
           }}
         />
@@ -157,18 +160,20 @@ export function PhotoTile({
           }
           sx={{
             position: 'absolute',
-            top: 0,
-            left: 0,
+            top: 6,
+            left: 6,
             p: 0.5,
-            borderRadius: 0,
+            borderRadius: '6px',
             color: 'common.white',
-            bgcolor: 'rgba(0,0,0,0.35)',
+            bgcolor: 'rgba(0,0,0,0.4)',
+            backdropFilter: 'blur(2px)',
+            transition: 'background-color 0.2s ease-in-out',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
             '&.Mui-checked': { color: 'common.white' },
           }}
         />
       )}
       <IconButton
-        className="tile-star"
         size="small"
         aria-label={item.isFavorite ? `Remove ${name} from favorites` : `Add ${name} to favorites`}
         aria-pressed={item.isFavorite}
@@ -177,13 +182,15 @@ export function PhotoTile({
           onToggleFavorite(item)
         }}
         onKeyDown={(event) => event.stopPropagation()}
+        className="tile-star transition-all duration-200 ease-in-out"
         sx={{
           position: 'absolute',
-          top: 4,
-          right: 4,
+          top: 6,
+          right: 6,
           color: 'warning.main',
-          bgcolor: 'rgba(0,0,0,0.35)',
-          '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+          bgcolor: 'rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(2px)',
+          '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
         }}
       >
         {item.isFavorite ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
@@ -195,12 +202,12 @@ export function PhotoTile({
           right: 0,
           bottom: 0,
           px: 1,
-          py: 0.25,
+          py: 0.75,
           color: 'common.white',
-          bgcolor: 'rgba(0,0,0,0.5)',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0))',
         }}
       >
-        <Typography variant="caption" noWrap component="div">
+        <Typography variant="caption" noWrap component="div" sx={{ fontWeight: 500 }}>
           {name}
         </Typography>
         {caption !== null && (

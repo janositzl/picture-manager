@@ -43,12 +43,20 @@ export function AlbumFormDialog(props: Props) {
   }
 
   return (
-    <Dialog open onClose={props.onClose} fullWidth maxWidth="xs">
+    <Dialog
+      open
+      onClose={props.onClose}
+      fullWidth
+      maxWidth="xs"
+      slotProps={{ paper: { className: 'rounded-2xl' } }}
+    >
       <form onSubmit={(event) => void submit(event)}>
-        <DialogTitle>{props.mode === 'edit' ? 'Edit album' : 'New album'}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          {props.mode === 'edit' ? 'Edit album' : 'New album'}
+        </DialogTitle>
         <DialogContent>
           {errors.form !== undefined && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }}>
               {errors.form}
             </Alert>
           )}
@@ -61,6 +69,7 @@ export function AlbumFormDialog(props: Props) {
             margin="dense"
             error={errors.name !== undefined}
             helperText={errors.name}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
           />
           <TextField
             label="Description"
@@ -72,11 +81,20 @@ export function AlbumFormDialog(props: Props) {
             margin="dense"
             error={errors.description !== undefined}
             helperText={errors.description}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={props.onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={busy || name.trim() === ''}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={props.onClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={busy || name.trim() === ''}
+            sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+          >
             {props.mode === 'edit' ? 'Save' : 'Create'}
           </Button>
         </DialogActions>

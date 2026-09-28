@@ -9,7 +9,7 @@ export function RootRedirect() {
 
   if (roots.isPending) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box className="p-8">
         <CircularProgress size={24} />
       </Box>
     )
@@ -21,7 +21,11 @@ export function RootRedirect() {
 
   const first = roots.data[0]
   if (first === undefined) {
-    return <Typography sx={{ p: 3 }}>No image roots are configured.</Typography>
+    return (
+      <Typography className="p-8" color="text.secondary">
+        No image roots are configured.
+      </Typography>
+    )
   }
 
   return <Navigate to={`/folders/${first.id}`} replace />

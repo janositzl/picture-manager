@@ -63,7 +63,16 @@ export function ExportDialog({ album, missingCount, onClose }: Props) {
         <Box
           component="pre"
           aria-label="Export preview"
-          sx={{ m: 0, p: 1, overflowX: 'auto', fontSize: 12, bgcolor: 'action.hover' }}
+          sx={{
+            m: 0,
+            p: 1.5,
+            overflowX: 'auto',
+            fontSize: 12,
+            bgcolor: 'action.hover',
+            borderRadius: '10px',
+            border: 1,
+            borderColor: 'divider',
+          }}
         >
           {lines.slice(0, PREVIEW_LINES).join('\n')}
           {lines.length > PREVIEW_LINES ? '\n…' : ''}
@@ -73,8 +82,14 @@ export function ExportDialog({ album, missingCount, onClose }: Props) {
   }
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Export album</DialogTitle>
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      slotProps={{ paper: { className: 'rounded-2xl' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 600 }}>Export album</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         <TextField
           label="Path prefix"
@@ -87,23 +102,32 @@ export function ExportDialog({ album, missingCount, onClose }: Props) {
           fullWidth
           size="small"
           margin="dense"
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
         />
         {missingCount > 0 && (
-          <Alert severity="warning">
+          <Alert severity="warning" sx={{ borderRadius: '10px' }}>
             {missingCount === 1 ? '1 photo is' : `${missingCount} photos are`} missing on disk.
           </Alert>
         )}
         {preview}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-        <Button disabled={!ready} onClick={() => void copy()}>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>
+          Close
+        </Button>
+        <Button
+          disabled={!ready}
+          onClick={() => void copy()}
+          sx={{ borderRadius: '8px', textTransform: 'none' }}
+        >
           Copy
         </Button>
         <Button
           variant="contained"
+          disableElevation
           disabled={!ready}
           onClick={() => downloadText(exportFileName(album.name), exported.data ?? '')}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
         >
           Download
         </Button>

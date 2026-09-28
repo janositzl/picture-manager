@@ -49,9 +49,15 @@ export function AlbumView() {
 
   if (albumId === null || isNotFound(album.error)) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Typography gutterBottom>Album not found.</Typography>
-        <Link component={RouterLink} to="/albums">
+      <Box className="p-8">
+        <Typography gutterBottom sx={{ fontWeight: 600 }}>
+          Album not found.
+        </Typography>
+        <Link
+          component={RouterLink}
+          to="/albums"
+          className="transition-colors duration-200 ease-in-out"
+        >
           Back to albums
         </Link>
       </Box>
@@ -131,7 +137,7 @@ export function AlbumView() {
     body = (
       <>
         {items.length > LARGE_ALBUM && (
-          <Alert severity="info" sx={{ m: 2, mb: 0 }}>
+          <Alert severity="info" sx={{ m: 2, mb: 0, borderRadius: '10px' }}>
             This album is large, so reordering may be slow.
           </Alert>
         )}
@@ -165,14 +171,19 @@ export function AlbumView() {
         display: 'flex',
         alignItems: 'center',
         gap: 2,
-        px: 2,
-        py: 1,
+        px: 2.5,
+        py: 1.25,
         borderBottom: 1,
         borderColor: 'divider',
       }}
     >
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="h6" component="h1" noWrap>
+        <Typography
+          variant="h6"
+          component="h1"
+          noWrap
+          sx={{ fontWeight: 600, letterSpacing: '-0.01em' }}
+        >
           {detail.name}
         </Typography>
         {detail.description && (
@@ -189,13 +200,18 @@ export function AlbumView() {
         control={<Switch size="small" checked={showFolders} onChange={toggleShowFolders} />}
         label="Show folders"
       />
-      <Button size="small" onClick={() => setDialog('edit')}>
+      <Button size="small" onClick={() => setDialog('edit')} sx={{ borderRadius: '8px', textTransform: 'none' }}>
         Edit…
       </Button>
-      <Button size="small" onClick={() => setDialog('export')}>
+      <Button size="small" onClick={() => setDialog('export')} sx={{ borderRadius: '8px', textTransform: 'none' }}>
         Export…
       </Button>
-      <Button size="small" color="error" onClick={() => setDialog('delete')}>
+      <Button
+        size="small"
+        color="error"
+        onClick={() => setDialog('delete')}
+        sx={{ borderRadius: '8px', textTransform: 'none' }}
+      >
         Delete…
       </Button>
     </Box>

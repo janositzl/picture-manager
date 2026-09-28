@@ -259,7 +259,15 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
               <IconButton
                 aria-label="Previous photo"
                 onClick={goPrev}
-                sx={{ position: 'absolute', left: 8, color: 'common.white' }}
+                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                sx={{
+                  position: 'absolute',
+                  left: 12,
+                  color: 'common.white',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
+                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                }}
               >
                 <ChevronLeftIcon fontSize="large" />
               </IconButton>
@@ -268,18 +276,32 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
               <IconButton
                 aria-label="Next photo"
                 onClick={goNext}
-                sx={{ position: 'absolute', right: 8, color: 'common.white' }}
+                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                sx={{
+                  position: 'absolute',
+                  right: 12,
+                  color: 'common.white',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
+                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                }}
               >
                 <ChevronRightIcon fontSize="large" />
               </IconButton>
             )}
-            <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+            <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 0.75 }}>
               {current !== undefined && (
                 <IconButton
                   aria-label={current.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                   aria-pressed={current.isFavorite}
                   onClick={toggleFavorite}
-                  sx={{ color: 'warning.main' }}
+                  className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                  sx={{
+                    color: 'warning.main',
+                    bgcolor: 'rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(4px)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                  }}
                 >
                   {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
                 </IconButton>
@@ -288,7 +310,13 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
                 <IconButton
                   aria-label="Add to album"
                   onClick={() => setPickerOpen(true)}
-                  sx={{ color: 'common.white' }}
+                  className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                  sx={{
+                    color: 'common.white',
+                    bgcolor: 'rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(4px)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                  }}
                 >
                   <PlaylistAddIcon />
                 </IconButton>
@@ -296,11 +324,27 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
               <IconButton
                 aria-label={infoOpen ? 'Hide info' : 'Show info'}
                 onClick={toggleInfo}
-                sx={{ color: 'common.white' }}
+                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                sx={{
+                  color: 'common.white',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
+                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                }}
               >
                 <InfoOutlinedIcon />
               </IconButton>
-              <IconButton aria-label="Close viewer" onClick={close} sx={{ color: 'common.white' }}>
+              <IconButton
+                aria-label="Close viewer"
+                onClick={close}
+                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                sx={{
+                  color: 'common.white',
+                  bgcolor: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
+                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                }}
+              >
                 <CloseIcon />
               </IconButton>
             </Box>

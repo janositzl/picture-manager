@@ -63,7 +63,7 @@ export function PhotoGrid({
   return (
     <div
       ref={attach}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/60 dark:bg-transparent"
       data-testid="photo-grid"
       // A stable gutter stops the scrollbar appearing/disappearing from resizing the tiles in a loop.
       style={{ scrollbarGutter: 'stable', paddingRight: GRID_PADDING, paddingBottom: GRID_PADDING }}

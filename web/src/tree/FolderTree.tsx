@@ -23,7 +23,7 @@ export function FolderTree() {
 
   if (roots.isPending) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box className="p-3">
         <CircularProgress size={20} />
       </Box>
     )
@@ -35,7 +35,7 @@ export function FolderTree() {
 
   return (
     <FolderJobsProvider>
-      <List dense role="tree" aria-label="Folder tree">
+      <List dense role="tree" aria-label="Folder tree" className="px-1.5 py-2">
         {roots.data.map((node) => (
           <FolderTreeNode
             key={node.id}

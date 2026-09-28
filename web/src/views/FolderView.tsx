@@ -21,9 +21,11 @@ export function FolderView() {
 
   if (folderId === null || isNotFound(folder.error)) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Typography gutterBottom>Folder not found.</Typography>
-        <Link component={RouterLink} to="/">
+      <Box className="p-8">
+        <Typography gutterBottom sx={{ fontWeight: 600 }}>
+          Folder not found.
+        </Typography>
+        <Link component={RouterLink} to="/" className="transition-colors duration-200 ease-in-out">
           Go to the first folder
         </Link>
       </Box>
@@ -42,14 +44,14 @@ export function FolderView() {
   let banner = null
   if (detail.isMissing) {
     banner = (
-      <Alert severity="warning" sx={{ m: 2, mb: 0 }}>
+      <Alert severity="warning" sx={{ m: 2, mb: 0, borderRadius: '10px' }}>
         This folder is missing on disk. Its photos are hidden until it's back. Rescan or remove it
         (Admin).
       </Alert>
     )
   } else if (detail.imageCount === 0) {
     banner = (
-      <Alert severity="info" sx={{ m: 2, mb: 0 }}>
+      <Alert severity="info" sx={{ m: 2, mb: 0, borderRadius: '10px' }}>
         No photos directly in this folder. Pick a subfolder in the tree.
       </Alert>
     )
@@ -69,7 +71,11 @@ export function FolderView() {
             order={order}
             actions={
               !detail.isMissing && detail.imageCount > 0 ? (
-                <Button size="small" onClick={() => setPickerTarget({ folderId })}>
+                <Button
+                  size="small"
+                  onClick={() => setPickerTarget({ folderId })}
+                  sx={{ borderRadius: '8px', textTransform: 'none' }}
+                >
                   Add folder to album…
                 </Button>
               ) : undefined

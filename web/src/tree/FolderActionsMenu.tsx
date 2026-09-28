@@ -83,6 +83,12 @@ export function FolderActionsMenu({ folderId, folderName, isExcluded, ancestorEx
         open={anchorEl !== null}
         onClose={close}
         onClick={(event: MouseEvent) => event.stopPropagation()}
+        slotProps={{
+          paper: {
+            className: 'rounded-xl border border-zinc-100 shadow-lg dark:border-zinc-800',
+            sx: { minWidth: 220 },
+          },
+        }}
       >
         <MenuItem onClick={() => runAction(() => refreshFolder(folderId))} disabled={scanDisabled}>
           Refresh structure

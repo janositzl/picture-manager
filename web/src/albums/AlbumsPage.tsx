@@ -39,13 +39,14 @@ export function AlbumsPage() {
       <Box
         component="ul"
         aria-label="Albums"
+        className="bg-zinc-50/60 dark:bg-transparent"
         sx={{
           listStyle: 'none',
           m: 0,
-          p: 2,
+          p: 3,
           display: 'grid',
-          gap: 2,
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: 3,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           alignContent: 'start',
           overflowY: 'auto',
           flex: 1,
@@ -67,17 +68,23 @@ export function AlbumsPage() {
           display: 'flex',
           alignItems: 'center',
           gap: 2,
-          px: 2,
-          py: 1,
+          px: 2.5,
+          py: 1.25,
           borderBottom: 1,
           borderColor: 'divider',
         }}
       >
-        <Typography variant="h6" component="h1">
+        <Typography variant="h6" component="h1" sx={{ fontWeight: 600, letterSpacing: '-0.01em' }}>
           Albums
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Button variant="contained" size="small" onClick={() => setCreating(true)}>
+        <Button
+          variant="contained"
+          size="small"
+          disableElevation
+          onClick={() => setCreating(true)}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+        >
           New album
         </Button>
       </Box>
@@ -98,7 +105,10 @@ export function AlbumsPage() {
 
 function AlbumCard({ album }: { album: AlbumSummary }) {
   return (
-    <Card variant="outlined">
+    <Card
+      variant="outlined"
+      className="overflow-hidden rounded-xl border-zinc-100 shadow-sm transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800"
+    >
       <CardActionArea component={RouterLink} to={`/albums/${album.id}`} aria-label={album.name}>
         {album.coverThumbnailUrl ? (
           <CardMedia
@@ -122,7 +132,7 @@ function AlbumCard({ album }: { album: AlbumSummary }) {
           </Box>
         )}
         <CardContent>
-          <Typography variant="subtitle1" component="h2" noWrap>
+          <Typography variant="subtitle1" component="h2" noWrap sx={{ fontWeight: 600 }}>
             {album.name}
           </Typography>
           <Typography variant="body2" color="text.secondary">
