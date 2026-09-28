@@ -41,7 +41,7 @@ public sealed class DiscoveryService : IDiscoveryService
         _clock = clock;
     }
 
-    public async Task<int> QueueDiscoveryAsync(int? rootId, int? folderId, CancellationToken cancellationToken = default)
+    public async Task<int> QueueDiscoveryAsync(int? rootId, int? folderId, bool isRecursive = true, CancellationToken cancellationToken = default)
     {
         if (await _jobRepository.HasActiveJobAsync(cancellationToken))
             throw new DiscoveryAlreadyInProgressException();
@@ -78,12 +78,12 @@ public sealed class DiscoveryService : IDiscoveryService
         {
             Kind = JobKind.Discovery,
             FolderId = jobFolderId,
-            IsRecursive = true,
+            IsRecursive = isRecursive,
             Status = JobStatus.Enumerating,
             StartedUtc = _clock.UtcNow
         }, cancellationToken);
 
-        _discoveryQueue.Enqueue(new QueuedDiscovery(discoveryJob.Id, folderId.HasValue ? null : rootId, folderId));
+        _discoveryQueue.Enqueue(new QueuedDiscovery(discoveryJob.Id, folderId.HasValue ? null : rootId, folderId, isRecursive));
         return discoveryJob.Id;
     }
 
@@ -125,7 +125,7 @@ public sealed class DiscoveryService : IDiscoveryService
             var settings = await _appSettingsRepository.GetAsync(cancellationToken);
             var excludeRules = new ScanExcludeRules(settings, Array.Empty<string>());
 
-            foldersDiscovered = await DiscoverTreeAsync(root, startFolder, startPath, excludeRules, discovery.DiscoveryJobId, cancellationToken);
+            foldersDiscovered = await DiscoverTreeAsync(root, startFolder, startPath, excludeRules, discovery.DiscoveryJobId, discovery.IsRecursive, cancellationToken);
 
             await FinalizeSuccessAsync(discovery.DiscoveryJobId, foldersDiscovered, cancellationToken);
         }
@@ -137,7 +137,7 @@ public sealed class DiscoveryService : IDiscoveryService
     }
 
     private async Task<int> DiscoverTreeAsync(
-        ImageRoot root, Folder startFolder, string startPath, ScanExcludeRules excludeRules, int discoveryJobId, CancellationToken cancellationToken)
+        ImageRoot root, Folder startFolder, string startPath, ScanExcludeRules excludeRules, int discoveryJobId, bool isRecursive, CancellationToken cancellationToken)
     {
         var foldersDiscovered = 0;
 
@@ -194,10 +194,11 @@ public sealed class DiscoveryService : IDiscoveryService
                     await _folderRepository.UpdateAsync(childFolder, cancellationToken);
                 }
 
-                // Skip reparse points (protects against a symlink/junction loop) and stop past the depth cap;
-                // the row is still created above for tree visibility.
+                // Skip reparse points (protects against a symlink/junction loop), stop past the depth cap, and
+                // (non-recursive) never descend past the target's own direct children; the row is still created
+                // above for tree visibility either way.
                 var isReparsePoint = new DirectoryInfo(entryPath).Attributes.HasFlag(FileAttributes.ReparsePoint);
-                if (!isReparsePoint && depth < ScanTargets.MaxFolderDepth)
+                if (isRecursive && !isReparsePoint && depth < ScanTargets.MaxFolderDepth)
                     pending.Enqueue((childFolder, entryPath, depth + 1));
             }
 

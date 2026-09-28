@@ -224,6 +224,26 @@ public sealed class DiscoveryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task QueueDiscoveryAsync_NonRecursive_StoresItOnTheJob()
+    {
+        await CreateService().QueueDiscoveryAsync(rootId: 1, folderId: null, isRecursive: false);
+
+        await _jobs.Received(1).AddAsync(Arg.Is<Job>(j => j.Kind == JobKind.Discovery && !j.IsRecursive), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunDiscoveryAsync_NonRecursive_DiscoversOnlyTheTargetsDirectChildren()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempRoot.FullName, "A", "A1"));
+
+        var discoveryJobId = await CreateService().DiscoverNowAsync(rootId: 1, isRecursive: false);
+
+        await _folders.Received(1).AddAsync(Arg.Is<Folder>(f => f.RootId == 1 && f.ParentId == 10 && f.Name == "A"), Arg.Any<CancellationToken>());
+        await _folders.DidNotReceive().AddAsync(Arg.Is<Folder>(f => f.Name == "A1"), Arg.Any<CancellationToken>());
+        await _jobs.Received(1).SetEnumerationResultAsync(discoveryJobId, foldersScanned: 1, filesFound: 0, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunDiscoveryAsync_FolderScoped_ResolvesAndWalksThatFolderOnly()
     {
         var subFolder = new Folder { Id = 15, RootId = 1, ParentId = 10, RelativePath = "sub", Name = "sub" };

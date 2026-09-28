@@ -42,10 +42,6 @@ public sealed class DiscoveryBackgroundService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var discoveryService = scope.ServiceProvider.GetRequiredService<IDiscoveryService>();
                 await discoveryService.RunDiscoveryAsync(discovery, stoppingToken);
-
-                // Only one job runs at a time, so a startup with several new/unfinished roots only gets the
-                // first one queued directly; chain to the next one here rather than waiting for a restart.
-                await QueueNextUndiscoveredRootAsync(discoveryService, stoppingToken);
             }
             catch (Exception ex) when (ex is ScanRootsUnavailableException or ScanRootUnavailableException
                                             or FolderUnavailableException or FolderNotOnDiskException)
@@ -67,14 +63,21 @@ public sealed class DiscoveryBackgroundService : BackgroundService
                 _logger.LogError(ex, "Discovery {DiscoveryJobId} failed", discovery.DiscoveryJobId);
                 await MarkFailedWithRetryAsync(discovery.DiscoveryJobId, ex, stoppingToken);
             }
+
+            // Only one job runs at a time, so a startup with several new/unfinished roots only gets the first one
+            // queued directly; chain to the next one here rather than waiting for a restart. Runs whether the
+            // discovery above succeeded or (expectedly or not) failed -- an unmounted share on one root must not
+            // strand every other root still waiting for its first discovery.
+            await QueueNextUndiscoveredRootAsync(stoppingToken);
         }
     }
 
-    private async Task QueueNextUndiscoveredRootAsync(IDiscoveryService discoveryService, CancellationToken stoppingToken)
+    private async Task QueueNextUndiscoveredRootAsync(CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var folders = scope.ServiceProvider.GetRequiredService<IFolderRepository>();
         var roots = scope.ServiceProvider.GetRequiredService<IImageRootRepository>();
+        var discoveryService = scope.ServiceProvider.GetRequiredService<IDiscoveryService>();
 
         foreach (var root in await roots.GetAllAsync(stoppingToken))
         {
@@ -83,7 +86,7 @@ public sealed class DiscoveryBackgroundService : BackgroundService
 
             try
             {
-                await discoveryService.QueueDiscoveryAsync(root.Id, null, stoppingToken);
+                await discoveryService.QueueDiscoveryAsync(root.Id, null, cancellationToken: stoppingToken);
             }
             catch (DiscoveryAlreadyInProgressException)
             {

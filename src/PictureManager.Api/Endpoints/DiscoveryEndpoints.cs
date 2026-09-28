@@ -21,7 +21,7 @@ public static class DiscoveryEndpoints
     {
         try
         {
-            var discoveryJobId = await discoveryService.QueueDiscoveryAsync(request.RootId, request.FolderId, cancellationToken);
+            var discoveryJobId = await discoveryService.QueueDiscoveryAsync(request.RootId, request.FolderId, request.IsRecursive, cancellationToken);
             return Results.Ok(new DiscoveryStartedResponse(discoveryJobId));
         }
         catch (DiscoveryAlreadyInProgressException ex)
@@ -65,6 +65,6 @@ public static class DiscoveryEndpoints
     }
 }
 
-public sealed record DiscoveryRequest(int? RootId, int? FolderId);
+public sealed record DiscoveryRequest(int? RootId, int? FolderId, bool IsRecursive = true);
 public sealed record DiscoveryStartedResponse(int DiscoveryJobId);
 public sealed record DiscoveryProgress(int Id, string Status, int FoldersDiscovered, string? ErrorMessage);
