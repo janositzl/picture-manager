@@ -20,7 +20,7 @@ describe('SettingsPage', () => {
 
   it('warns that the next scan will prune when a new exclusion is saved', async () => {
     const { user } = renderPage()
-    const field = await screen.findByPlaceholderText('e.g. @eaDir')
+    const field = await screen.findByPlaceholderText('e.g. Deleted')
     await user.type(field, 'Thumbs.db')
     await user.click(screen.getByRole('button', { name: 'Add to Excluded folder names' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -49,7 +49,7 @@ describe('SettingsPage', () => {
 
   it('adds a comma-separated batch of folder names in one go', async () => {
     const { user } = renderPage()
-    const field = await screen.findByPlaceholderText('e.g. @eaDir')
+    const field = await screen.findByPlaceholderText('e.g. Deleted')
     await user.type(field, 'Thumbs.db, .DS_Store')
     await user.click(screen.getByRole('button', { name: 'Add to Excluded folder names' }))
     expect(screen.getByText('Thumbs.db')).toBeInTheDocument()
