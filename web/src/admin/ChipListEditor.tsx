@@ -9,23 +9,35 @@ type Props = {
   placeholder?: string
   disabled?: boolean
   error?: string
+  hint?: string
 }
 
-const HINT = 'Separate multiple entries with commas or spaces.'
+const DEFAULT_HINT = 'Separate multiple entries with commas or spaces. Quote entries ("Old Photos") to keep spaces.'
+
+// Matches a "double-quoted", a 'single-quoted', or a plain comma/whitespace-delimited token.
+const TOKEN_PATTERN = /"([^"]*)"|'([^']*)'|[^,\s]+/g
+
+function tokenize(draft: string): string[] {
+  const tokens: string[] = []
+  for (const match of draft.matchAll(TOKEN_PATTERN)) {
+    const value = (match[1] ?? match[2] ?? match[0]).trim()
+    if (value !== '') tokens.push(value)
+  }
+  return tokens
+}
 
 /**
  * A labeled list of strings, editable as chips: type or paste one or more (comma/space/newline
- * separated) + Enter/Add to add them, click a chip's × to remove.
+ * separated, or "quoted" to keep spaces) + Enter/Add to add them, click a chip's × to remove.
  */
-export function ChipListEditor({ label, values, onChange, placeholder, disabled, error }: Props) {
+export function ChipListEditor({ label, values, onChange, placeholder, disabled, error, hint }: Props) {
   const [draft, setDraft] = useState('')
 
   const add = () => {
     const existing = new Set(values)
     const additions: string[] = []
-    for (const raw of draft.split(/[,\s]+/)) {
-      const value = raw.trim()
-      if (value === '' || existing.has(value)) continue
+    for (const value of tokenize(draft)) {
+      if (existing.has(value)) continue
       existing.add(value)
       additions.push(value)
     }
@@ -57,7 +69,7 @@ export function ChipListEditor({ label, values, onChange, placeholder, disabled,
         placeholder={placeholder}
         disabled={disabled}
         error={error !== undefined}
-        helperText={error ?? HINT}
+        helperText={error ?? hint ?? DEFAULT_HINT}
         sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
         slotProps={{
           input: {

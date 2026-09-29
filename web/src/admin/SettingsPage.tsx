@@ -70,15 +70,16 @@ export function SettingsPage() {
           label="Excluded folder names"
           values={excludedFolderNames}
           onChange={setExcludedFolderNames}
-          placeholder="e.g. @eaDir"
+          placeholder="e.g. Deleted"
           error={errors.excludedFolderNames}
         />
         <ChipListEditor
           label="Excluded extensions"
           values={excludedExtensions}
           onChange={setExcludedExtensions}
-          placeholder="e.g. .tmp"
+          placeholder="e.g. .RW2"
           error={errors.excludedExtensions}
+          hint="Separate multiple entries with commas or spaces."
         />
         <Box sx={{ mb: 1 }}>
           <FormControlLabel
@@ -102,6 +103,7 @@ export function SettingsPage() {
             onChange={setIncludedExtensions}
             placeholder="e.g. .jpg"
             error={errors.includedExtensions}
+            hint="Separate multiple entries with commas or spaces."
           />
         )}
         <Button

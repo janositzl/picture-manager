@@ -12,7 +12,9 @@ function Harness() {
 describe('ChipListEditor', () => {
   it('shows the usage hint', () => {
     render(<Harness />)
-    expect(screen.getByText('Separate multiple entries with commas or spaces.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Separate multiple entries with commas or spaces. Quote entries ("Old Photos") to keep spaces.'),
+    ).toBeInTheDocument()
   })
 
   it('adds a comma-separated batch in one go', async () => {
@@ -40,5 +42,14 @@ describe('ChipListEditor', () => {
     await user.type(field, '  a  ,  ,  a  ,  b {enter}')
     expect(screen.getAllByText('a')).toHaveLength(1)
     expect(screen.getByText('b')).toBeInTheDocument()
+  })
+
+  it('keeps a quoted entry with spaces as a single token', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const field = screen.getByRole('textbox')
+    await user.type(field, '"Old Photos", .bak{enter}')
+    expect(screen.getByText('Old Photos')).toBeInTheDocument()
+    expect(screen.getByText('.bak')).toBeInTheDocument()
   })
 })
