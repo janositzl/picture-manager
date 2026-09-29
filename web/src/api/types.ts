@@ -34,6 +34,8 @@ export type ImageListItem = {
   previewUrl: string | null
   /** "{root name}/{relative path}", or just the root name for a root's top folder. */
   folderPath: string
+  /** True when the file couldn't be decoded as an image during enrichment (corrupt or misnamed). */
+  isInvalid: boolean
 }
 
 export type AlbumRef = { id: number; name: string }

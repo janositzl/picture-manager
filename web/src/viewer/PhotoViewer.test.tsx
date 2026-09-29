@@ -165,6 +165,22 @@ describe('PhotoViewer', () => {
     expect(screen.queryByRole('button', { name: 'Next photo' })).not.toBeInTheDocument()
   })
 
+  it('says when a photo in the list is corrupt, without attempting to load a preview', async () => {
+    const items = [{ ...madeiraImages[0]!, isInvalid: true }]
+    renderRoutes(
+      [
+        {
+          path: '/',
+          element: (
+            <PhotoViewer list={{ items, hasNextPage: false, fetchNextPage: () => undefined }} />
+          ),
+        },
+      ],
+      '/?image=20',
+    )
+    expect(await screen.findByText("This photo can't be displayed.")).toBeInTheDocument()
+  })
+
   it('says when a photo in the list has no file on disk', async () => {
     const items = [{ ...madeiraImages[0]!, isMissing: true, previewUrl: null, thumbnailUrl: null }]
     renderRoutes(

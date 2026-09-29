@@ -216,6 +216,21 @@ public class ImageQueryRepositoryTests
     }
 
     [Fact]
+    public async Task ListAsync_InvalidImage_RowCarriesIndexStateInvalid()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var invalid = TestData.Image(folder, "corrupt", indexState: IndexState.Invalid);
+        db.Context.Images.Add(invalid);
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
+
+        rows.Single().IndexState.Should().Be(IndexState.Invalid);
+    }
+
+    [Fact]
     public async Task GetVisibleDetailAsync_ReturnsMetadataAndLocation_AndNullForMissingImage()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
@@ -238,6 +253,7 @@ public class ImageQueryRepositoryTests
         detail.RelativePath.Should().Be("Holidays/Madeira");
         detail.CameraMake.Should().Be("Canon");
         detail.RawMetadata.Should().Contain("Canon");
+        detail.Image.IndexState.Should().Be(IndexState.Indexed);
         (await repository.GetVisibleDetailAsync(missing.Id)).Should().BeNull();
     }
 

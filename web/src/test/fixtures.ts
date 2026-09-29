@@ -135,6 +135,7 @@ export function image(
     thumbnailUrl: `/api/images/${id}/thumbnail?v=H${id}`,
     previewUrl: `/api/images/${id}/preview?v=H${id}`,
     folderPath: folderPaths[folderId] ?? 'dev',
+    isInvalid: false,
     ...overrides,
   }
 }

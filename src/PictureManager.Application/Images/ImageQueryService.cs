@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
+using PictureManager.Model;
 
 namespace PictureManager.Application.Images;
 
@@ -96,7 +97,7 @@ public sealed class ImageQueryService : IImageQueryService
             image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash), ImageUrls.Preview(image.Id, image.ContentHash),
             row.FileSize, row.FileModified, row.Orientation, row.CameraMake, row.CameraModel, row.LensModel,
             row.Latitude, row.Longitude, ParseJson(row.RawMetadata), FolderDisplayPath.For(row.RootName, row.RelativePath),
-            albums));
+            albums, image.IndexState == IndexState.Invalid));
     }
 
     public async Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default)

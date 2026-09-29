@@ -215,6 +215,8 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
         The file for this photo is missing on disk.
       </Typography>
     )
+  } else if (current.isInvalid) {
+    stage = <Typography sx={{ color: 'grey.400' }}>This photo can't be displayed.</Typography>
   } else if (src === null) {
     stage = (
       <Typography sx={{ color: 'grey.400' }}>This photo hasn't been processed yet.</Typography>

@@ -40,7 +40,8 @@ public static class TestData
         DateTime? fileModified = null,
         string? contentHash = null,
         bool isFavorite = false,
-        DateTime? missingSinceUtc = null) => new()
+        DateTime? missingSinceUtc = null,
+        IndexState indexState = IndexState.Indexed) => new()
     {
         Folder = folder,
         FileName = fileName,
@@ -50,7 +51,7 @@ public static class TestData
         FileModified = fileModified ?? Utc,
         DateTaken = dateTaken,
         IsFavorite = isFavorite,
-        IndexState = IndexState.Indexed,
+        IndexState = indexState,
         FirstSeenUtc = Utc,
         MissingSinceUtc = missingSinceUtc,
         CreatedAt = Utc,

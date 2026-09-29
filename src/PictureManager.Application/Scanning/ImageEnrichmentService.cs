@@ -12,13 +12,16 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
     private readonly IImageRepository _imageRepository;
     private readonly IContentHasher _contentHasher;
     private readonly IExifReader _exifReader;
+    private readonly IImageValidator _imageValidator;
     private readonly IClock _clock;
 
-    public ImageEnrichmentService(IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IClock clock)
+    public ImageEnrichmentService(
+        IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IImageValidator imageValidator, IClock clock)
     {
         _imageRepository = imageRepository;
         _contentHasher = contentHasher;
         _exifReader = exifReader;
+        _imageValidator = imageValidator;
         _clock = clock;
     }
 
@@ -41,6 +44,7 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
 
         var hash = await _contentHasher.ComputeAsync(physicalPath, image.FileSize, cancellationToken);
         var exif = await _exifReader.ReadAsync(physicalPath, cancellationToken);
+        var isValid = await _imageValidator.IsValidAsync(physicalPath, cancellationToken);
 
         var possibleMove = await _imageRepository.GetMissingByContentHashAsync(hash, cancellationToken);
         if (possibleMove is not null && possibleMove.Id != image.Id)
@@ -59,7 +63,7 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         image.Latitude = exif.Latitude;
         image.Longitude = exif.Longitude;
         image.RawMetadata = exif.RawMetadataJson;
-        image.IndexState = IndexState.Indexed;
+        image.IndexState = isValid ? IndexState.Indexed : IndexState.Invalid;
         image.MissingSinceUtc = null;
         image.UpdatedAt = _clock.UtcNow;
 

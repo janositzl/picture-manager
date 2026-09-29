@@ -48,12 +48,64 @@ public class ImageEnrichmentServiceTests
             var clock = Substitute.For<IClock>();
             clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, clock);
+            var imageValidator = Substitute.For<IImageValidator>();
+            imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
+
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, clock);
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(
                 Arg.Is<Image>(i => i.ContentHash == "hash-abc" && i.Width == 100 && i.CameraMake == "Canon"
                     && i.IndexState == IndexState.Indexed && i.MissingSinceUtc == null),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task EnrichAsync_UndecodableFile_MarksIndexStateInvalid()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tempFile, new byte[] { 1, 2, 3 });
+            var tempDir = Path.GetDirectoryName(tempFile)!;
+            var fileName = Path.GetFileNameWithoutExtension(tempFile);
+            var extension = Path.GetExtension(tempFile);
+
+            var image = new Image
+            {
+                Id = 1,
+                FileName = fileName,
+                Extension = extension,
+                FileSize = 3,
+                Folder = new Folder { Id = 5, RelativePath = string.Empty, Root = new ImageRoot { Id = 1, MountPath = tempDir } }
+            };
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
+            imageRepository.GetMissingByContentHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Image?)null);
+
+            var contentHasher = Substitute.For<IContentHasher>();
+            contentHasher.ComputeAsync(tempFile, 3, Arg.Any<CancellationToken>()).Returns("hash-abc");
+
+            var exifReader = Substitute.For<IExifReader>();
+            exifReader.ReadAsync(tempFile, Arg.Any<CancellationToken>()).Returns(ExifData.Empty);
+
+            var imageValidator = Substitute.For<IImageValidator>();
+            imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(false);
+
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
+
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, clock);
+            await service.EnrichAsync(1);
+
+            await imageRepository.Received(1).UpdateAsync(
+                Arg.Is<Image>(i => i.ContentHash == "hash-abc" && i.IndexState == IndexState.Invalid && i.MissingSinceUtc == null),
                 Arg.Any<CancellationToken>());
         }
         finally
@@ -79,7 +131,8 @@ public class ImageEnrichmentServiceTests
         var clock = Substitute.For<IClock>();
         clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
-        var service = new ImageEnrichmentService(imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), clock);
+        var service = new ImageEnrichmentService(
+            imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(), clock);
         await service.EnrichAsync(2);
 
         await imageRepository.Received(1).UpdateAsync(
@@ -117,7 +170,10 @@ public class ImageEnrichmentServiceTests
             var exifReader = Substitute.For<IExifReader>();
             exifReader.ReadAsync(tempFile, Arg.Any<CancellationToken>()).Returns(ExifData.Empty);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, Substitute.For<IClock>());
+            var imageValidator = Substitute.For<IImageValidator>();
+            imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
+
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IClock>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).DeleteAsync(staleMissingImage, Arg.Any<CancellationToken>());

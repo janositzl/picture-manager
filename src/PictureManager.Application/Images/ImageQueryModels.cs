@@ -1,4 +1,5 @@
 using System;
+using PictureManager.Model;
 
 namespace PictureManager.Application.Images;
 
@@ -34,7 +35,8 @@ public sealed record ImageRow(
     DateTime SortDate,
     string SortName,
     string RootName,
-    string RelativePath);
+    string RelativePath,
+    IndexState IndexState = IndexState.Indexed);
 
 public sealed record ImageDetailRow(
     ImageRow Image,

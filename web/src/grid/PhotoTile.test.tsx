@@ -68,6 +68,21 @@ describe('PhotoTile', () => {
     expect(onOpen).toHaveBeenCalledWith(7)
   })
 
+  it('shows a corrupt-file placeholder for an invalid image, without attempting to load a thumbnail', () => {
+    render(
+      <PhotoTile
+        item={image(1, 3, { isInvalid: true })}
+        size={180}
+        caption={null}
+        dimmed={false}
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    expect(screen.getByText('Corrupt file')).toBeInTheDocument()
+    expect(screen.getByTestId('tile-1').querySelector('img')).not.toBeInTheDocument()
+  })
+
   it('shows a placeholder when the file is missing', () => {
     render(
       <PhotoTile

@@ -54,6 +54,8 @@ export function PhotoTile({
   let content: ReactNode
   if (missing) {
     content = <Placeholder icon={<ImageNotSupportedIcon />} label="File missing" />
+  } else if (item.isInvalid) {
+    content = <Placeholder icon={<BrokenImageIcon />} label="Corrupt file" />
   } else if (thumbnail === null) {
     content = <Placeholder icon={<HourglassEmptyIcon />} label="Processing" />
   } else if (failedSrc === thumbnail) {

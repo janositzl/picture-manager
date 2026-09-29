@@ -57,7 +57,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Where(i => i.Id == id)
             .Select(i => new ImageDetailRow(
                 new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath),
+                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
                 i.FileSize, i.FileModified, i.Orientation, i.CameraMake, i.CameraModel, i.LensModel,
                 i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath))
             .FirstOrDefaultAsync(cancellationToken);
@@ -130,7 +130,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Where(i => hashes.Contains(i.ContentHash))
             .Select(i => new DuplicateMemberRow(
                 new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath),
+                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
                 i.Folder!.Root!.Name,
                 i.Folder.RelativePath))
             .ToListAsync(cancellationToken);

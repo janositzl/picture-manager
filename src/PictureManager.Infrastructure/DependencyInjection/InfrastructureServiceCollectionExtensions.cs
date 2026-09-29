@@ -35,6 +35,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
         services.AddSingleton<IExifReader, MetadataExtractorExifReader>();
+        services.AddSingleton<IImageValidator, SkiaImageValidator>();
         services.AddSingleton<IThumbnailService, SkiaSharpThumbnailService>();
 
         return services;

@@ -8,6 +8,7 @@ using NSubstitute;
 using PictureManager.Application.Common;
 using PictureManager.Application.Images;
 using PictureManager.Application.Repositories;
+using PictureManager.Model;
 using Xunit;
 
 namespace PictureManager.Application.Tests.Images;
@@ -155,6 +156,26 @@ public class ImageQueryServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_InvalidIndexState_MapsToIsInvalidTrue()
+    {
+        StubRows(new[] { Row(1) with { IndexState = IndexState.Invalid } });
+
+        var items = (await CreateService().ListAsync(new ImageListRequest())).Value!.Items;
+
+        items[0].IsInvalid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ListAsync_IndexedRow_MapsToIsInvalidFalse()
+    {
+        StubRows(new[] { Row(1) });
+
+        var items = (await CreateService().ListAsync(new ImageListRequest())).Value!.Items;
+
+        items[0].IsInvalid.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetDetailAsync_NotVisible_ReturnsNotFound()
     {
         _images.GetVisibleDetailAsync(5, Arg.Any<CancellationToken>()).Returns((ImageDetailRow?)null);
@@ -176,6 +197,20 @@ public class ImageQueryServiceTests
         detail.RawMetadata!.Value.GetProperty("Exif IFD0.Make").GetString().Should().Be("Canon");
         detail.Albums.Should().Equal(new AlbumRef(3, "Best of"));
         detail.ThumbnailUrl.Should().Be("/api/images/1/thumbnail?v=ABC");
+        detail.IsInvalid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetDetailAsync_InvalidIndexState_MapsToIsInvalidTrue()
+    {
+        _images.GetVisibleDetailAsync(1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
+            Row(1) with { IndexState = IndexState.Invalid }, 2048, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), 6,
+            "Canon", "R6", null, 32.6, -16.9, """{"Exif IFD0.Make":"Canon"}""", "nas", "Holidays/Madeira"));
+        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRef>());
+
+        var detail = (await CreateService().GetDetailAsync(1)).Value!;
+
+        detail.IsInvalid.Should().BeTrue();
     }
 
     [Fact]

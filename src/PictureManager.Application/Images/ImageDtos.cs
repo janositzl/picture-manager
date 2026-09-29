@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PictureManager.Application.Common;
+using PictureManager.Model;
 
 namespace PictureManager.Application.Images;
 
@@ -17,12 +18,13 @@ public sealed record ImageListItem(
     bool IsFavorite,
     string? ThumbnailUrl,
     string? PreviewUrl,
-    string FolderPath)
+    string FolderPath,
+    bool IsInvalid)
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
         ImageUrls.Thumbnail(row.Id, row.ContentHash), ImageUrls.Preview(row.Id, row.ContentHash),
-        FolderDisplayPath.For(row.RootName, row.RelativePath));
+        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid);
 }
 
 public sealed record ImageDetail(
@@ -46,7 +48,8 @@ public sealed record ImageDetail(
     double? Longitude,
     JsonElement? RawMetadata,
     string FolderPath,
-    IReadOnlyList<AlbumRef> Albums);
+    IReadOnlyList<AlbumRef> Albums,
+    bool IsInvalid);
 
 public sealed record ImageListRequest(
     int? FolderId = null,
