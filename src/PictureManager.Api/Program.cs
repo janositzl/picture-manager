@@ -9,6 +9,7 @@ using PictureManager.Application.Scanning;
 using PictureManager.Application.Thumbnails;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Worker.DependencyInjection;
+using Scalar.AspNetCore;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -37,6 +38,7 @@ try
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddWorker();
     builder.Services.AddProblemDetails();
+    builder.Services.AddOpenApi();
 
     var imageRootsOptions = new ImageRootsOptions
     {
@@ -65,6 +67,18 @@ try
 
     app.MapHealthChecks("/api/health");
     app.MapGet("/api/ping", () => Results.Ok(new { status = "ok" }));
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+        app.MapOpenApi("/openapi/{documentName}.yaml");
+        app.MapScalarApiReference();
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/openapi/v1.json", "PictureManager.Api v1");
+            options.RoutePrefix = "swagger";
+        });
+    }
 
     using (var scope = app.Services.CreateScope())
     {
