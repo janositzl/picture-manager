@@ -19,6 +19,7 @@ web/dist-ssr/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # =========== Docker / data ===========
 dev-data/images/*

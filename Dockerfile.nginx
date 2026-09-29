@@ -1,0 +1,65 @@
+# PictureManager container image with nginx fronting the API.
+#
+# Same build as Dockerfile (web frontend + API + EF Core migration bundle),
+# but the runtime stage adds nginx + supervisord: nginx serves the built
+# frontend and reverse-proxies /api to Kestrel, which binds to loopback only.
+# See Documents/PictureManager-Docker-Deployment-Guide.md for when to pick
+# this variant over the plain Kestrel-only image (Dockerfile).
+
+ARG DOTNET_VERSION=10.0
+ARG NODE_VERSION=22-alpine
+
+FROM node:${NODE_VERSION} AS web-build
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ .
+RUN npm run build
+
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
+WORKDIR /src
+
+COPY PictureManager.slnx ./
+COPY src/PictureManager.Api/PictureManager.Api.csproj src/PictureManager.Api/
+COPY src/PictureManager.Application/PictureManager.Application.csproj src/PictureManager.Application/
+COPY src/PictureManager.Infrastructure/PictureManager.Infrastructure.csproj src/PictureManager.Infrastructure/
+COPY src/PictureManager.Model/PictureManager.Model.csproj src/PictureManager.Model/
+COPY src/PictureManager.Worker/PictureManager.Worker.csproj src/PictureManager.Worker/
+RUN dotnet restore src/PictureManager.Api/PictureManager.Api.csproj
+
+COPY src/ src/
+RUN dotnet publish src/PictureManager.Api/PictureManager.Api.csproj \
+    -c Release -o /app/publish --no-restore
+
+RUN dotnet tool install --global dotnet-ef --version 10.* \
+    && export PATH="$PATH:/root/.dotnet/tools" \
+    && dotnet ef migrations bundle \
+        --project src/PictureManager.Infrastructure/PictureManager.Infrastructure.csproj \
+        --startup-project src/PictureManager.Api/PictureManager.Api.csproj \
+        --self-contained -r linux-x64 \
+        -o /app/publish/efbundle --force
+
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx supervisor \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data/images /data/thumbnail-cache /app/logs
+
+COPY --from=build /app/publish/ ./
+COPY --from=web-build /web/dist/ ./wwwroot/
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/entrypoint-nginx.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/efbundle
+
+# Loopback-only: nginx is the sole process bound to a public interface (port 80).
+ENV ASPNETCORE_URLS=http://127.0.0.1:8080 \
+    ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 80
+
+# Runs as root: nginx's master process and supervisord both need it (nginx workers
+# still drop to www-data on their own). Unlike Dockerfile's Kestrel-only image,
+# this variant does not run as an unprivileged user.
+ENTRYPOINT ["/app/entrypoint.sh"]

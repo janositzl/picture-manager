@@ -1,0 +1,5 @@
+# Docker build/runtime files must keep LF endings — CRLF breaks shebangs
+# ("/bin/sh^M: bad interpreter") when these run inside Linux containers.
+docker/* text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf

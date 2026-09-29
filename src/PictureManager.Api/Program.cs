@@ -117,6 +117,16 @@ try
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();
 
+    // The built web frontend, when present (the Docker image copies web/dist into
+    // wwwroot). Not present in local dev/test, where the frontend runs via its own
+    // Vite dev server instead — WebRootPath is null then, so this is a no-op.
+    if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
+    {
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+        app.MapFallbackToFile("index.html");
+    }
+
     app.Run();
 }
 catch (Exception ex) when (ex is not HostAbortedException)

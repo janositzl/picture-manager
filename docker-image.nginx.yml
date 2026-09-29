@@ -1,0 +1,59 @@
+# nginx-fronted deployment variant. Same stack as docker-compose.prod.yml
+# (db + api), but api is built from Dockerfile.nginx: nginx serves the web
+# frontend and proxies /api to an internal, loopback-only Kestrel process.
+# See Documents/PictureManager-Docker-Deployment-Guide.md for when to pick
+# this over docker-compose.prod.yml.
+#
+#   docker compose -f docker-image.nginx.yml up -d --build
+#
+# Reuses the same .env as docker-compose.prod.yml (POSTGRES_*, API_PORT,
+# IMAGE_LIBRARY_PATH, IMAGE_ROOT_NAME) — see .env.prod.example.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-picturemanager}
+      POSTGRES_USER: ${POSTGRES_USER:-picturemanager}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-picturemanager}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - picturemanager
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__PictureManagerDb: Host=db;Port=5432;Database=${POSTGRES_DB:-picturemanager};Username=${POSTGRES_USER:-picturemanager};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      ThumbnailCache__RootPath: /data/thumbnail-cache
+      ThumbnailCache__PreviewEnabled: "true"
+      ImageRoots__0__Name: ${IMAGE_ROOT_NAME:-library}
+      ImageRoots__0__MountPath: /data/images
+    ports:
+      - "${API_PORT:-5080}:80"
+    volumes:
+      - ${IMAGE_LIBRARY_PATH}:/data/images:ro
+      - thumbnail-cache:/data/thumbnail-cache
+      - api-logs:/app/logs
+    networks:
+      - picturemanager
+
+volumes:
+  pgdata:
+  thumbnail-cache:
+  api-logs:
+
+networks:
+  picturemanager:
