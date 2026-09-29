@@ -7,8 +7,8 @@ import type { DiscoveryProgress, ScanProgress } from '../api/types'
 import { useNotify } from '../app/notify'
 
 export type ActiveJob =
-  | { kind: 'discoveries'; folderId: number; progress: DiscoveryProgress | null }
-  | { kind: 'scans'; folderId: number; progress: ScanProgress | null }
+  | { kind: 'discoveries'; folderId: number | null; progress: DiscoveryProgress | null }
+  | { kind: 'scans'; folderId: number | null; progress: ScanProgress | null }
 
 type FolderJobs = {
   activeJob: ActiveJob | null
@@ -29,16 +29,19 @@ function startErrorMessage(error: unknown): string {
 
 /** Tracks the single discovery/scan job the backend allows at a time, shared by the whole tree. */
 export function FolderJobsProvider({ children }: { children: ReactNode }) {
-  const [job, setJob] = useState<{ kind: JobKind; folderId: number; jobId: number } | null>(null)
+  const [job, setJob] = useState<{ kind: JobKind; folderId: number | null; jobId: number } | null>(null)
   const queryClient = useQueryClient()
   const notify = useNotify()
 
   // Restores a job that's still running server-side after a page load, so a reload mid-scan
   // doesn't lose track of it (the backend is the source of truth, not this component's state).
+  // folderId is null for a whole-instance job (e.g. the startup catch-up re-enriching images an
+  // interrupted scan left unenriched, or a scan/discovery of every active root); it still needs to
+  // be tracked so the banner shows it and HasActiveJobAsync's 409 isn't a silent surprise.
   useEffect(() => {
     let cancelled = false
     getActiveJob().then((active) => {
-      if (cancelled || active === null || active.folderId === null) return
+      if (cancelled || active === null) return
       setJob({ kind: active.kind === 'Discovery' ? 'discoveries' : 'scans', folderId: active.folderId, jobId: active.id })
     }).catch(() => {
       // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.

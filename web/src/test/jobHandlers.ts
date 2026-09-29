@@ -66,7 +66,7 @@ export function controllableEvents(path: string, id: number) {
 export function activeJob(dto: {
   kind: 'Scan' | 'Discovery'
   id: number
-  folderId: number
+  folderId: number | null
   status?: string
   foldersProcessed?: number
   filesFound?: number

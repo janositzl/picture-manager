@@ -28,6 +28,20 @@ describe('JobStatusBanner', () => {
     )
   })
 
+  it('restores a whole-instance scan (no folder scope) and shows it without a folder link', async () => {
+    server.use(
+      activeJob({ kind: 'Scan', id: 1, folderId: null, foldersProcessed: 0, filesFound: 12 }),
+      scanEvents(1, [
+        { Id: 1, Status: 'Enriching', FoldersScanned: 0, FilesFound: 12, FilesEnriched: 4, ErrorMessage: null },
+      ]),
+    )
+    renderApp('/folders/1')
+
+    const banner = await screen.findByRole('alert')
+    await waitFor(() => expect(banner).toHaveTextContent('Enriching… 4/12 files'))
+    expect(screen.queryByRole('link', { name: 'Holidays' })).not.toBeInTheDocument()
+  })
+
   it('restores a discovery already running server-side', async () => {
     server.use(
       activeJob({ kind: 'Discovery', id: 1, folderId: 2, foldersProcessed: 5 }),
