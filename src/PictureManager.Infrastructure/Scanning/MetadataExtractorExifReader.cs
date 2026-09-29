@@ -44,19 +44,25 @@ public sealed class MetadataExtractorExifReader : IExifReader
         {
             foreach (var tag in directory.Tags)
             {
-                rawMetadata[$"{directory.Name}.{tag.Name}"] = tag.Description ?? string.Empty;
+                rawMetadata[$"{directory.Name}.{tag.Name}"] = StripNulChars(tag.Description) ?? string.Empty;
             }
         }
 
         var result = new ExifData(
             width, height, orientation, dateTaken,
-            ifd0?.GetDescription(ExifIfd0Directory.TagMake),
-            ifd0?.GetDescription(ExifIfd0Directory.TagModel),
-            subIfd?.GetDescription(ExifSubIfdDirectory.TagLensModel),
+            StripNulChars(ifd0?.GetDescription(ExifIfd0Directory.TagMake)),
+            StripNulChars(ifd0?.GetDescription(ExifIfd0Directory.TagModel)),
+            StripNulChars(subIfd?.GetDescription(ExifSubIfdDirectory.TagLensModel)),
             geoLocation?.Latitude,
             geoLocation?.Longitude,
             JsonSerializer.Serialize(rawMetadata));
 
         return Task.FromResult(result);
     }
+
+    // Some tag values (notably ICC profile descriptions, e.g. "sRGB IEC61966-2.1") come through with
+    // trailing NUL padding from their source binary format. PostgreSQL's text and jsonb types can't
+    // store a literal NUL byte at all -- jsonb fails hard with "22P05: unsupported Unicode escape
+    // sequence" -- so it must be stripped before anything here reaches the database.
+    public static string? StripNulChars(string? value) => value?.Replace("\0", string.Empty);
 }

@@ -36,6 +36,15 @@ public class MetadataExtractorExifReaderTests
         }
     }
 
+    [Theory]
+    [InlineData("sRGB IEC61966-2.1\0", "sRGB IEC61966-2.1")]
+    [InlineData("a\0b\0c", "abc")]
+    [InlineData(null, null)]
+    public void StripNulChars_RemovesEmbeddedNulBytes(string? input, string? expected)
+    {
+        MetadataExtractorExifReader.StripNulChars(input).Should().Be(expected);
+    }
+
     [Fact]
     public async Task ReadAsync_UnreadableFile_ReturnsEmptyExifData_DoesNotThrow()
     {
