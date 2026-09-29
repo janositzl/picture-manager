@@ -12,6 +12,7 @@ artifacts/
 node_modules/
 web/dist/
 web/dist-ssr/
+src/PictureManager.Api/wwwroot/
 *.local
 .eslintcache
 
