@@ -50,6 +50,14 @@ public sealed class ImageRepository : IImageRepository
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<int>> GetPendingImageIdsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Images
+            .Where(i => i.IndexState == IndexState.Pending && i.MissingSinceUtc == null && i.Folder!.IsActive)
+            .Select(i => i.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Image?> GetMissingByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Images.FirstOrDefaultAsync(

@@ -86,9 +86,16 @@ try
         await seeder.SeedAsync();
 
         // Before the server accepts requests, so it can only ever fail jobs a previous process left behind.
-        var interrupted = await scope.ServiceProvider.GetRequiredService<IScanService>().FailInterruptedJobsAsync();
+        var scanService = scope.ServiceProvider.GetRequiredService<IScanService>();
+        var interrupted = await scanService.FailInterruptedJobsAsync();
         if (interrupted > 0)
             Log.Warning("Marked {Count} scan job(s) interrupted by a restart as failed", interrupted);
+
+        // Images left Pending by a scan whose in-memory enrichment queue was lost in that same restart:
+        // nothing else ever retries them (a rescan sees the file as unchanged and skips re-enqueuing).
+        var requeued = await scanService.RequeueStalledEnrichmentAsync();
+        if (requeued > 0)
+            Log.Information("Re-queued {Count} image(s) left unenriched by an interrupted scan", requeued);
 
         // Discovery is cheap and takes priority over any queued scan (HasActiveJobAsync refuses a second job,
         // so this only fires when nothing else is running): a brand-new root, or one a previous discovery never

@@ -100,6 +100,52 @@ public class ImageRepositoryTests
     }
 
     [Fact]
+    public async Task GetPendingImageIdsAsync_ReturnsOnlyPendingImagesUnderActiveFolders_ExcludingKnownMissing()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        var inactiveFolder = new Folder
+        {
+            Name = "Removed", RelativePath = "Removed", RootId = folder.RootId, IsActive = false,
+            CreatedUtc = DateTime.UtcNow, ModifiedUtc = DateTime.UtcNow
+        };
+        context.Folders.Add(inactiveFolder);
+        await context.SaveChangesAsync();
+
+        var pending = new Image
+        {
+            FolderId = folder.Id, FileName = "Pending", Extension = ".jpg", ContentHash = string.Empty,
+            IndexState = IndexState.Pending, FileSize = 1, FileModified = DateTime.UtcNow,
+            FirstSeenUtc = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+        var indexed = new Image
+        {
+            FolderId = folder.Id, FileName = "Indexed", Extension = ".jpg", ContentHash = "h1",
+            IndexState = IndexState.Indexed, FileSize = 1, FileModified = DateTime.UtcNow,
+            FirstSeenUtc = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+        var pendingButMissing = new Image
+        {
+            FolderId = folder.Id, FileName = "Missing", Extension = ".jpg", ContentHash = string.Empty,
+            IndexState = IndexState.Pending, MissingSinceUtc = DateTime.UtcNow, FileSize = 1,
+            FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+        var pendingUnderInactiveFolder = new Image
+        {
+            FolderId = inactiveFolder.Id, FileName = "Tombstoned", Extension = ".jpg", ContentHash = string.Empty,
+            IndexState = IndexState.Pending, FileSize = 1, FileModified = DateTime.UtcNow,
+            FirstSeenUtc = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+        context.Images.AddRange(pending, indexed, pendingButMissing, pendingUnderInactiveFolder);
+        await context.SaveChangesAsync();
+
+        var repository = new ImageRepository(context);
+        var ids = await repository.GetPendingImageIdsAsync();
+
+        ids.Should().BeEquivalentTo(new[] { pending.Id });
+    }
+
+    [Fact]
     public async Task GetMissingByContentHashAsync_ReturnsMatchingMissingImage()
     {
         await using var context = CreateContext();

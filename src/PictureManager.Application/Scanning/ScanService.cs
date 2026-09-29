@@ -148,6 +148,31 @@ public sealed class ScanService : IScanService
     public Task<int> FailInterruptedJobsAsync(CancellationToken cancellationToken = default) =>
         _scanJobRepository.FailActiveJobsAsync(InterruptedMessage, _clock.UtcNow, cancellationToken);
 
+    public async Task<int> RequeueStalledEnrichmentAsync(CancellationToken cancellationToken = default)
+    {
+        if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
+            return 0;
+
+        var imageIds = await _imageRepository.GetPendingImageIdsAsync(cancellationToken);
+        if (imageIds.Count == 0)
+            return 0;
+
+        var job = await _scanJobRepository.AddAsync(new Job
+        {
+            Kind = JobKind.Scan,
+            FolderId = null,
+            IsRecursive = true,
+            Status = JobStatus.Enriching,
+            FilesFound = imageIds.Count,
+            StartedUtc = _clock.UtcNow
+        }, cancellationToken);
+
+        foreach (var imageId in imageIds)
+            _enrichmentQueue.Enqueue(job.Id, imageId);
+
+        return imageIds.Count;
+    }
+
     private async Task<(int FoldersScanned, int FilesFound)> ScanFolderTargetAsync(int folderId, QueuedScan scan, CancellationToken cancellationToken)
     {
         // Resolved again here: the folder can be removed, or its root deactivated, while the scan waits in the queue.

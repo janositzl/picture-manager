@@ -21,4 +21,14 @@ public interface IScanService
 
     /// <summary>Fails jobs a previous process left Enumerating/Enriching. Call once at startup. Returns how many.</summary>
     Task<int> FailInterruptedJobsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-enqueues images left Pending (unenriched) by a scan whose enrichment queue was lost -- e.g. an
+    /// app restart mid-Enriching, since the queue is in-memory only. Creates a new Job (FolderId null:
+    /// spans whatever roots/folders the orphaned images belong to) so the existing per-job completion
+    /// tracking (and the UI's progress banner) covers the catch-up too. No-op if a job is already active
+    /// or nothing is pending. Call once at startup, after FailInterruptedJobsAsync. Returns how many were
+    /// re-enqueued.
+    /// </summary>
+    Task<int> RequeueStalledEnrichmentAsync(CancellationToken cancellationToken = default);
 }
