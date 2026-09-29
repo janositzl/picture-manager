@@ -52,6 +52,22 @@ public class FolderEndpointsTests
     }
 
     [Fact]
+    public async Task DeleteAsync_Success_ReturnsNoContent()
+    {
+        _service.DeleteAsync(4, Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        (await FolderEndpoints.DeleteAsync(4, _service, CancellationToken.None)).Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_NotRemoved_ReturnsValidationProblem()
+    {
+        _service.DeleteAsync(4, Arg.Any<CancellationToken>()).Returns(Result.Invalid("id", "nope"));
+
+        (await FolderEndpoints.DeleteAsync(4, _service, CancellationToken.None)).Result.Should().BeOfType<ValidationProblem>();
+    }
+
+    [Fact]
     public async Task SetExcludedAsync_Success_ReturnsNoContent()
     {
         _service.SetExcludedAsync(4, true, Arg.Any<CancellationToken>()).Returns(Result.Ok());

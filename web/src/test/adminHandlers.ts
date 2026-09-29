@@ -170,4 +170,10 @@ export const adminHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
   http.delete('/api/folders/:id', () => new HttpResponse(null, { status: 204 })),
+  http.delete('/api/folders/:id/removed', ({ params }) => {
+    const id = Number(params.id)
+    if (!removedFolders.some((f) => f.id === id)) return notFound()
+    removedFolders = removedFolders.filter((f) => f.id !== id)
+    return new HttpResponse(null, { status: 204 })
+  }),
 ]

@@ -30,4 +30,18 @@ describe('RemovedFoldersPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Restore' }))
     await waitFor(() => expect(screen.getByText('No removed folders.')).toBeInTheDocument())
   })
+
+  it('deletes a folder after confirming, and removes it from the list', async () => {
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Delete Holidays/Old' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(screen.getByText('No removed folders.')).toBeInTheDocument())
+  })
+
+  it('cancels a delete without removing the folder', async () => {
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Delete Holidays/Old' }))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(screen.getByText('Old')).toBeInTheDocument()
+  })
 })

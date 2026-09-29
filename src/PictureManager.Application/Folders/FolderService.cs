@@ -70,6 +70,18 @@ public sealed class FolderService : IFolderService
         return Result.Ok();
     }
 
+    public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var folder = await _folders.GetByIdAsync(id, cancellationToken);
+        if (folder is null)
+            return Result.NotFound();
+        if (folder.IsActive)
+            return Result.Invalid("id", "The folder has not been removed.");
+
+        await _folders.DeleteSubtreeAsync(id, cancellationToken);
+        return Result.Ok();
+    }
+
     public async Task<Result> SetExcludedAsync(int id, bool isExcluded, CancellationToken cancellationToken = default)
     {
         var folder = await _folders.GetByIdAsync(id, cancellationToken);

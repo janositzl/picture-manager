@@ -125,6 +125,33 @@ public class FolderServiceTests
     }
 
     [Fact]
+    public async Task DeleteAsync_Unknown_ReturnsNotFound()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns((Folder?)null);
+
+        (await CreateService().DeleteAsync(4)).Status.Should().Be(ResultStatus.NotFound);
+        await _folders.DidNotReceive().DeleteSubtreeAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_NotRemoved_ReturnsInvalid()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = true });
+
+        (await CreateService().DeleteAsync(4)).Status.Should().Be(ResultStatus.Invalid);
+        await _folders.DidNotReceive().DeleteSubtreeAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Tombstone_DeletesTheSubtree()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = false });
+
+        (await CreateService().DeleteAsync(4)).IsSuccess.Should().BeTrue();
+        await _folders.Received(1).DeleteSubtreeAsync(4, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SetExcludedAsync_Unknown_ReturnsNotFound()
     {
         _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns((Folder?)null);

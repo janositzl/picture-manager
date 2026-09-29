@@ -21,3 +21,22 @@ export function restoreFolderErrorMessage(error: unknown): string {
   }
   return "Couldn't restore the folder."
 }
+
+export function useDeleteRemovedFolder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (folderId: number) =>
+      apiFetch<void>(`/api/folders/${folderId}/removed`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.removedFolders() })
+    },
+  })
+}
+
+export function deleteRemovedFolderErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const fieldError = Object.values(error.problem?.errors ?? {})[0]?.[0]
+    if (fieldError) return fieldError
+  }
+  return "Couldn't delete the folder."
+}
