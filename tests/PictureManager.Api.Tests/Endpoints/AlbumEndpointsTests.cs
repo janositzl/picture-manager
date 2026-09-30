@@ -103,6 +103,16 @@ public class AlbumEndpointsTests
     }
 
     [Fact]
+    public async Task SortAsync_PassesKey_AndReturnsNoContent()
+    {
+        _service.SortAsync(42, "dateAsc", Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        var result = await AlbumEndpoints.SortAsync(42, new AlbumSortRequest("dateAsc"), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
     public async Task ExportAsync_ReturnsUtf8TextWithoutBom_AndAlbumFileName()
     {
         _service.ExportAsync(42, "/mnt", Arg.Any<CancellationToken>())

@@ -200,6 +200,19 @@ export const albumHandlers = [
     album.updatedAt = now()
     return new HttpResponse(null, { status: 204 })
   }),
+  http.post('/api/albums/:id/sort', async ({ params, request }) => {
+    const album = albumFor(params)
+    if (!album) return notFound()
+    const { by } = (await request.json()) as { by: 'dateAsc' | 'dateDesc' | 'name' }
+    const key = (id: number) =>
+      by === 'name' ? (findImage(id)?.fileName ?? '') : (findImage(id)?.dateTaken ?? '')
+    const sign = by === 'dateDesc' ? -1 : 1
+    album.imageIds = [...album.imageIds].sort(
+      (a, b) => sign * key(a).localeCompare(key(b)) || a - b,
+    )
+    album.updatedAt = now()
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.get('/api/albums/:id/export', ({ params, request }) => {
     const album = albumFor(params)
     if (!album) return notFound()

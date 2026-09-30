@@ -115,6 +115,18 @@ public sealed class AlbumRepository : IAlbumRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<int>> GetImageIdsSortedAsync(int albumId, AlbumSortKey key, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.AlbumImages.AsNoTracking().Where(ai => ai.AlbumId == albumId);
+        var ordered = key switch
+        {
+            AlbumSortKey.DateAscending => query.OrderBy(ai => ai.Image!.SortDate),
+            AlbumSortKey.DateDescending => query.OrderByDescending(ai => ai.Image!.SortDate),
+            _ => query.OrderBy(ai => ai.Image!.FileName.ToLower()),
+        };
+        return await ordered.ThenBy(ai => ai.ImageId).Select(ai => ai.ImageId).ToListAsync(cancellationToken);
+    }
+
     public async Task AppendImagesAsync(int albumId, IReadOnlyList<int> imageIds, DateTime addedAtUtc, CancellationToken cancellationToken = default)
     {
         var maxSortOrder = await _dbContext.AlbumImages

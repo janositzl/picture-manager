@@ -32,6 +32,9 @@ public interface IAlbumRepository
 
     Task<IReadOnlyList<int>> GetOrderedImageIdsAsync(int albumId, CancellationToken cancellationToken = default);
 
+    /// <summary>Image ids sorted by the key (ties broken by ImageId), ignoring the stored SortOrder.</summary>
+    Task<IReadOnlyList<int>> GetImageIdsSortedAsync(int albumId, AlbumSortKey key, CancellationToken cancellationToken = default);
+
     /// <summary>Adds entries after the current maximum SortOrder, in the given order. Ids must not already be in the album.</summary>
     Task AppendImagesAsync(int albumId, IReadOnlyList<int> imageIds, DateTime addedAtUtc, CancellationToken cancellationToken = default);
 

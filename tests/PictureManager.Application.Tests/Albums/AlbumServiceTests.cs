@@ -275,6 +275,30 @@ public class AlbumServiceTests
         await _albums.DidNotReceive().ReorderAsync(Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("dateAsc", AlbumSortKey.DateAscending)]
+    [InlineData("dateDesc", AlbumSortKey.DateDescending)]
+    [InlineData("name", AlbumSortKey.Name)]
+    public async Task SortAsync_StoresTheSortedOrder(string by, AlbumSortKey key)
+    {
+        _albums.GetImageIdsSortedAsync(7, key, Arg.Any<CancellationToken>()).Returns(new List<int> { 103, 101, 102 });
+
+        (await CreateService().SortAsync(7, by)).IsSuccess.Should().BeTrue();
+
+        await _albums.Received(1).ReorderAsync(7, Arg.Is<IReadOnlyList<int>>(ids => ids.SequenceEqual(new[] { 103, 101, 102 })), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("random")]
+    public async Task SortAsync_UnknownKey_ReturnsInvalid_WithoutReordering(string? by)
+    {
+        var result = await CreateService().SortAsync(7, by);
+
+        result.Errors!.Keys.Should().Contain("by");
+        await _albums.DidNotReceive().ReorderAsync(Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task ExportAsync_FormatsLines_AndUsesAlbumNameForFile()
     {

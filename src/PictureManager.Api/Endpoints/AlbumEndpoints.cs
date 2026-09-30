@@ -18,6 +18,8 @@ public sealed record AlbumRemoveImagesRequest(int[]? ImageIds);
 
 public sealed record AlbumMoveRequest(int? AfterImageId);
 
+public sealed record AlbumSortRequest(string? By);
+
 public static class AlbumEndpoints
 {
     public static IEndpointRouteBuilder MapAlbumEndpoints(this IEndpointRouteBuilder user)
@@ -31,6 +33,7 @@ public static class AlbumEndpoints
         user.MapPost("/albums/{id:int}/images", AddImagesAsync);
         user.MapPost("/albums/{id:int}/images/remove", RemoveImagesAsync);
         user.MapPost("/albums/{id:int}/images/{imageId:int}/move", MoveImageAsync);
+        user.MapPost("/albums/{id:int}/sort", SortAsync);
         user.MapGet("/albums/{id:int}/export", ExportAsync);
         return user;
     }
@@ -86,6 +89,10 @@ public static class AlbumEndpoints
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> MoveImageAsync(
         int id, int imageId, AlbumMoveRequest body, IAlbumService service, CancellationToken cancellationToken) =>
         (await service.MoveImageAsync(id, imageId, body.AfterImageId, cancellationToken)).ToNoContent();
+
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SortAsync(
+        int id, AlbumSortRequest body, IAlbumService service, CancellationToken cancellationToken) =>
+        (await service.SortAsync(id, body.By, cancellationToken)).ToNoContent();
 
     public static async Task<Results<FileContentHttpResult, NotFound>> ExportAsync(
         int id, string? prefix, IAlbumService service, CancellationToken cancellationToken)

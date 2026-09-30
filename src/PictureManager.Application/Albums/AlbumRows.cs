@@ -16,3 +16,10 @@ public sealed record AlbumSummaryRow(
 public sealed record AlbumImageRow(ImageRow Image, int SortOrder, bool IsMissing);
 
 public sealed record AlbumExportRow(string RootName, string? RootAlias, string RelativePath, string FileName, string Extension);
+
+public enum AlbumSortKey
+{
+    DateAscending,
+    DateDescending,
+    Name,
+}

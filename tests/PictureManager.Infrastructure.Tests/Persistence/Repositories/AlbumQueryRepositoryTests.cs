@@ -42,6 +42,29 @@ public class AlbumQueryRepositoryTests
         rows[1].CoverContentHash.Should().Be("COVERHASH");
     }
 
+    [Theory]
+    [InlineData(AlbumSortKey.DateAscending, new[] { "c", "a", "b" })]
+    [InlineData(AlbumSortKey.DateDescending, new[] { "b", "a", "c" })]
+    [InlineData(AlbumSortKey.Name, new[] { "a", "b", "c" })]
+    public async Task GetImageIdsSortedAsync_OrdersByKey_IgnoringStoredSortOrder(AlbumSortKey key, string[] expectedNames)
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var a = TestData.Image(folder, "A", dateTaken: new DateTime(2024, 5, 1));
+        var b = TestData.Image(folder, "b", dateTaken: new DateTime(2025, 1, 1));
+        var c = TestData.Image(folder, "c", dateTaken: new DateTime(2020, 1, 1));
+        var album = TestData.Album("mixed");
+        db.Context.AlbumImages.AddRange(
+            TestData.AlbumImage(album, a, 2), TestData.AlbumImage(album, b, 0), TestData.AlbumImage(album, c, 1));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var ids = await new AlbumRepository(context).GetImageIdsSortedAsync(album.Id, key);
+
+        var names = new[] { a, b, c }.ToDictionary(i => i.Id, i => i.FileName.ToLowerInvariant());
+        ids.Select(id => names[id]).Should().Equal(expectedNames);
+    }
+
     [Fact]
     public async Task GetOwnedAsync_OtherOwnersAlbum_ReturnsNull()
     {

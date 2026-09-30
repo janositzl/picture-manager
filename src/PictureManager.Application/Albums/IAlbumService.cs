@@ -26,5 +26,8 @@ public interface IAlbumService
 
     Task<Result> MoveImageAsync(int id, int imageId, int? afterImageId, CancellationToken cancellationToken = default);
 
+    /// <summary>Rewrites the album's stored order to the given sort: "dateAsc", "dateDesc" or "name".</summary>
+    Task<Result> SortAsync(int id, string? by, CancellationToken cancellationToken = default);
+
     Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default);
 }

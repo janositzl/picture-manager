@@ -73,6 +73,18 @@ export function useRemoveFromAlbum(albumId: number) {
   })
 }
 
+export type AlbumSort = 'dateAsc' | 'dateDesc' | 'name'
+
+/** Rewrites the album's stored order; the grid and exports then follow it. */
+export function useSortAlbum(albumId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (by: AlbumSort) =>
+      apiFetch<void>(`/api/albums/${albumId}/sort`, jsonRequest('POST', { by })),
+    onSuccess: () => refreshAlbumContents(queryClient, albumId),
+  })
+}
+
 export function useMoveInAlbum(albumId: number) {
   const queryClient = useQueryClient()
   const notify = useNotify()

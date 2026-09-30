@@ -1,7 +1,24 @@
-import { Alert, Box, Button, FormControlLabel, Link, Switch, Typography } from '@mui/material'
+import {
+  Alert,
+  Box,
+  Button,
+  FormControlLabel,
+  Link,
+  Menu,
+  MenuItem,
+  Switch,
+  Typography,
+} from '@mui/material'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
-import { useDeleteAlbum, useMoveInAlbum, useRemoveFromAlbum, type AddTarget } from '../api/albums'
+import {
+  useDeleteAlbum,
+  useMoveInAlbum,
+  useRemoveFromAlbum,
+  useSortAlbum,
+  type AddTarget,
+  type AlbumSort,
+} from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
 import { useAlbum, useAlbumImages } from '../api/queries'
@@ -37,7 +54,13 @@ const HEADER_BUTTON_SX = {
   '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
 }
 
-type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | null
+type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | 'sort' | null
+
+const SORT_OPTIONS: { by: AlbumSort; label: string }[] = [
+  { by: 'dateAsc', label: 'Date taken (oldest first)' },
+  { by: 'dateDesc', label: 'Date taken (newest first)' },
+  { by: 'name', label: 'Filename (A to Z)' },
+]
 type PickerState = { target: AddTarget; unavailable: number }
 
 export function AlbumView() {
@@ -53,12 +76,15 @@ export function AlbumView() {
   const removeImages = useRemoveFromAlbum(albumId ?? 0)
   const moveImage = useMoveInAlbum(albumId ?? 0)
   const deleteAlbum = useDeleteAlbum(albumId ?? 0)
+  const sortAlbum = useSortAlbum(albumId ?? 0)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
   const selection = useSelection(ids, `album-${albumId}`)
   const [showFolders, setShowFolders] = useState(readShowFolders)
   const [dialog, setDialog] = useState<OpenDialog>(null)
   const [picker, setPicker] = useState<PickerState | null>(null)
+  const [sortAnchor, setSortAnchor] = useState<HTMLElement | null>(null)
+  const [sortBy, setSortBy] = useState<AlbumSort | null>(null)
 
   if (albumId === null || isNotFound(album.error)) {
     return (
@@ -116,6 +142,16 @@ export function AlbumView() {
       selection.clear()
     } catch {
       notify("Couldn't remove photos.")
+    }
+    setDialog(null)
+  }
+
+  const confirmSort = async () => {
+    if (sortBy === null) return
+    try {
+      await sortAlbum.mutateAsync(sortBy)
+    } catch {
+      notify("Couldn't sort the album.")
     }
     setDialog(null)
   }
@@ -214,6 +250,28 @@ export function AlbumView() {
         label="Show folders"
       />
       <TileSizeToggle />
+      <Button
+        size="small"
+        disabled={items.length < 2}
+        onClick={(event) => setSortAnchor(event.currentTarget)}
+        sx={HEADER_BUTTON_SX}
+      >
+        Sort by…
+      </Button>
+      <Menu anchorEl={sortAnchor} open={sortAnchor !== null} onClose={() => setSortAnchor(null)}>
+        {SORT_OPTIONS.map(({ by, label }) => (
+          <MenuItem
+            key={by}
+            onClick={() => {
+              setSortAnchor(null)
+              setSortBy(by)
+              setDialog('sort')
+            }}
+          >
+            {label}
+          </MenuItem>
+        ))}
+      </Menu>
       <Button size="small" onClick={() => setDialog('edit')} sx={HEADER_BUTTON_SX}>
         Edit…
       </Button>
@@ -259,6 +317,16 @@ export function AlbumView() {
         <ExportDialog
           album={detail}
           missingCount={items.filter((item) => item.isMissing).length}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'sort' && (
+        <ConfirmDialog
+          title="Sort album"
+          message={`Sort ${detail.name} by ${SORT_OPTIONS.find((option) => option.by === sortBy)?.label.toLowerCase()}? This replaces the current order.`}
+          confirmLabel="Sort"
+          busy={sortAlbum.isPending}
+          onConfirm={() => void confirmSort()}
           onClose={() => setDialog(null)}
         />
       )}

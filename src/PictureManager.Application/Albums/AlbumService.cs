@@ -212,6 +212,27 @@ public sealed class AlbumService : IAlbumService
         return Result.Ok();
     }
 
+    public async Task<Result> SortAsync(int id, string? by, CancellationToken cancellationToken = default)
+    {
+        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+            return Result.NotFound();
+
+        AlbumSortKey? key = by switch
+        {
+            "dateAsc" => AlbumSortKey.DateAscending,
+            "dateDesc" => AlbumSortKey.DateDescending,
+            "name" => AlbumSortKey.Name,
+            _ => null,
+        };
+        if (key is not { } sortKey)
+            return Result.Invalid("by", "Must be one of: dateAsc, dateDesc, name.");
+
+        var order = await _albums.GetImageIdsSortedAsync(id, sortKey, cancellationToken);
+        await _albums.ReorderAsync(id, order, cancellationToken);
+        await _albums.TouchAsync(id, _clock.UtcNow, cancellationToken);
+        return Result.Ok();
+    }
+
     public async Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default)
     {
         var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);
