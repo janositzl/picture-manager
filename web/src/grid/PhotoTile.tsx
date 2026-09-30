@@ -4,15 +4,14 @@ import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Checkbox, IconButton, Typography } from '@mui/material'
-import { useState, type HTMLAttributes, type ReactNode } from 'react'
+import { memo, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import type { ImageListItem } from '../api/types'
 import type { SelectMods } from './useSelection'
 
-export type TileSelection = {
-  selecting: boolean
-  selected: boolean
-  onSelect: (id: number, mods: SelectMods) => void
-}
+/** Tiles this small can't fit both the photo and a readable caption, so the caption hides until hover. */
+const CAPTION_HOVER_ONLY_BELOW = 130
+/** How long a tile must stay mounted before its thumbnail is actually requested. */
+const IMAGE_REQUEST_DELAY_MS = 100
 
 /** dnd-kit's drag handle wiring for a sortable tile (the tile itself is the handle). */
 export type TileActivator = {
@@ -28,28 +27,41 @@ type Props = {
   caption: string | null
   dimmed: boolean
   missing?: boolean
-  selection?: TileSelection
+  selecting?: boolean
+  selected?: boolean
+  onSelect?: (id: number, mods: SelectMods) => void
   activator?: TileActivator
+  /** In a fast-scrolling virtualized grid: don't request a thumbnail for a tile scrolled past within IMAGE_REQUEST_DELAY_MS. */
+  deferImage?: boolean
   onOpen: (id: number) => void
   onToggleFavorite: (item: ImageListItem) => void
 }
 
-export function PhotoTile({
+function PhotoTileComponent({
   item,
   size,
   caption,
   dimmed,
   missing = false,
-  selection,
+  selecting = false,
+  selected = false,
+  onSelect,
   activator,
+  deferImage = false,
   onOpen,
   onToggleFavorite,
 }: Props) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const [imageReady, setImageReady] = useState(!deferImage)
+  const [loaded, setLoaded] = useState(false)
   const name = `${item.fileName}${item.extension}`
   const thumbnail = item.thumbnailUrl
-  const selecting = selection?.selecting ?? false
-  const selected = selection?.selected ?? false
+
+  useEffect(() => {
+    if (!deferImage) return
+    const timer = setTimeout(() => setImageReady(true), IMAGE_REQUEST_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [deferImage])
 
   let content: ReactNode
   if (missing) {
@@ -60,21 +72,31 @@ export function PhotoTile({
     content = <Placeholder icon={<HourglassEmptyIcon />} label="Processing" />
   } else if (failedSrc === thumbnail) {
     content = <Placeholder icon={<BrokenImageIcon />} label="Thumbnail unavailable" />
+  } else if (!imageReady) {
+    content = null
   } else {
     content = (
       <img
         src={thumbnail}
         alt=""
-        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
         onError={() => setFailedSrc(thumbnail)}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: 'block',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 0.15s ease-in-out',
+        }}
       />
     )
   }
 
   // While selecting, activating a tile toggles it instead of opening the viewer.
   const activate = (shift: boolean) => {
-    if (selection && selecting) selection.onSelect(item.id, { shift })
+    if (onSelect && selecting) onSelect(item.id, { shift })
     else onOpen(item.id)
   }
 
@@ -90,8 +112,8 @@ export function PhotoTile({
       data-dimmed={dimmed}
       data-selected={selected}
       onClick={(event) => {
-        if (selection && !selecting && (event.ctrlKey || event.metaKey)) {
-          selection.onSelect(item.id, { shift: false })
+        if (onSelect && !selecting && (event.ctrlKey || event.metaKey)) {
+          onSelect(item.id, { shift: false })
           return
         }
         activate(event.shiftKey)
@@ -126,7 +148,8 @@ export function PhotoTile({
         boxShadow: selected ? 2 : 0,
         '& .tile-star': { opacity: item.isFavorite ? 1 : 0 },
         '& .tile-check': { opacity: selecting ? 1 : 0 },
-        '&:hover .tile-star, &:focus-within .tile-star, &:hover .tile-check, &:focus-within .tile-check':
+        '& .tile-caption': { opacity: size < CAPTION_HOVER_ONLY_BELOW ? 0 : 1 },
+        '&:hover .tile-star, &:focus-within .tile-star, &:hover .tile-check, &:focus-within .tile-check, &:hover .tile-caption, &:focus-within .tile-caption':
           { opacity: 1 },
       }}
     >
@@ -143,7 +166,7 @@ export function PhotoTile({
           }}
         />
       )}
-      {selection && (
+      {onSelect && (
         <Checkbox
           className="tile-check"
           size="small"
@@ -156,7 +179,7 @@ export function PhotoTile({
             if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
           }}
           onChange={(event) =>
-            selection.onSelect(item.id, {
+            onSelect(item.id, {
               shift: (event.nativeEvent as MouseEvent).shiftKey === true,
             })
           }
@@ -198,6 +221,7 @@ export function PhotoTile({
         {item.isFavorite ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
       </IconButton>
       <Box
+        className="tile-caption"
         sx={{
           position: 'absolute',
           left: 0,
@@ -207,6 +231,7 @@ export function PhotoTile({
           py: 0.75,
           color: 'common.white',
           background: 'linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0))',
+          transition: 'opacity 0.2s ease-in-out',
         }}
       >
         <Typography variant="caption" noWrap component="div" sx={{ fontWeight: 500 }}>
@@ -221,6 +246,8 @@ export function PhotoTile({
     </Box>
   )
 }
+
+export const PhotoTile = memo(PhotoTileComponent)
 
 function Placeholder({ icon, label }: { icon: ReactNode; label: string }) {
   return (

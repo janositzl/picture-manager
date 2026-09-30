@@ -116,6 +116,24 @@ describe('FolderView', () => {
     expect(await screen.findByRole('heading', { name: 'Madeira' })).toBeInTheDocument()
   })
 
+  it('changing the thumbnail size updates the toggle and survives a reload', async () => {
+    const { user, unmount } = renderApp('/folders/3')
+    await screen.findByRole('button', { name: 'IMG_0001.jpg' })
+    await user.click(screen.getByRole('button', { name: 'Small thumbnails' }))
+    expect(screen.getByRole('button', { name: 'Small thumbnails' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    unmount()
+
+    renderApp('/folders/3')
+    await screen.findByRole('button', { name: 'IMG_0001.jpg' })
+    expect(screen.getByRole('button', { name: 'Small thumbnails' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
   it('offers Retry when photos fail to load', async () => {
     let fail = true
     server.use(

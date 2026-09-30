@@ -8,6 +8,7 @@ import { useAlbum, useAlbumImages } from '../api/queries'
 import { useNotify } from '../app/notify'
 import { BORDER } from '../design/accent'
 import { SelectionBar } from '../grid/SelectionBar'
+import { TileSizeToggle } from '../grid/TileSizeToggle'
 import { useSelection } from '../grid/useSelection'
 import { parseGridParams, parseId, withParams } from '../routing/urlState'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
@@ -212,6 +213,7 @@ export function AlbumView() {
         control={<Switch size="small" checked={showFolders} onChange={toggleShowFolders} />}
         label="Show folders"
       />
+      <TileSizeToggle />
       <Button size="small" onClick={() => setDialog('edit')} sx={HEADER_BUTTON_SX}>
         Edit…
       </Button>

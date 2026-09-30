@@ -7,6 +7,7 @@ import type { ReactNode } from 'react'
 import { Link as RouterLink, useSearchParams } from 'react-router'
 import type { BreadcrumbItem } from '../api/types'
 import { BORDER } from '../design/accent'
+import { TileSizeToggle } from '../grid/TileSizeToggle'
 import { withParams, type Order, type Sort } from '../routing/urlState'
 
 type Props = {
@@ -87,6 +88,7 @@ export function GridHeader({ title, path, count, sort, order, actions }: Props) 
       </Box>
       <Box sx={{ flex: 1 }} />
       {actions}
+      <TileSizeToggle />
       <Box
         sx={{
           display: 'flex',

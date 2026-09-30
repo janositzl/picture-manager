@@ -1,6 +1,9 @@
 import { Box, Skeleton } from '@mui/material'
+import { TILE_MIN_WIDTH, useTileSize } from '../grid/tileSize'
 
 export function GridSkeleton() {
+  const [tileSizeKey] = useTileSize()
+  const size = TILE_MIN_WIDTH[tileSizeKey]
   return (
     <Box
       aria-busy="true"
@@ -12,8 +15,8 @@ export function GridSkeleton() {
         <Skeleton
           key={index}
           variant="rectangular"
-          width={180}
-          height={180}
+          width={size}
+          height={size}
           sx={{ borderRadius: '10px' }}
         />
       ))}

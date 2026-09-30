@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
@@ -45,8 +45,16 @@ export function ImageBrowser({
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
 
   // Opening is a push (Back closes the viewer); the state marks it as opened in-app.
-  const open = (id: number) =>
-    setSearchParams(withParams(searchParams, { image: id }), { state: { viewer: true } })
+  // The functional update keeps `open` stable across renders instead of depending on `searchParams`.
+  const open = useCallback(
+    (id: number) =>
+      setSearchParams((prev) => withParams(prev, { image: id }), { state: { viewer: true } }),
+    [setSearchParams],
+  )
+  const onToggleFavorite = useCallback(
+    (tile: ImageListItem) => setFavorite.mutate({ id: tile.id, isFavorite: !tile.isFavorite }),
+    [setFavorite],
+  )
 
   let body: ReactNode
   if (images.isPending) {
@@ -70,15 +78,12 @@ export function ImageBrowser({
             size={size}
             caption={captionFor?.(item) ?? null}
             dimmed={dimUnfavorited && !item.isFavorite}
-            selection={{
-              selecting: selection.isSelecting,
-              selected: selection.selected.has(item.id),
-              onSelect: selection.toggle,
-            }}
+            selecting={selection.isSelecting}
+            selected={selection.selected.has(item.id)}
+            onSelect={selection.toggle}
+            deferImage
             onOpen={open}
-            onToggleFavorite={(tile) =>
-              setFavorite.mutate({ id: tile.id, isFavorite: !tile.isFavorite })
-            }
+            onToggleFavorite={onToggleFavorite}
           />
         )}
       />

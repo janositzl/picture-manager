@@ -18,6 +18,7 @@ import { useCallback, useState, type HTMLAttributes, type ReactNode } from 'reac
 import type { AlbumImageItem } from '../api/types'
 import { columnCount, GRID_PADDING, TILE_GAP, tileSize } from '../grid/columns'
 import { PhotoTile, type TileActivator } from '../grid/PhotoTile'
+import { TILE_MIN_WIDTH, useTileSize } from '../grid/tileSize'
 import type { Selection } from '../grid/useSelection'
 
 type Props = {
@@ -39,6 +40,7 @@ export function AlbumGrid({
   onMove,
 }: Props) {
   const [width, setWidth] = useState(0)
+  const [tileSizeKey] = useTileSize()
   const sensors = useSensors(
     // A few pixels of travel before a drag starts, so a click still opens the photo.
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -58,7 +60,7 @@ export function AlbumGrid({
     return () => observer.disconnect()
   }, [])
 
-  const columns = columnCount(width)
+  const columns = columnCount(width, TILE_MIN_WIDTH[tileSizeKey])
   const size = tileSize(width, columns)
   const ids = items.map((item) => item.id)
 
@@ -103,11 +105,9 @@ export function AlbumGrid({
                       caption={showFolders ? item.folderPath : null}
                       dimmed={false}
                       missing={item.isMissing}
-                      selection={{
-                        selecting: selection.isSelecting,
-                        selected: selection.selected.has(item.id),
-                        onSelect: selection.toggle,
-                      }}
+                      selecting={selection.isSelecting}
+                      selected={selection.selected.has(item.id)}
+                      onSelect={selection.toggle}
                       activator={activator}
                       onOpen={onOpen}
                       onToggleFavorite={() => onToggleFavorite(item)}

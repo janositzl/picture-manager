@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { image } from '../test/fixtures'
@@ -98,6 +98,61 @@ describe('PhotoTile', () => {
     expect(screen.getByText('File missing')).toBeInTheDocument()
   })
 
+  it('fits the whole photo inside the tile instead of cropping it', () => {
+    render(
+      <PhotoTile
+        item={image(1, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    const img = screen.getByTestId('tile-1').querySelector('img')!
+    expect(img.style.objectFit).toBe('contain')
+  })
+
+  it('with deferImage, only requests the thumbnail after the tile has stayed mounted a moment', () => {
+    vi.useFakeTimers()
+    render(
+      <PhotoTile
+        item={image(1, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        deferImage
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    expect(screen.getByTestId('tile-1').querySelector('img')).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(100))
+    expect(screen.getByTestId('tile-1').querySelector('img')).toHaveAttribute(
+      'src',
+      image(1, 3).thumbnailUrl,
+    )
+    vi.useRealTimers()
+  })
+
+  it('with deferImage, never requests the thumbnail if unmounted before the delay elapses', () => {
+    vi.useFakeTimers()
+    const { unmount } = render(
+      <PhotoTile
+        item={image(1, 3)}
+        size={180}
+        caption={null}
+        dimmed={false}
+        deferImage
+        onOpen={noop}
+        onToggleFavorite={noop}
+      />,
+    )
+    unmount()
+    vi.advanceTimersByTime(100)
+    vi.useRealTimers()
+  })
+
   it('Ctrl-click selects instead of opening, and the checkbox reports Shift', async () => {
     const onOpen = vi.fn()
     const onSelect = vi.fn()
@@ -107,7 +162,9 @@ describe('PhotoTile', () => {
         size={180}
         caption={null}
         dimmed={false}
-        selection={{ selecting: false, selected: false, onSelect }}
+        selecting={false}
+        selected={false}
+        onSelect={onSelect}
         onOpen={onOpen}
         onToggleFavorite={noop}
       />,

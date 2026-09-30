@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ImageListItem } from '../api/types'
 import { columnCount, GRID_PADDING, TILE_GAP, tileSize } from './columns'
+import { TILE_MIN_WIDTH, useTileSize } from './tileSize'
 
 type Props = {
   items: ImageListItem[]
@@ -24,6 +25,7 @@ export function PhotoGrid({
 }: Props) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
+  const [tileSizeKey] = useTileSize()
 
   const attach = useCallback((element: HTMLDivElement | null) => {
     setScrollElement(element)
@@ -36,7 +38,7 @@ export function PhotoGrid({
     return () => observer.disconnect()
   }, [])
 
-  const columns = columnCount(width)
+  const columns = columnCount(width, TILE_MIN_WIDTH[tileSizeKey])
   const size = tileSize(width, columns)
   const rowCount = Math.ceil(items.length / columns)
 

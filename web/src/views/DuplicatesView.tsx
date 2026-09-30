@@ -7,6 +7,7 @@ import { useSetFavorite } from '../api/favorites'
 import { useDuplicates } from '../api/queries'
 import { PhotoTile } from '../grid/PhotoTile'
 import { SelectionBar } from '../grid/SelectionBar'
+import { TILE_MIN_WIDTH, useTileSize } from '../grid/tileSize'
 import { useSelection } from '../grid/useSelection'
 import { parseGridParams, withParams } from '../routing/urlState'
 import { EmptyMessage } from '../shared/EmptyMessage'
@@ -14,7 +15,6 @@ import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { PhotoViewer } from '../viewer/PhotoViewer'
 import { GridSkeleton } from './GridSkeleton'
 
-const TILE_SIZE = 180
 /** Load the next page of groups when this close (px) to the bottom. */
 const LOAD_MORE_MARGIN = 400
 const noMorePages = () => undefined
@@ -25,6 +25,7 @@ export function DuplicatesView() {
   const { image } = parseGridParams(searchParams)
   const groups = useDuplicates()
   const setFavorite = useSetFavorite()
+  const [tileSizeKey] = useTileSize()
   const all = useMemo(() => groups.data?.pages.flatMap((page) => page.items) ?? [], [groups.data])
   const ids = useMemo(() => all.flatMap((group) => group.images.map((item) => item.id)), [all])
   const selection = useSelection(ids, 'duplicates')
@@ -94,14 +95,12 @@ export function DuplicatesView() {
                 <PhotoTile
                   key={item.id}
                   item={item}
-                  size={TILE_SIZE}
+                  size={TILE_MIN_WIDTH[tileSizeKey]}
                   caption={item.folderPath}
                   dimmed={false}
-                  selection={{
-                    selecting: selection.isSelecting,
-                    selected: selection.selected.has(item.id),
-                    onSelect: selection.toggle,
-                  }}
+                  selecting={selection.isSelecting}
+                  selected={selection.selected.has(item.id)}
+                  onSelect={selection.toggle}
                   onOpen={open}
                   onToggleFavorite={(tile) =>
                     setFavorite.mutate({ id: tile.id, isFavorite: !tile.isFavorite })
