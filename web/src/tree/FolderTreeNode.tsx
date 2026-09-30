@@ -115,18 +115,20 @@ export function FolderTreeNode({
           />
         )}
         {node.isMissing && <WarningAmberIcon fontSize="small" color="warning" sx={{ mr: 0.5 }} />}
-        <ListItemText
-          primary={node.name}
-          slotProps={{
-            primary: {
-              noWrap: true,
-              sx: {
-                fontWeight: selected ? 600 : 400,
-                color: dimmed ? 'text.secondary' : selected ? ACCENT_TEXT : 'text.primary',
+        <Tooltip title={node.name} enterDelay={500} disableInteractive>
+          <ListItemText
+            primary={node.name}
+            slotProps={{
+              primary: {
+                noWrap: true,
+                sx: {
+                  fontWeight: selected ? 600 : 400,
+                  color: dimmed ? 'text.secondary' : selected ? ACCENT_TEXT : 'text.primary',
+                },
               },
-            },
-          }}
-        />
+            }}
+          />
+        </Tooltip>
         {expanded && children.isFetching && <CircularProgress size={14} />}
         <FolderActionsMenu
           folderId={node.id}

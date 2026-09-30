@@ -35,6 +35,13 @@ describe('FolderTree', () => {
     expect(router.state.location.pathname).toBe('/folders/3')
   })
 
+  it('shows the folder name in a tooltip on hover', async () => {
+    const { user } = renderApp('/folders/1')
+    const name = await screen.findByText('dev')
+    await user.hover(name)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('dev')
+  })
+
   it('offers Retry when the roots fail to load', async () => {
     server.use(
       http.get('/api/folders/roots', () => HttpResponse.json({ title: 'boom' }, { status: 500 })),

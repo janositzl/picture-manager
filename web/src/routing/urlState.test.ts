@@ -16,8 +16,15 @@ describe('parseId', () => {
 })
 
 describe('parseGridParams', () => {
-  it('defaults to date, newest first, no image', () =>
-    expect(parseGridParams(params(''))).toEqual({ sort: 'date', order: 'desc', image: null }))
+  it('defaults to name, ascending, no image', () =>
+    expect(parseGridParams(params(''))).toEqual({ sort: 'name', order: 'asc', image: null }))
+
+  it('defaults date sorts to descending', () =>
+    expect(parseGridParams(params('?sort=date'))).toEqual({
+      sort: 'date',
+      order: 'desc',
+      image: null,
+    }))
 
   it('defaults name sorts to ascending', () =>
     expect(parseGridParams(params('?sort=name'))).toEqual({
@@ -35,8 +42,8 @@ describe('parseGridParams', () => {
 
   it('falls back on invalid values and drops an invalid image id', () =>
     expect(parseGridParams(params('?sort=size&order=up&image=abc'))).toEqual({
-      sort: 'date',
-      order: 'desc',
+      sort: 'name',
+      order: 'asc',
       image: null,
     }))
 })

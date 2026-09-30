@@ -1,4 +1,10 @@
-import { queryOptions, useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  queryOptions,
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { apiFetch } from './client'
 import { toImageQuery, type ImageFilter } from './imageFilter'
@@ -55,6 +61,9 @@ export function useFolder(id: number | null) {
     queryKey: queryKeys.folder(id ?? 0),
     queryFn: ({ signal }) => apiFetch<FolderDetail>(`/api/folders/${id}`, { signal }),
     enabled: id !== null,
+    // Keeps the previously selected folder's detail (and the tree's auto-expand path) on screen
+    // while the next one loads, instead of flashing back to a pending state on every navigation.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -69,6 +78,9 @@ export function useImages(filter: ImageFilter, options: UseImagesOptions = {}) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: Page<ImageListItem>) => lastPage.nextCursor,
     refetchOnMount: options.refetchOnMount ?? true,
+    // Keeps the previous folder/filter's photos on screen while the new ones load, instead of
+    // blanking the grid to a skeleton on every navigation.
+    placeholderData: keepPreviousData,
   })
 }
 

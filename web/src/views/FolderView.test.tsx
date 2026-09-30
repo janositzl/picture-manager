@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { madeiraImages } from '../test/fixtures'
+import { folderDetails, madeiraImages } from '../test/fixtures'
 import { pagedImages } from '../test/handlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
@@ -61,19 +61,19 @@ describe('FolderView', () => {
     await waitFor(() => expect(requests.some((q) => q.get('cursor') === 'p1')).toBe(true))
 
     await user.click(screen.getByRole('combobox', { name: /Sort/ }))
-    await user.click(await screen.findByRole('option', { name: 'Name' }))
+    await user.click(await screen.findByRole('option', { name: 'Date' }))
 
-    await waitFor(() => expect(requests.some((q) => q.get('sort') === 'name')).toBe(true))
-    const firstNameRequest = requests.find((q) => q.get('sort') === 'name')!
-    expect(firstNameRequest.get('order')).toBe('asc')
-    expect(firstNameRequest.get('cursor')).toBeNull()
-    expect(router.state.location.search).toBe('?sort=name')
+    await waitFor(() => expect(requests.some((q) => q.get('sort') === 'date')).toBe(true))
+    const firstDateRequest = requests.find((q) => q.get('sort') === 'date')!
+    expect(firstDateRequest.get('order')).toBe('desc')
+    expect(firstDateRequest.get('cursor')).toBeNull()
+    expect(router.state.location.search).toBe('?sort=date')
   })
 
   it('toggles the direction', async () => {
     const { user, router } = renderApp('/folders/3')
-    await user.click(await screen.findByRole('button', { name: 'Descending, switch to ascending' }))
-    expect(router.state.location.search).toBe('?order=asc')
+    await user.click(await screen.findByRole('button', { name: 'Ascending, switch to descending' }))
+    expect(router.state.location.search).toBe('?order=desc')
   })
 
   it('puts the photo in the URL when a tile is clicked', async () => {
@@ -95,6 +95,25 @@ describe('FolderView', () => {
     server.use(pagedImages([madeiraImages.slice(0, 2), madeiraImages.slice(2)]))
     renderApp('/folders/3')
     expect(await screen.findByRole('button', { name: 'IMG_0003.jpg' })).toBeInTheDocument()
+  })
+
+  it('keeps the previous folder visible while the next one loads, instead of flashing a blank skeleton', async () => {
+    server.use(
+      http.get('/api/folders/3', async () => {
+        await delay(50)
+        return HttpResponse.json(folderDetails[3])
+      }),
+    )
+    const { user } = renderApp('/folders/2')
+    expect(await screen.findByRole('heading', { name: 'Holidays' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('treeitem', { name: 'Madeira' }))
+
+    // While folder 3 is still loading, the previous folder's content must stay put — no blank skeleton.
+    expect(screen.queryByLabelText('Loading photos')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Holidays' })).toBeInTheDocument()
+
+    expect(await screen.findByRole('heading', { name: 'Madeira' })).toBeInTheDocument()
   })
 
   it('offers Retry when photos fail to load', async () => {

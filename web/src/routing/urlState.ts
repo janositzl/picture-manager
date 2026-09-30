@@ -18,7 +18,7 @@ export function parseId(value: string | null): number | null {
 
 /** Invalid sort/order values fall back to the defaults; an invalid image id is dropped. */
 export function parseGridParams(params: URLSearchParams): GridParams {
-  const sort: Sort = params.get('sort') === 'name' ? 'name' : 'date'
+  const sort: Sort = params.get('sort') === 'date' ? 'date' : 'name'
   const rawOrder = params.get('order')
   const order: Order = rawOrder === 'asc' || rawOrder === 'desc' ? rawOrder : defaultOrder(sort)
   return { sort, order, image: parseId(params.get('image')) }

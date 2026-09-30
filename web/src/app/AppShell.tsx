@@ -7,7 +7,13 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { AppBar, Box, Button, IconButton, Toolbar, Typography } from '@mui/material'
 import { Aperture } from 'lucide-react'
-import { useState, type ComponentType } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { Link as RouterLink, Outlet, useLocation } from 'react-router'
 import { ACCENT, ACCENT_SOFT, ACCENT_TEXT, HEADING_SX } from '../design/accent'
 import { SearchBox } from '../search/SearchBox'
@@ -16,13 +22,27 @@ import { FolderTree } from '../tree/FolderTree'
 import { JobStatusBanner } from '../tree/JobStatusBanner'
 
 const TREE_COLLAPSED_KEY = 'pm.tree.collapsed'
+const TREE_WIDTH_KEY = 'pm.tree.width'
+const TREE_DEFAULT_WIDTH = 280
+const TREE_MIN_WIDTH = 200
+const TREE_MAX_WIDTH = 480
 
-const NAV_ITEMS: Array<{ to: string; label: string; icon: ComponentType<{ fontSize?: 'small' }> }> = [
-  { to: '/', label: 'Folders', icon: FolderOutlinedIcon },
-  { to: '/favorites', label: 'Favorites', icon: StarBorderIcon },
-  { to: '/albums', label: 'Albums', icon: PhotoLibraryOutlinedIcon },
-  { to: '/duplicates', label: 'Duplicates', icon: ContentCopyOutlinedIcon },
-]
+function clampTreeWidth(width: number): number {
+  return Math.min(TREE_MAX_WIDTH, Math.max(TREE_MIN_WIDTH, width))
+}
+
+function readTreeWidth(): number {
+  const stored = Number(readStored(TREE_WIDTH_KEY))
+  return Number.isFinite(stored) && stored > 0 ? clampTreeWidth(stored) : TREE_DEFAULT_WIDTH
+}
+
+const NAV_ITEMS: Array<{ to: string; label: string; icon: ComponentType<{ fontSize?: 'small' }> }> =
+  [
+    { to: '/', label: 'Folders', icon: FolderOutlinedIcon },
+    { to: '/favorites', label: 'Favorites', icon: StarBorderIcon },
+    { to: '/albums', label: 'Albums', icon: PhotoLibraryOutlinedIcon },
+    { to: '/duplicates', label: 'Duplicates', icon: ContentCopyOutlinedIcon },
+  ]
 
 /** "/" immediately redirects to /folders/:id, so the Folders tab must match that whole subtree too. */
 function isNavActive(pathname: string, to: string): boolean {
@@ -31,7 +51,9 @@ function isNavActive(pathname: string, to: string): boolean {
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => readStored(TREE_COLLAPSED_KEY) === 'true')
+  const [treeWidth, setTreeWidth] = useState(readTreeWidth)
   const location = useLocation()
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
   const toggleCollapsed = () => {
     const next = !collapsed
@@ -39,9 +61,43 @@ export function AppShell() {
     writeStored(TREE_COLLAPSED_KEY, String(next))
   }
 
+  const onResizePointerDown = (event: ReactPointerEvent) => {
+    dragRef.current = { startX: event.clientX, startWidth: treeWidth }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (drag === null) return
+      setTreeWidth(clampTreeWidth(drag.startWidth + (event.clientX - drag.startX)))
+    }
+    const onPointerUp = () => {
+      if (dragRef.current === null) return
+      dragRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setTreeWidth((current) => {
+        writeStored(TREE_WIDTH_KEY, String(current))
+        return current
+      })
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [])
+
   return (
     <div className="flex h-screen flex-col">
-      <AppBar position="static" elevation={0} sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{ bgcolor: 'background.paper', color: 'text.primary' }}
+      >
         <Toolbar variant="dense" sx={{ gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0 }}>
             <Box
@@ -107,17 +163,36 @@ export function AppShell() {
         <Box
           component="nav"
           aria-label="Folders"
+          style={{ width: collapsed ? 44 : treeWidth }}
           sx={{
-            width: collapsed ? 44 : 280,
+            position: 'relative',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             borderRight: 1,
             borderColor: 'divider',
-            transition: 'width 0.2s ease-in-out',
+            transition: dragRef.current === null ? 'width 0.2s ease-in-out' : 'none',
           }}
         >
+          {!collapsed && (
+            <Box
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize folder panel"
+              onPointerDown={onResizePointerDown}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                right: -3,
+                width: 6,
+                cursor: 'col-resize',
+                zIndex: 1,
+                '&:hover': { bgcolor: 'action.hover' },
+              }}
+            />
+          )}
           {collapsed ? (
             <IconButton
               size="small"
