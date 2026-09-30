@@ -13,6 +13,7 @@ export const devRoot: FolderNode = {
   imageCount: 0,
   isMissing: false,
   isExcluded: false,
+  isScanned: false,
 }
 export const holidays: FolderNode = {
   id: 2,
@@ -21,6 +22,7 @@ export const holidays: FolderNode = {
   imageCount: 2,
   isMissing: false,
   isExcluded: false,
+  isScanned: false,
 }
 export const madeira: FolderNode = {
   id: 3,
@@ -29,6 +31,7 @@ export const madeira: FolderNode = {
   imageCount: 3,
   isMissing: false,
   isExcluded: false,
+  isScanned: true,
 }
 export const old: FolderNode = {
   id: 4,
@@ -37,6 +40,7 @@ export const old: FolderNode = {
   imageCount: 1,
   isMissing: true,
   isExcluded: false,
+  isScanned: false,
 }
 export const excludedFolder: FolderNode = {
   id: 5,
@@ -45,6 +49,7 @@ export const excludedFolder: FolderNode = {
   imageCount: 0,
   isMissing: false,
   isExcluded: true,
+  isScanned: false,
 }
 export const excludedChild: FolderNode = {
   id: 6,
@@ -53,6 +58,7 @@ export const excludedChild: FolderNode = {
   imageCount: 0,
   isMissing: false,
   isExcluded: false,
+  isScanned: false,
 }
 
 export const rootFolders: FolderNode[] = [devRoot]

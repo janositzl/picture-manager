@@ -208,7 +208,8 @@ public sealed class FolderRepository : IFolderRepository
                 f.Children.Any(c => c.IsActive),
                 f.Images.Count(i => i.MissingSinceUtc == null),
                 f.MissingSinceUtc != null,
-                f.IsExcluded));
+                f.IsExcluded,
+                f.LastScannedAt != null));
 
     // "", "a", "a/b" for "a/b": the root's top folder plus every ancestor and the folder itself.
     private static List<string> AncestorPaths(string relativePath)

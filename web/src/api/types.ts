@@ -5,6 +5,8 @@ export type FolderNode = {
   imageCount: number
   isMissing: boolean
   isExcluded: boolean
+  /** True once a scan of this folder has completed. */
+  isScanned: boolean
 }
 
 export type BreadcrumbItem = { id: number; name: string }

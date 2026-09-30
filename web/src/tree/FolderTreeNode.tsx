@@ -1,4 +1,5 @@
 import BlockIcon from '@mui/icons-material/Block'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined'
@@ -129,6 +130,11 @@ export function FolderTreeNode({
             }}
           />
         </Tooltip>
+        {node.isScanned && !excluded && (
+          <Tooltip title="Scanned">
+            <CheckCircleOutlinedIcon fontSize="inherit" color="success" sx={{ ml: 0.5, fontSize: 14 }} />
+          </Tooltip>
+        )}
         {expanded && children.isFetching && <CircularProgress size={14} />}
         <FolderActionsMenu
           folderId={node.id}
