@@ -146,6 +146,18 @@ export function AlbumView() {
     setDialog(null)
   }
 
+  // The viewer's Shift+D: no confirmation, like Shift+A adding without one.
+  const removeFromViewer = async (imageId: number): Promise<boolean> => {
+    try {
+      await removeImages.mutateAsync({ imageIds: [imageId] })
+      notify(`Removed 1 photo from ${detail.name}.`)
+      return true
+    } catch {
+      notify("Couldn't remove photo.")
+      return false
+    }
+  }
+
   const confirmSort = async () => {
     if (sortBy === null) return
     try {
@@ -290,6 +302,7 @@ export function AlbumView() {
       {body}
       {image !== null && (
         <PhotoViewer
+          onRemoveFromAlbum={removeFromViewer}
           list={{
             items,
             hasNextPage: images.hasNextPage,

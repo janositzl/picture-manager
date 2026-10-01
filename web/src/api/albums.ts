@@ -73,6 +73,16 @@ export function useRemoveFromAlbum(albumId: number) {
   })
 }
 
+/** Removal where the album is only known at call time (the viewer's Shift+D outside an album). */
+export function useRemoveImagesFromAlbum() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ albumId, imageIds }: { albumId: number; imageIds: number[] }) =>
+      apiFetch<void>(`/api/albums/${albumId}/images/remove`, jsonRequest('POST', { imageIds })),
+    onSuccess: (_result, { albumId }) => refreshAlbumContents(queryClient, albumId),
+  })
+}
+
 export type AlbumSort = 'dateAsc' | 'dateDesc' | 'name'
 
 /** Rewrites the album's stored order; the grid and exports then follow it. */

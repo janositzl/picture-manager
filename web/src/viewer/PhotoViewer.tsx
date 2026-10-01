@@ -5,17 +5,28 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
-import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
+import { AlbumRemovePicker } from '../albums/AlbumRemovePicker'
 import { readLastUsedAlbum, writeLastUsedAlbum } from '../albums/preferences'
 import { useAlbumAdder } from '../albums/useAlbumAdder'
 import { isNotFound } from '../api/client'
+import { useRemoveImagesFromAlbum } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
 import { albumsQuery, useImage } from '../api/queries'
-import type { ImageListItem } from '../api/types'
+import type { AlbumRef, ImageListItem } from '../api/types'
 import { useNotify } from '../app/notify'
 import { parseGridParams, withParams } from '../routing/urlState'
 import { InfoPanel } from './InfoPanel'
@@ -51,7 +62,14 @@ export type ViewerList = {
 const isMissingItem = (item: object): boolean => 'isMissing' in item && item.isMissing === true
 
 /** Full-screen viewer for ?image=, stepping through the same cached list as the grid below it. */
-export function PhotoViewer({ list }: { list: ViewerList }) {
+export function PhotoViewer({
+  list,
+  onRemoveFromAlbum,
+}: {
+  list: ViewerList
+  /** Set when the list is an album: Shift+D removes from it. Resolves true once the photo is removed. */
+  onRemoveFromAlbum?: (imageId: number) => Promise<boolean>
+}) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -65,6 +83,8 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   const notify = useNotify()
   const { addTo } = useAlbumAdder()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const removeFromAlbum = useRemoveImagesFromAlbum()
+  const [removeChoices, setRemoveChoices] = useState<AlbumRef[] | null>(null)
 
   const items = list.items
   const index = imageId === null ? -1 : items.findIndex((item) => item.id === imageId)
@@ -96,6 +116,43 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
     } else if (outcome === 'failed') {
       notify("Couldn't add photos.")
     }
+  }
+
+  const removeFrom = async (album: AlbumRef, imageId: number) => {
+    try {
+      await removeFromAlbum.mutateAsync({ albumId: album.id, imageIds: [imageId] })
+      notify(`Removed 1 photo from ${album.name}.`)
+      return true
+    } catch {
+      notify("Couldn't remove photo.")
+      return false
+    }
+  }
+
+  // Shift+D. In an album view: drop the photo from that album and move on to its neighbour.
+  // Elsewhere: remove it from the last used album if it's in it, else from its only album;
+  // a photo in several others asks which.
+  const quickRemove = async () => {
+    if (current === undefined) return
+    if (onRemoveFromAlbum !== undefined) {
+      if (!inList) return
+      const neighbour = next ?? prev
+      if (!(await onRemoveFromAlbum(current.id))) return
+      if (neighbour !== undefined) show(neighbour.id)
+      else close()
+      return
+    }
+    if (detail.data === undefined || detail.data.id !== current.id) return
+    const albums = detail.data.albums
+    if (albums.length === 0) {
+      notify("This photo isn't in any album.")
+      return
+    }
+    const lastId = readLastUsedAlbum()
+    const target =
+      albums.find((a) => a.id === lastId) ?? (albums.length === 1 ? albums[0] : undefined)
+    if (target === undefined) setRemoveChoices(albums)
+    else await removeFrom(target, current.id)
   }
 
   // Stepping replaces the entry, so Back closes the viewer instead of replaying every photo.
@@ -144,7 +201,7 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
   }, [next])
 
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (pickerOpen) return
+    if (pickerOpen || removeChoices !== null) return
     if (event.altKey || event.ctrlKey || event.metaKey) return
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea')) return
     switch (event.key) {
@@ -175,6 +232,10 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
         event.preventDefault()
         if (event.shiftKey) void quickAdd()
         else if (canAdd) setPickerOpen(true)
+        break
+      case 'd':
+      case 'D':
+        if (event.shiftKey) void quickRemove()
         break
     }
   })
@@ -258,60 +319,87 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
           >
             {stage}
             {canGoPrev && (
-              <IconButton
-                aria-label="Previous photo"
-                onClick={goPrev}
-                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
-                sx={{
-                  position: 'absolute',
-                  left: 12,
-                  color: 'common.white',
-                  bgcolor: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(4px)',
-                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
-                }}
-              >
-                <ChevronLeftIcon fontSize="large" />
-              </IconButton>
-            )}
-            {canGoNext && (
-              <IconButton
-                aria-label="Next photo"
-                onClick={goNext}
-                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
-                sx={{
-                  position: 'absolute',
-                  right: 12,
-                  color: 'common.white',
-                  bgcolor: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(4px)',
-                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
-                }}
-              >
-                <ChevronRightIcon fontSize="large" />
-              </IconButton>
-            )}
-            <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 0.75 }}>
-              {current !== undefined && (
+              <Tooltip title="Previous photo (←)">
                 <IconButton
-                  aria-label={current.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                  aria-pressed={current.isFavorite}
-                  onClick={toggleFavorite}
+                  aria-label="Previous photo"
+                  onClick={goPrev}
                   className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
                   sx={{
-                    color: 'warning.main',
+                    position: 'absolute',
+                    left: 12,
+                    color: 'common.white',
                     bgcolor: 'rgba(0,0,0,0.35)',
                     backdropFilter: 'blur(4px)',
                     '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
                   }}
                 >
-                  {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                  <ChevronLeftIcon fontSize="large" />
                 </IconButton>
+              </Tooltip>
+            )}
+            {canGoNext && (
+              <Tooltip title="Next photo (→)">
+                <IconButton
+                  aria-label="Next photo"
+                  onClick={goNext}
+                  className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                  sx={{
+                    position: 'absolute',
+                    right: 12,
+                    color: 'common.white',
+                    bgcolor: 'rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(4px)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                  }}
+                >
+                  <ChevronRightIcon fontSize="large" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 0.75 }}>
+              {current !== undefined && (
+                <Tooltip
+                  title={current.isFavorite ? 'Remove from favorites (F)' : 'Add to favorites (F)'}
+                >
+                  <IconButton
+                    aria-label={current.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    aria-pressed={current.isFavorite}
+                    onClick={toggleFavorite}
+                    className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                    sx={{
+                      color: 'warning.main',
+                      bgcolor: 'rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(4px)',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                    }}
+                  >
+                    {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                  </IconButton>
+                </Tooltip>
               )}
               {canAdd && (
+                <Tooltip title="Add to album (A, Shift+A for last used)">
+                  <IconButton
+                    aria-label="Add to album"
+                    onClick={() => setPickerOpen(true)}
+                    className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                    sx={{
+                      color: 'common.white',
+                      bgcolor: 'rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(4px)',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                    }}
+                  >
+                    <PlaylistAddIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Tooltip
+                title={`${infoOpen ? 'Hide info' : 'Show info'} (I)${current === undefined ? '' : ` – ${name}`}`}
+              >
                 <IconButton
-                  aria-label="Add to album"
-                  onClick={() => setPickerOpen(true)}
+                  aria-label={infoOpen ? 'Hide info' : 'Show info'}
+                  onClick={toggleInfo}
                   className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
                   sx={{
                     color: 'common.white',
@@ -320,35 +408,24 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
                     '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
                   }}
                 >
-                  <PlaylistAddIcon />
+                  <InfoOutlinedIcon />
                 </IconButton>
-              )}
-              <IconButton
-                aria-label={infoOpen ? 'Hide info' : 'Show info'}
-                onClick={toggleInfo}
-                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
-                sx={{
-                  color: 'common.white',
-                  bgcolor: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(4px)',
-                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
-                }}
-              >
-                <InfoOutlinedIcon />
-              </IconButton>
-              <IconButton
-                aria-label="Close viewer"
-                onClick={close}
-                className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
-                sx={{
-                  color: 'common.white',
-                  bgcolor: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(4px)',
-                  '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
-                }}
-              >
-                <CloseIcon />
-              </IconButton>
+              </Tooltip>
+              <Tooltip title="Close (Esc)">
+                <IconButton
+                  aria-label="Close viewer"
+                  onClick={close}
+                  className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                  sx={{
+                    color: 'common.white',
+                    bgcolor: 'rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(4px)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                  }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </Tooltip>
             </Box>
           </Box>
           {infoOpen && !notFound && (
@@ -361,6 +438,18 @@ export function PhotoViewer({ list }: { list: ViewerList }) {
           )}
         </Box>
       </Dialog>
+      {removeChoices !== null && current !== undefined && (
+        <AlbumRemovePicker
+          albums={removeChoices}
+          disabled={removeFromAlbum.isPending}
+          onChoose={(album) =>
+            void removeFrom(album, current.id).then((removed) => {
+              if (removed) setRemoveChoices(null)
+            })
+          }
+          onClose={() => setRemoveChoices(null)}
+        />
+      )}
       {pickerOpen && current !== undefined && (
         <AlbumPicker target={{ imageIds: [current.id] }} onClose={() => setPickerOpen(false)} />
       )}
