@@ -7,7 +7,7 @@ import { createTestQueryClient, createWrapper } from '../test/render'
 import { server } from '../test/server'
 import { patchFavorite } from './favorites'
 import { queryKeys, useAlbumImages, useAlbums, useDuplicates } from './queries'
-import type { DuplicateGroup, Page } from './types'
+import type { DuplicateGroup, Page, SimilarGroup } from './types'
 
 function setup() {
   const queryClient = createTestQueryClient()
@@ -78,6 +78,25 @@ describe('album and duplicate queries', () => {
     patchFavorite(queryClient, 20, true)
     const data = queryClient.getQueryData<InfiniteData<Page<DuplicateGroup>>>(
       queryKeys.duplicates(),
+    )
+    expect(data?.pages[0]?.items[0]?.images.find((i) => i.id === 20)?.isFavorite).toBe(true)
+  })
+
+  it('a star change also updates copies inside cached similar groups', () => {
+    const { queryClient } = setup()
+    const group: SimilarGroup = {
+      key: 'S1',
+      count: 2,
+      maxDistance: 3,
+      images: duplicateGroups[0]!.images,
+    }
+    queryClient.setQueryData<InfiniteData<Page<SimilarGroup>, string | null>>(
+      queryKeys.similarDuplicates(),
+      { pages: [{ items: [group], nextCursor: null }], pageParams: [null] },
+    )
+    patchFavorite(queryClient, 20, true)
+    const data = queryClient.getQueryData<InfiniteData<Page<SimilarGroup>>>(
+      queryKeys.similarDuplicates(),
     )
     expect(data?.pages[0]?.items[0]?.images.find((i) => i.id === 20)?.isFavorite).toBe(true)
   })

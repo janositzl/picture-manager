@@ -13,6 +13,7 @@ import type {
   AlbumImageItem,
   AlbumSummary,
   DuplicateGroup,
+  SimilarGroup,
   FolderDetail,
   FolderNode,
   ImageDetail,
@@ -35,7 +36,9 @@ export const queryKeys = {
   albumExport: (id: number, prefix: string) => ['albums', id, 'export', prefix] as const,
   // Under the photo-list prefix, so patchFavorite updates album tiles too.
   albumImages: (id: number) => ['images', 'list', { kind: 'album', albumId: id }] as const,
+  // Both live under the 'duplicates' prefix, so patchFavorite reaches the exact and similar caches.
   duplicates: () => ['duplicates'] as const,
+  similarDuplicates: () => ['duplicates', 'similar'] as const,
   settings: () => ['settings'] as const,
   roots: () => ['roots'] as const,
   removedFolders: () => ['folders', 'removed'] as const,
@@ -157,6 +160,21 @@ export function useDuplicates() {
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: Page<DuplicateGroup>) => lastPage.nextCursor,
+  })
+}
+
+/** Groups of visually similar photos; only fetches while Similar mode is shown. */
+export function useSimilarDuplicates(enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.similarDuplicates(),
+    queryFn: ({ pageParam, signal }) =>
+      apiFetch<Page<SimilarGroup>>(
+        `/api/duplicates/similar?${pageQuery(pageParam, DUPLICATES_PAGE_SIZE)}`,
+        { signal },
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage: Page<SimilarGroup>) => lastPage.nextCursor,
+    enabled,
   })
 }
 

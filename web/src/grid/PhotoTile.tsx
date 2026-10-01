@@ -3,7 +3,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
-import { Box, Checkbox, IconButton, Typography } from '@mui/material'
+import { Box, Checkbox, Chip, IconButton, Typography } from '@mui/material'
 import { memo, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import type { ImageListItem } from '../api/types'
 import type { SelectMods } from './useSelection'
@@ -25,6 +25,8 @@ type Props = {
   item: ImageListItem
   size: number
   caption: string | null
+  /** A small label pinned to the tile's top edge, e.g. "Largest". */
+  badge?: string
   dimmed: boolean
   missing?: boolean
   selecting?: boolean
@@ -41,6 +43,7 @@ function PhotoTileComponent({
   item,
   size,
   caption,
+  badge,
   dimmed,
   missing = false,
   selecting = false,
@@ -195,6 +198,20 @@ function PhotoTileComponent({
             transition: 'background-color 0.2s ease-in-out',
             '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
             '&.Mui-checked': { color: 'common.white' },
+          }}
+        />
+      )}
+      {badge !== undefined && (
+        <Chip
+          size="small"
+          label={badge}
+          sx={{
+            position: 'absolute',
+            top: 8,
+            left: 42,
+            color: 'common.white',
+            bgcolor: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(2px)',
           }}
         />
       )}

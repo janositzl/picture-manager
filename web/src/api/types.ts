@@ -38,6 +38,8 @@ export type ImageListItem = {
   folderPath: string
   /** True when the file couldn't be decoded as an image during enrichment (corrupt or misnamed). */
   isInvalid: boolean
+  /** Bytes; only present on similar-photo results. */
+  fileSize?: number
 }
 
 export type AlbumRef = { id: number; name: string }
@@ -87,6 +89,12 @@ export type AlbumImageItem = ImageListItem & { isMissing: boolean }
 
 export type AlbumAddResult = { added: number; skipped: number }
 
+export type SimilarGroup = {
+  key: string
+  count: number
+  maxDistance: number
+  images: ImageListItem[]
+}
 export type DuplicateGroup = { contentHash: string; count: number; images: ImageListItem[] }
 
 export type JobStatus =

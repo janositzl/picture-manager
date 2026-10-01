@@ -1,7 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import type { ImageListItem } from '../api/types'
 import { albumStore } from '../test/albumHandlers'
+import { holidaysImages, madeiraImages } from '../test/fixtures'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
@@ -58,5 +60,52 @@ describe('DuplicatesView', () => {
     const { user, router } = renderApp('/folders/3')
     await user.click(await screen.findByRole('link', { name: 'Duplicates' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/duplicates'))
+  })
+})
+
+const sized = (item: ImageListItem, width: number, height: number): ImageListItem => ({
+  ...item,
+  width,
+  height,
+  fileSize: 1000,
+})
+
+describe('DuplicatesView similar mode', () => {
+  it('switches to similar mode and shows the largest copy first with its resolution', async () => {
+    server.use(
+      http.get('/api/duplicates/similar', () =>
+        HttpResponse.json({
+          items: [
+            {
+              key: 'S1',
+              count: 3,
+              maxDistance: 4,
+              images: [
+                sized(madeiraImages[0]!, 4000, 3000),
+                sized(holidaysImages[0]!, 2000, 1500),
+                sized(madeiraImages[2]!, 800, 600),
+              ],
+            },
+          ],
+          nextCursor: null,
+        }),
+      ),
+    )
+    const { user, router } = renderApp('/duplicates')
+    await user.click(await screen.findByRole('button', { name: 'Similar' }))
+    expect(await screen.findByRole('heading', { name: '3 similar photos' })).toBeInTheDocument()
+    expect(router.state.location.search).toContain('mode=similar')
+    const first = screen.getByTestId(`tile-${madeiraImages[0]!.id}`)
+    expect(within(first).getByText(/4000 × 3000/)).toBeInTheDocument()
+    expect(within(first).getByText('Largest')).toBeInTheDocument()
+    expect(screen.getAllByText('Largest')).toHaveLength(1)
+  })
+
+  it('similar mode says when there are none', async () => {
+    server.use(
+      http.get('/api/duplicates/similar', () => HttpResponse.json({ items: [], nextCursor: null })),
+    )
+    renderApp('/duplicates?mode=similar')
+    expect(await screen.findByText('No similar photos found.')).toBeInTheDocument()
   })
 })
