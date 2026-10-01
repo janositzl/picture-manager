@@ -22,6 +22,7 @@ public class FaceRecognitionServiceTests
     private readonly IJobRepository _jobs = Substitute.For<IJobRepository>();
     private readonly IFaceRepository _faces = Substitute.For<IFaceRepository>();
     private readonly IFaceAnalyzer _analyzer = Substitute.For<IFaceAnalyzer>();
+    private readonly IFaceClusterer _clusterer = Substitute.For<IFaceClusterer>();
     private readonly IFaceRecognitionQueue _queue = Substitute.For<IFaceRecognitionQueue>();
     private readonly IFaceImageProcessor _processor = Substitute.For<IFaceImageProcessor>();
     private readonly JobCancellationRegistry _cancellations = new();
@@ -48,7 +49,7 @@ public class FaceRecognitionServiceTests
             .AddScoped(_ => _jobs)
             .BuildServiceProvider();
         return new FaceRecognitionService(
-            _folders, _roots, _jobs, _faces, _analyzer, _queue, _cancellations,
+            _folders, _roots, _jobs, _faces, _analyzer, _clusterer, _queue, _cancellations,
             provider.GetRequiredService<IServiceScopeFactory>(),
             new FaceRecognitionOptions { ReadConcurrency = 1, InferenceConcurrency = 1 }, _clock);
     }
@@ -88,6 +89,7 @@ public class FaceRecognitionServiceTests
         await _jobs.Received(1).TryTransitionToEnrichingAsync(50, Arg.Any<CancellationToken>());
         await _processor.Received(3).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>());
         await _jobs.Received(3).IncrementFaceProgressAsync(50, 1, Arg.Any<CancellationToken>());
+        await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
         await _jobs.Received(1).TryMarkCompletedAsync(50, JobStatus.Enriching, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Pgvector;
+using Pgvector.EntityFrameworkCore;
 using PictureManager.Application.Faces;
 using PictureManager.Application.Repositories;
 using PictureManager.Infrastructure.Persistence.Queries;
@@ -147,4 +148,56 @@ public sealed class FaceRepository : IFaceRepository
         state.ErrorMessage = errorMessage;
         state.ProcessedUtc = nowUtc;
     }
+
+    public async Task<IReadOnlyList<FaceCandidate>> GetUnassignedFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
+        await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.FaceModelId == faceModelId && f.AssignmentState == FaceAssignmentState.Unassigned && f.QualityScore >= minQuality)
+            .OrderByDescending(f => f.QualityScore)
+            .Select(f => new FaceCandidate(f.Id, f.QualityScore))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(
+        int faceId, int faceModelId, NeighborPool pool, int k, CancellationToken cancellationToken = default)
+    {
+        var embedding = await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.Id == faceId).Select(f => f.Embedding).FirstOrDefaultAsync(cancellationToken);
+        if (embedding is null)
+            return Array.Empty<FaceNeighbor>();
+
+        var faces = _dbContext.Faces.AsNoTracking().Where(f => f.FaceModelId == faceModelId && f.Id != faceId);
+        faces = pool == NeighborPool.Assigned
+            ? faces.Where(f => f.PersonId != null
+                               && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed))
+            : faces.Where(f => f.AssignmentState == FaceAssignmentState.Unassigned);
+
+        return await faces
+            .OrderBy(f => f.Embedding.CosineDistance(embedding))
+            .Take(k)
+            .Select(f => new FaceNeighbor(f.Id, f.PersonId, (float)f.Embedding.CosineDistance(embedding)))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Faces
+            .Where(f => faceIds.Contains(f.Id) && f.AssignmentState == FaceAssignmentState.Unassigned)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(f => f.PersonId, personId)
+                .SetProperty(f => f.AssignmentState, FaceAssignmentState.Auto),
+                cancellationToken);
+    }
+
+    public async Task<int> CreateUnnamedPersonAsync(int coverFaceId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        var person = new Person { CoverFaceId = coverFaceId, CreatedUtc = nowUtc, ModifiedUtc = nowUtc };
+        _dbContext.People.Add(person);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        _dbContext.ChangeTracker.Clear();
+        return person.Id;
+    }
+
+    public Task<int> DeleteEmptyUnnamedPeopleAsync(CancellationToken cancellationToken = default) =>
+        _dbContext.People
+            .Where(p => p.Name == null && !_dbContext.Faces.Any(f => f.PersonId == p.Id))
+            .ExecuteDeleteAsync(cancellationToken);
 }

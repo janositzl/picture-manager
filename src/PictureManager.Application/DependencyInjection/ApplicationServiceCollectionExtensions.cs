@@ -30,6 +30,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IDuplicateService, DuplicateService>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<IFaceImageProcessor, FaceImageProcessor>();
+        services.AddScoped<IFaceClusterer, FaceClusterer>();
         services.AddScoped<IFaceRecognitionService, FaceRecognitionService>();
 
         return services;

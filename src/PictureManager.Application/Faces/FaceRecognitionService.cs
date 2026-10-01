@@ -21,6 +21,7 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
     private readonly IJobRepository _jobRepository;
     private readonly IFaceRepository _faceRepository;
     private readonly IFaceAnalyzer _analyzer;
+    private readonly IFaceClusterer _clusterer;
     private readonly IFaceRecognitionQueue _queue;
     private readonly IJobCancellationRegistry _cancellations;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -33,6 +34,7 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         IJobRepository jobRepository,
         IFaceRepository faceRepository,
         IFaceAnalyzer analyzer,
+        IFaceClusterer clusterer,
         IFaceRecognitionQueue queue,
         IJobCancellationRegistry cancellations,
         IServiceScopeFactory scopeFactory,
@@ -44,6 +46,7 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         _jobRepository = jobRepository;
         _faceRepository = faceRepository;
         _analyzer = analyzer;
+        _clusterer = clusterer;
         _queue = queue;
         _cancellations = cancellations;
         _scopeFactory = scopeFactory;
@@ -103,6 +106,9 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
                 var result = await processor.ProcessAsync(imageId, faceModelId, token);
                 await jobs.IncrementFaceProgressAsync(job.JobId, result.FacesFound, token);
             });
+
+            // Global, current model only. Runs after every job so newly detected faces join people at once.
+            await _clusterer.ClusterAsync(faceModelId, cancellationToken);
 
             await _jobRepository.TryMarkCompletedAsync(job.JobId, JobStatus.Enriching, _clock.UtcNow, cancellationToken);
         }
