@@ -7,7 +7,9 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 services:
   db:
-    image: postgres:17-alpine
+    build:
+      context: ./docker/postgres
+    image: picturemanager-postgres:17-pgvector
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-picturemanager}

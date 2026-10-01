@@ -10,7 +10,9 @@
 # IMAGE_LIBRARY_PATH, IMAGE_ROOT_NAME) — see .env.prod.example.
 services:
   db:
-    image: postgres:17-alpine
+    build:
+      context: ./docker/postgres
+    image: picturemanager-postgres:17-pgvector
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-picturemanager}
