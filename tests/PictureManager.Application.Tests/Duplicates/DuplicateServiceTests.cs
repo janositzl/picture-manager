@@ -137,4 +137,43 @@ public class DuplicateServiceTests
         second.NextCursor.Should().BeNull();
         second.Items.Concat(first.Items).Select(g => g.Key).Should().OnlyHaveUniqueItems();
     }
+
+    [Fact]
+    public async Task ListSimilarAsync_NullDimensionMember_SortsLast_WithoutThrowing()
+    {
+        _images.GetPerceptualHashesAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new PerceptualHashRow(1, "0F0F0F0F0F0F0F0F"), new PerceptualHashRow(2, "0F0F0F0F0F0F0F0E")
+        });
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            Member(1, "H1", "png-original", "", null, null, 999),
+            Member(2, "H2", "jpeg-copy", "", 400, 300, 1)
+        });
+
+        var page = (await CreateService().ListSimilarAsync(null, null, null)).Value!;
+
+        page.Items.Single().Images.Select(i => i.Id).Should().Equal(2, 1);
+    }
+
+    [Fact]
+    public async Task ListSimilarAsync_MembersVanishBetweenQueries_CountMatchesImages_AndTinyGroupsAreSkipped()
+    {
+        _images.GetPerceptualHashesAsync(Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new PerceptualHashRow(1, "0F0F0F0F0F0F0F0F"), new PerceptualHashRow(2, "0F0F0F0F0F0F0F0E"), new PerceptualHashRow(3, "0F0F0F0F0F0F0F0C"),
+            new PerceptualHashRow(4, "AAAAAAAAAAAAAAAA"), new PerceptualHashRow(5, "AAAAAAAAAAAAAAA8")
+        });
+        // Image 3 vanished from the first cluster; image 5 vanished from the second, leaving it with one member.
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            Member(1, "H1", "a", ""), Member(2, "H2", "b", ""), Member(4, "H4", "d", "")
+        });
+
+        var page = (await CreateService().ListSimilarAsync(null, null, null)).Value!;
+
+        var group = page.Items.Should().ContainSingle().Subject;
+        group.Images.Should().HaveCount(2);
+        group.Count.Should().Be(2);
+    }
 }

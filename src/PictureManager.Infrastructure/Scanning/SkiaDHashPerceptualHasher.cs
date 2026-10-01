@@ -22,7 +22,10 @@ public sealed class SkiaDHashPerceptualHasher : IPerceptualHasher
         using var image = SKImage.FromBitmap(oriented);
         using var small = new SKBitmap(new SKImageInfo(Width, Height, SKColorType.Gray8, SKAlphaType.Opaque));
         using (var canvas = new SKCanvas(small))
+        {
+            canvas.Clear(SKColors.White); // alpha images composite on a fixed background, so hashes are deterministic
             canvas.DrawImage(image, new SKRect(0, 0, Width, Height), Downsample); // mipmaps avoid aliasing on big sources
+        }
 
         ulong hash = 0;
         for (var y = 0; y < Height; y++)

@@ -111,7 +111,11 @@ public sealed class DuplicateService : IDuplicateService
                 .ThenBy(m => m.Image.Id)
                 .Select(ToItem)
                 .ToList();
-            groups.Add(new SimilarGroup("s" + cluster.Min(), cluster.Count, MaxPairwiseDistance(cluster, hashes), images));
+            // Member rows can vanish between the hash query and this one; a group left with fewer than two
+            // images is no longer a group, so the page may come back shorter than the limit.
+            if (images.Count < 2)
+                continue;
+            groups.Add(new SimilarGroup("s" + cluster.Min(), images.Count, MaxPairwiseDistance(cluster, hashes), images));
         }
 
         var nextCursor = offset + take < clusters.Count

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
 using PictureManager.Model;
@@ -16,10 +17,11 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
     private readonly IImageValidator _imageValidator;
     private readonly IPerceptualHasher _perceptualHasher;
     private readonly IClock _clock;
+    private readonly ILogger<ImageEnrichmentService> _logger;
 
     public ImageEnrichmentService(
         IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IImageValidator imageValidator,
-        IPerceptualHasher perceptualHasher, IClock clock)
+        IPerceptualHasher perceptualHasher, IClock clock, ILogger<ImageEnrichmentService> logger)
     {
         _imageRepository = imageRepository;
         _contentHasher = contentHasher;
@@ -27,6 +29,7 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         _imageValidator = imageValidator;
         _perceptualHasher = perceptualHasher;
         _clock = clock;
+        _logger = logger;
     }
 
     public async Task EnrichAsync(int imageId, CancellationToken cancellationToken = default)
@@ -40,6 +43,11 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
 
         if (!File.Exists(physicalPath))
         {
+            // A missing or empty mount folder is a mount problem, not a deletion: leave the row untouched
+            // (its hash stays null, so it is retried on the next startup/rescan).
+            if (!ScanTargets.IsRootAvailable(image.Folder.Root.MountPath))
+                return;
+
             image.MissingSinceUtc = _clock.UtcNow;
             image.UpdatedAt = _clock.UtcNow;
             await _imageRepository.UpdateAsync(image, cancellationToken);
@@ -57,10 +65,14 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         {
             try
             {
-                perceptual = await _perceptualHasher.ComputeAsync(physicalPath, exif.Orientation, cancellationToken) ?? string.Empty;
+                var computed = await _perceptualHasher.ComputeAsync(physicalPath, exif.Orientation, cancellationToken);
+                if (computed is null)
+                    _logger.LogDebug("Perceptual hash unavailable (undecodable) for image {ImageId}", image.Id);
+                perceptual = computed ?? string.Empty;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                _logger.LogWarning(ex, "Perceptual hash failed for image {ImageId}; storing empty sentinel", image.Id);
                 perceptual = string.Empty;
             }
         }

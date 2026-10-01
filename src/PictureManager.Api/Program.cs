@@ -97,15 +97,6 @@ try
         if (requeued > 0)
             Log.Information("Re-queued {Count} image(s) left unenriched by an interrupted scan", requeued);
 
-        // Backfill perceptual hashes for images indexed before hashing existed. Only when the catch-up above
-        // queued nothing, so the two don't compete for the single "no active job" slot; it resumes next start.
-        if (requeued == 0)
-        {
-            var backfilled = await scanService.RequeueMissingPerceptualHashAsync();
-            if (backfilled > 0)
-                Log.Information("Queued {Count} indexed image(s) for perceptual-hash backfill", backfilled);
-        }
-
         // Discovery is cheap and takes priority over any queued scan (HasActiveJobAsync refuses a second job,
         // so this only fires when nothing else is running): a brand-new root, or one a previous discovery never
         // finished walking, gets queued here rather than waiting for a manual "Refresh structure".
@@ -126,6 +117,16 @@ try
                 // "Refresh structure" picks this root up.
                 break;
             }
+        }
+
+        // Backfill perceptual hashes for images indexed before hashing existed. Runs after discovery so discovery
+        // keeps priority for the single "no active job" slot (RequeueAsync does nothing while a job is active);
+        // skipped when the catch-up above queued something, and it resumes next start.
+        if (requeued == 0)
+        {
+            var backfilled = await scanService.RequeueMissingPerceptualHashAsync();
+            if (backfilled > 0)
+                Log.Information("Queued {Count} indexed image(s) for perceptual-hash backfill", backfilled);
         }
     }
 

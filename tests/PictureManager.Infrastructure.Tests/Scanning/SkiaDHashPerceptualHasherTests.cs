@@ -37,6 +37,21 @@ public sealed class SkiaDHashPerceptualHasherTests : IDisposable
         return bmp;
     }
 
+    [Fact]
+    public async Task ComputeAsync_TransparentImage_HashesLikeItsCompositionOnWhite()
+    {
+        // Transparent pixels must composite on a fixed white background, not on whatever the canvas holds.
+        using var transparent = new SKBitmap(new SKImageInfo(40, 40, SKColorType.Rgba8888, SKAlphaType.Premul));
+        transparent.Erase(SKColors.Transparent);
+        using var white = new SKBitmap(40, 40);
+        white.Erase(SKColors.White);
+
+        var a = await _hasher.ComputeAsync(Save(transparent, "t.png", SKEncodedImageFormat.Png, 100), null);
+        var b = await _hasher.ComputeAsync(Save(white, "w.png", SKEncodedImageFormat.Png, 100), null);
+
+        a.Should().Be(b);
+    }
+
     private static SKBitmap Resize(SKBitmap src, int w, int h) =>
         src.Resize(new SKImageInfo(w, h), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 
