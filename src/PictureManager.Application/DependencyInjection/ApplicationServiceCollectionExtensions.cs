@@ -3,6 +3,7 @@ using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
 using PictureManager.Application.Discovery;
 using PictureManager.Application.Duplicates;
+using PictureManager.Application.Faces;
 using PictureManager.Application.Folders;
 using PictureManager.Application.Images;
 using PictureManager.Application.Roots;
@@ -28,6 +29,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IAlbumService, AlbumService>();
         services.AddScoped<IDuplicateService, DuplicateService>();
         services.AddScoped<ISettingsService, SettingsService>();
+        services.AddScoped<IFaceImageProcessor, FaceImageProcessor>();
+        services.AddScoped<IFaceRecognitionService, FaceRecognitionService>();
 
         return services;
     }

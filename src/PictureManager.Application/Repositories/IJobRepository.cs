@@ -45,6 +45,9 @@ public interface IJobRepository
     /// <summary>Atomically increments FilesEnriched by 1.</summary>
     Task IncrementFilesEnrichedAsync(int scanJobId, CancellationToken cancellationToken = default);
 
+    /// <summary>Face recognition: atomically FilesEnriched += 1 and FacesFound += facesFound.</summary>
+    Task IncrementFaceProgressAsync(int jobId, int facesFound, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Atomically flips Status from Enriching to Completed (setting CompletedUtc) IF FilesEnriched
     /// is already &gt;= FilesFound. Returns whether a row was changed. Safe to call speculatively

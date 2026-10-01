@@ -115,6 +115,16 @@ public sealed class JobRepository : IJobRepository
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.FilesEnriched, j => j.FilesEnriched + 1), cancellationToken);
     }
 
+    public async Task IncrementFaceProgressAsync(int jobId, int facesFound, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Jobs
+            .Where(j => j.Id == jobId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(j => j.FilesEnriched, j => j.FilesEnriched + 1)
+                .SetProperty(j => j.FacesFound, j => j.FacesFound + facesFound),
+                cancellationToken);
+    }
+
     public async Task<bool> TryMarkCompletedIfEnrichedAsync(int scanJobId, DateTime completedUtc, CancellationToken cancellationToken = default)
     {
         var rows = await _dbContext.Jobs
