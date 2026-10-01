@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PictureManager.Application.Discovery;
+using PictureManager.Application.Faces;
 using PictureManager.Application.Scanning;
 using PictureManager.Worker.Discovery;
+using PictureManager.Worker.Faces;
 using PictureManager.Worker.Scanning;
 
 namespace PictureManager.Worker.DependencyInjection;
@@ -17,6 +19,9 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<ScanBackgroundService>();
         services.AddSingleton<IDiscoveryQueue, ChannelDiscoveryQueue>();
         services.AddHostedService<DiscoveryBackgroundService>();
+
+        services.AddSingleton<IFaceRecognitionQueue, ChannelFaceRecognitionQueue>();
+        services.AddHostedService<FaceRecognitionBackgroundService>();
 
         return services;
     }
