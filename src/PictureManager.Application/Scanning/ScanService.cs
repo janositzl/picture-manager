@@ -52,27 +52,7 @@ public sealed class ScanService : IScanService
         if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
             throw new ScanAlreadyInProgressException();
 
-        int? jobFolderId = null;
-        if (folderId.HasValue)
-        {
-            var (_, folder) = await ScanTargets.GetVisibleFolderAsync(_folderRepository, _imageRootRepository, folderId.Value, cancellationToken);
-
-            // The walk couldn't reach it; scanning or discovering its parent is what notices it's back.
-            if (folder.MissingSinceUtc is not null)
-                throw FolderUnavailableException.Missing(folderId.Value);
-
-            if (folder.IsExcluded || await _folderRepository.HasExcludedAncestorAsync(folder.Id, cancellationToken))
-                throw FolderUnavailableException.Excluded(folderId.Value);
-
-            jobFolderId = folder.Id;
-        }
-        else if (rootId.HasValue)
-        {
-            await ScanTargets.GetActiveRootAsync(_imageRootRepository, rootId.Value, cancellationToken);
-
-            // Every root has a top folder (ImageRootSeeder); it's the job's recorded scope.
-            jobFolderId = (await _folderRepository.GetByRootAndRelativePathAsync(rootId.Value, string.Empty, cancellationToken))?.Id;
-        }
+        var jobFolderId = await ScanTargets.ResolveJobFolderIdAsync(_folderRepository, _imageRootRepository, rootId, folderId, cancellationToken);
 
         if (jobFolderId.HasValue)
             await _folderRepository.SetScanStatusAsync(jobFolderId.Value, FolderScanStatus.Scanning, cancellationToken);

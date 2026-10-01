@@ -39,6 +39,38 @@ public static class ScanTargets
         return root is { IsActive: true } ? root : throw new ScanRootUnavailableException(rootId);
     }
 
+    /// <summary>
+    /// The folder a scan, discovery or face-recognition job is scoped to: the given folder (which must be visible,
+    /// not missing and not excluded), a root's top folder, or null when neither is given (all active roots).
+    /// </summary>
+    public static async Task<int?> ResolveJobFolderIdAsync(
+        IFolderRepository folders, IImageRootRepository roots, int? rootId, int? folderId, CancellationToken cancellationToken)
+    {
+        if (folderId.HasValue)
+        {
+            var (_, folder) = await GetVisibleFolderAsync(folders, roots, folderId.Value, cancellationToken);
+
+            // The walk couldn't reach it; scanning or discovering its parent is what notices it's back.
+            if (folder.MissingSinceUtc is not null)
+                throw FolderUnavailableException.Missing(folderId.Value);
+
+            if (folder.IsExcluded || await folders.HasExcludedAncestorAsync(folder.Id, cancellationToken))
+                throw FolderUnavailableException.Excluded(folderId.Value);
+
+            return folder.Id;
+        }
+
+        if (rootId.HasValue)
+        {
+            await GetActiveRootAsync(roots, rootId.Value, cancellationToken);
+
+            // Every root has a top folder (ImageRootSeeder); it's the job's recorded scope.
+            return (await folders.GetByRootAndRelativePathAsync(rootId.Value, string.Empty, cancellationToken))?.Id;
+        }
+
+        return null;
+    }
+
     public static async Task<Folder> GetOrCreateFolderAsync(
         IFolderRepository folders, IClock clock, int rootId, int? parentId, string relativePath, string name, CancellationToken cancellationToken)
     {
