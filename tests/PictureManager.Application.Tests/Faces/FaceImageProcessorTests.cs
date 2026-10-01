@@ -37,7 +37,11 @@ public sealed class FaceImageProcessorTests : IDisposable
         _faces.SaveResultAsync(default, default, default!, default!, default, default).ReturnsForAnyArgs(true);
     }
 
-    public void Dispose() => _root.Delete(recursive: true);
+    public void Dispose()
+    {
+        if (Directory.Exists(_root.FullName))
+            _root.Delete(recursive: true);
+    }
 
     private string Physical => Path.Combine(_root.FullName, "IMG1.jpg");
 
@@ -91,6 +95,39 @@ public sealed class FaceImageProcessorTests : IDisposable
 
         result.Outcome.Should().Be(FaceImageOutcome.Failed);
         await _faces.Received(1).SaveFailureAsync(7, ModelId, "hash", FaceProcessingStatus.Failed, 1, "network name no longer available", Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_IoErrorAfterFileVanished_SkipsWithoutWritingState()
+    {
+        File.WriteAllText(Physical, "x");
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
+        {
+            File.Delete(Physical);
+            throw new IOException("network name no longer available");
+        });
+
+        var result = await Create().ProcessAsync(7, ModelId);
+
+        result.Outcome.Should().Be(FaceImageOutcome.Skipped);
+        await _faces.DidNotReceiveWithAnyArgs().SaveFailureAsync(default, default, default!, default, default, default, default, default);
+        await _faces.DidNotReceiveWithAnyArgs().SaveResultAsync(default, default, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_IoErrorAfterRootUnmounted_SkipsWithoutWritingState()
+    {
+        File.WriteAllText(Physical, "x");
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
+        {
+            _root.Delete(recursive: true);
+            throw new IOException("network name no longer available");
+        });
+
+        var result = await Create().ProcessAsync(7, ModelId);
+
+        result.Outcome.Should().Be(FaceImageOutcome.Skipped);
+        await _faces.DidNotReceiveWithAnyArgs().SaveFailureAsync(default, default, default!, default, default, default, default, default);
     }
 
     [Fact]

@@ -54,6 +54,13 @@ public sealed class FaceImageProcessor : IFaceImageProcessor
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not FaceModelUnavailableException)
         {
+            // The share dropped while this image was being read: not the image's fault, so no attempt is burned.
+            if (ex is IOException && (!File.Exists(path) || !ScanTargets.IsRootAvailable(image.Folder.Root.MountPath)))
+            {
+                _logger.LogWarning("Image {ImageId} became unavailable during face analysis; skipped", imageId);
+                return new FaceImageResult(FaceImageOutcome.Skipped, 0);
+            }
+
             _logger.LogWarning(ex, "Face analysis failed for image {ImageId}", imageId);
             await RecordFailureAsync(image, faceModelId, ScanTargets.TruncateErrorMessage(ex.Message), permanent: false, cancellationToken);
             return new FaceImageResult(FaceImageOutcome.Failed, 0);
