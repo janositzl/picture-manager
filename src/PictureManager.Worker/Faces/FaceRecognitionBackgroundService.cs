@@ -18,7 +18,9 @@ namespace PictureManager.Worker.Faces;
 public sealed class FaceRecognitionBackgroundService : BackgroundService
 {
     private const int MaxFailureRetries = 3;
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(2);
+
+    private readonly TimeSpan _retryDelay;
 
     private readonly IFaceRecognitionQueue _queue;
     private readonly IJobCancellationRegistry _cancellations;
@@ -28,8 +30,10 @@ public sealed class FaceRecognitionBackgroundService : BackgroundService
 
     public FaceRecognitionBackgroundService(
         IFaceRecognitionQueue queue, IJobCancellationRegistry cancellations, IServiceScopeFactory scopeFactory, IClock clock,
-        ILogger<FaceRecognitionBackgroundService> logger)
+        ILogger<FaceRecognitionBackgroundService> logger,
+        TimeSpan? retryDelay = null)
     {
+        _retryDelay = retryDelay ?? DefaultRetryDelay;
         _queue = queue;
         _cancellations = cancellations;
         _scopeFactory = scopeFactory;
@@ -92,7 +96,13 @@ public sealed class FaceRecognitionBackgroundService : BackgroundService
             catch (Exception retryEx) when (attempt < MaxFailureRetries)
             {
                 _logger.LogWarning(retryEx, "Retry {Attempt} failed to record face recognition {JobId} failure", attempt, jobId);
-                await Task.Delay(RetryDelay, stoppingToken);
+                await Task.Delay(_retryDelay, stoppingToken);
+            }
+            catch (Exception finalEx)
+            {
+                // Never let this escape: it would fault the hosted service and stop the host.
+                _logger.LogError(finalEx, "Could not record face recognition {JobId} failure after {Attempts} attempts", jobId, MaxFailureRetries);
+                return;
             }
         }
     }
