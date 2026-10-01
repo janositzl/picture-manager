@@ -16,6 +16,9 @@ public interface IImageRepository
     /// already known missing -- orphaned by a scan whose in-memory enrichment queue was lost (e.g. a
     /// restart mid-Enriching).</summary>
     Task<IReadOnlyList<int>> GetPendingImageIdsAsync(CancellationToken cancellationToken = default);
+    /// <summary>Ids of visible Indexed images with no perceptual hash yet (null; "" means tried and undecodable) --
+    /// indexed before perceptual hashing existed. Same visibility rule as the rest of the app.</summary>
+    Task<IReadOnlyList<int>> GetIdsMissingPerceptualHashAsync(CancellationToken cancellationToken = default);
     /// <summary>Returns a MISSING (MissingSinceUtc != null) image with this content hash, if any -- used for move detection. Never returns an active (non-missing) image, even if one shares the hash.</summary>
     Task<Image?> GetMissingByContentHashAsync(string contentHash, CancellationToken cancellationToken = default);
     Task UpdateAsync(Image image, CancellationToken cancellationToken = default);

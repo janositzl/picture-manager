@@ -146,6 +146,42 @@ public class ImageRepositoryTests
     }
 
     [Fact]
+    public async Task GetIdsMissingPerceptualHashAsync_ReturnsIndexedVisibleWithNullHashOnly()
+    {
+        await using var context = CreateContext();
+        var folder = await SeedFolderAsync(context);
+        var inactiveFolder = new Folder
+        {
+            Name = "Removed", RelativePath = "Removed", RootId = folder.RootId, IsActive = false,
+            CreatedUtc = DateTime.UtcNow, ModifiedUtc = DateTime.UtcNow
+        };
+        context.Folders.Add(inactiveFolder);
+        await context.SaveChangesAsync();
+
+        Image Make(string name, IndexState state, string? perceptualHash, DateTime? missingSince = null, int? folderId = null) => new()
+        {
+            FolderId = folderId ?? folder.Id, FileName = name, Extension = ".jpg", ContentHash = "h-" + name,
+            IndexState = state, PerceptualHash = perceptualHash, MissingSinceUtc = missingSince, FileSize = 1,
+            FileModified = DateTime.UtcNow, FirstSeenUtc = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        };
+
+        var wanted = Make("Wanted", IndexState.Indexed, null);
+        context.Images.AddRange(
+            wanted,
+            Make("EmptySentinel", IndexState.Indexed, ""),
+            Make("Hashed", IndexState.Indexed, "0123456789abcdef"),
+            Make("Pending", IndexState.Pending, null),
+            Make("Invalid", IndexState.Invalid, null),
+            Make("Missing", IndexState.Indexed, null, DateTime.UtcNow),
+            Make("Tombstoned", IndexState.Indexed, null, folderId: inactiveFolder.Id));
+        await context.SaveChangesAsync();
+
+        var ids = await new ImageRepository(context).GetIdsMissingPerceptualHashAsync();
+
+        ids.Should().BeEquivalentTo(new[] { wanted.Id });
+    }
+
+    [Fact]
     public async Task GetMissingByContentHashAsync_ReturnsMatchingMissingImage()
     {
         await using var context = CreateContext();

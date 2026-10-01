@@ -148,12 +148,18 @@ public sealed class ScanService : IScanService
     public Task<int> FailInterruptedJobsAsync(CancellationToken cancellationToken = default) =>
         _scanJobRepository.FailActiveJobsAsync(InterruptedMessage, _clock.UtcNow, cancellationToken);
 
-    public async Task<int> RequeueStalledEnrichmentAsync(CancellationToken cancellationToken = default)
+    public Task<int> RequeueStalledEnrichmentAsync(CancellationToken cancellationToken = default) =>
+        RequeueAsync(_imageRepository.GetPendingImageIdsAsync, cancellationToken);
+
+    public Task<int> RequeueMissingPerceptualHashAsync(CancellationToken cancellationToken = default) =>
+        RequeueAsync(_imageRepository.GetIdsMissingPerceptualHashAsync, cancellationToken);
+
+    private async Task<int> RequeueAsync(Func<CancellationToken, Task<IReadOnlyList<int>>> getImageIds, CancellationToken cancellationToken)
     {
         if (await _scanJobRepository.HasActiveJobAsync(cancellationToken))
             return 0;
 
-        var imageIds = await _imageRepository.GetPendingImageIdsAsync(cancellationToken);
+        var imageIds = await getImageIds(cancellationToken);
         if (imageIds.Count == 0)
             return 0;
 
@@ -356,9 +362,16 @@ public sealed class ScanService : IScanService
                             break;
 
                         case ReconcileAction.Unchanged:
-                            // Not enqueued for enrichment, so it must not count toward FilesFound:
-                            // FilesFound drives the background service's FilesEnriched >= FilesFound
-                            // completion check, and must equal the number of items actually enqueued.
+                            // Unchanged files are normally not re-enriched. Exception: indexed before perceptual
+                            // hashing existed (PerceptualHash null; "" means tried-and-undecodable, don't retry).
+                            // When enqueued it must count toward FilesFound (see completion check note below).
+                            if (existingImage!.IndexState == IndexState.Indexed && existingImage.PerceptualHash is null)
+                            {
+                                _enrichmentQueue.Enqueue(scanJobId, existingImage.Id);
+                                filesFound++;
+                            }
+                            // Otherwise not enqueued, so it must not count toward FilesFound: FilesFound drives the
+                            // background service's FilesEnriched >= FilesFound completion check.
                             break;
                     }
                 }

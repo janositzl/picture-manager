@@ -31,4 +31,12 @@ public interface IScanService
     /// re-enqueued.
     /// </summary>
     Task<int> RequeueStalledEnrichmentAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Backfill: re-enqueues visible Indexed images that have no perceptual hash yet (indexed before
+    /// perceptual hashing existed) so enrichment computes it. Same job semantics as
+    /// <see cref="RequeueStalledEnrichmentAsync"/>: no-op if a job is active or nothing is missing a hash.
+    /// Returns how many were enqueued.
+    /// </summary>
+    Task<int> RequeueMissingPerceptualHashAsync(CancellationToken cancellationToken = default);
 }

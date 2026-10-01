@@ -51,7 +51,7 @@ public class ImageEnrichmentServiceTests
             var imageValidator = Substitute.For<IImageValidator>();
             imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, clock);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock);
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(
@@ -101,7 +101,7 @@ public class ImageEnrichmentServiceTests
             var clock = Substitute.For<IClock>();
             clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, clock);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock);
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(
@@ -132,7 +132,7 @@ public class ImageEnrichmentServiceTests
         clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
         var service = new ImageEnrichmentService(
-            imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(), clock);
+            imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(), Substitute.For<IPerceptualHasher>(), clock);
         await service.EnrichAsync(2);
 
         await imageRepository.Received(1).UpdateAsync(
@@ -173,7 +173,7 @@ public class ImageEnrichmentServiceTests
             var imageValidator = Substitute.For<IImageValidator>();
             imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IClock>());
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), Substitute.For<IClock>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).DeleteAsync(staleMissingImage, Arg.Any<CancellationToken>());
@@ -182,5 +182,85 @@ public class ImageEnrichmentServiceTests
         {
             File.Delete(tempFile);
         }
+    }
+
+    private static async Task<(Image Image, IPerceptualHasher Hasher)> EnrichWithHasherAsync(
+        bool isValid, Action<IPerceptualHasher, string> configureHasher)
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tempFile, new byte[] { 1, 2, 3 });
+            var image = new Image
+            {
+                Id = 1,
+                FileName = Path.GetFileNameWithoutExtension(tempFile),
+                Extension = Path.GetExtension(tempFile),
+                FileSize = 3,
+                Folder = new Folder { Id = 5, RelativePath = string.Empty, Root = new ImageRoot { Id = 1, MountPath = Path.GetDirectoryName(tempFile)! } }
+            };
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByIdWithFolderAsync(1, Arg.Any<CancellationToken>()).Returns(image);
+
+            var contentHasher = Substitute.For<IContentHasher>();
+            contentHasher.ComputeAsync(tempFile, 3, Arg.Any<CancellationToken>()).Returns("hash-abc");
+            var exifReader = Substitute.For<IExifReader>();
+            exifReader.ReadAsync(tempFile, Arg.Any<CancellationToken>()).Returns(ExifData.Empty);
+            var imageValidator = Substitute.For<IImageValidator>();
+            imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(isValid);
+
+            var hasher = Substitute.For<IPerceptualHasher>();
+            configureHasher(hasher, tempFile);
+
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, hasher, Substitute.For<IClock>());
+            await service.EnrichAsync(1);
+
+            await imageRepository.Received(1).UpdateAsync(image, Arg.Any<CancellationToken>());
+            return (image, hasher);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task EnrichAsync_ValidImage_StoresPerceptualHash()
+    {
+        var (image, _) = await EnrichWithHasherAsync(true, (hasher, path) =>
+            hasher.ComputeAsync(path, Arg.Any<int?>(), Arg.Any<CancellationToken>()).Returns("0123456789abcdef"));
+
+        image.PerceptualHash.Should().Be("0123456789abcdef");
+    }
+
+    [Fact]
+    public async Task EnrichAsync_HasherReturnsNull_StoresEmptySentinel_AndStillIndexes()
+    {
+        var (image, _) = await EnrichWithHasherAsync(true, (hasher, path) =>
+            hasher.ComputeAsync(path, Arg.Any<int?>(), Arg.Any<CancellationToken>()).Returns((string?)null));
+
+        image.PerceptualHash.Should().Be(string.Empty);
+        image.IndexState.Should().Be(IndexState.Indexed);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_HasherThrows_StoresEmptySentinel_AndStillIndexes()
+    {
+        var (image, _) = await EnrichWithHasherAsync(true, (hasher, path) =>
+            hasher.ComputeAsync(path, Arg.Any<int?>(), Arg.Any<CancellationToken>())
+                .Returns<string?>(_ => throw new InvalidDataException("bad pixels")));
+
+        image.PerceptualHash.Should().Be(string.Empty);
+        image.IndexState.Should().Be(IndexState.Indexed);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_InvalidImage_SkipsHasher()
+    {
+        var (image, hasher) = await EnrichWithHasherAsync(false, (_, _) => { });
+
+        await hasher.DidNotReceiveWithAnyArgs().ComputeAsync(default!, default, default);
+        image.PerceptualHash.Should().BeNull();
     }
 }

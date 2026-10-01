@@ -843,6 +843,88 @@ public class ScanServiceTests
         await folderRepository.Received(1).SetScanStatusAsync(10, FolderScanStatus.Error, Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Scan_UnchangedIndexedImageWithoutPerceptualHash_IsEnqueuedAndCounted()
+    {
+        var (queue, jobs) = await ScanUnchangedImageAsync(IndexState.Indexed, perceptualHash: null);
+
+        queue.Received(1).Enqueue(999, 5);
+        await jobs.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Scan_UnchangedImageWithPerceptualHash_IsNotEnqueued()
+    {
+        var (queue, jobs) = await ScanUnchangedImageAsync(IndexState.Indexed, perceptualHash: "0123456789abcdef");
+
+        queue.DidNotReceiveWithAnyArgs().Enqueue(default, default);
+        await jobs.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 0, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Scan_UnchangedImageWithEmptySentinel_IsNotEnqueued()
+    {
+        var (queue, jobs) = await ScanUnchangedImageAsync(IndexState.Indexed, perceptualHash: "");
+
+        queue.DidNotReceiveWithAnyArgs().Enqueue(default, default);
+        await jobs.Received(1).SetEnumerationResultAsync(999, foldersScanned: 1, filesFound: 0, Arg.Any<CancellationToken>());
+    }
+
+    private static async Task<(IEnrichmentQueue Queue, IJobRepository Jobs)> ScanUnchangedImageAsync(IndexState indexState, string? perceptualHash)
+    {
+        var tempRoot = Directory.CreateTempSubdirectory("pm-scan-test-");
+        try
+        {
+            var filePath = Path.Combine(tempRoot.FullName, "photo.jpg");
+            await File.WriteAllBytesAsync(filePath, new byte[] { 1, 2, 3 });
+            var diskInfo = new FileInfo(filePath);
+
+            var imageRoot = new ImageRoot { Id = 1, Name = "dev", MountPath = tempRoot.FullName, IsActive = true };
+            var rootFolder = new Folder { Id = 10, RootId = 1, RelativePath = string.Empty, Name = "dev" };
+            var existingImage = new Image
+            {
+                Id = 5, FolderId = 10, FileName = "photo", Extension = ".jpg",
+                FileSize = diskInfo.Length, FileModified = TruncateToMicroseconds(diskInfo.LastWriteTimeUtc),
+                IndexState = indexState, PerceptualHash = perceptualHash
+            };
+
+            var imageRootRepository = Substitute.For<IImageRootRepository>();
+            imageRootRepository.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(imageRoot);
+            var folderRepository = Substitute.For<IFolderRepository>();
+            folderRepository.GetByRootAndRelativePathAsync(1, string.Empty, Arg.Any<CancellationToken>()).Returns(rootFolder);
+
+            var imageRepository = Substitute.For<IImageRepository>();
+            imageRepository.GetByFolderAndFileNameAsync(10, "photo", ".jpg", Arg.Any<CancellationToken>()).Returns(existingImage);
+            imageRepository.GetByFolderIdAsync(10, Arg.Any<CancellationToken>()).Returns(new List<Image> { existingImage });
+
+            var appSettingsRepository = Substitute.For<IAppSettingsRepository>();
+            appSettingsRepository.GetAsync(Arg.Any<CancellationToken>()).Returns(new AppSettings());
+
+            var scanJobRepository = Substitute.For<IJobRepository>();
+            scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                var job = callInfo.Arg<Job>();
+                job.Id = 999;
+                return job;
+            });
+
+            var enrichmentQueue = Substitute.For<IEnrichmentQueue>();
+            var clock = Substitute.For<IClock>();
+            clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var scanService = new ScanService(
+                imageRootRepository, folderRepository, imageRepository,
+                appSettingsRepository, scanJobRepository, enrichmentQueue, Substitute.For<IScanQueue>(), clock, new ScanningOptions());
+
+            await scanService.ScanNowAsync(rootId: 1, isRecursive: true);
+            return (enrichmentQueue, scanJobRepository);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot.FullName, recursive: true);
+        }
+    }
+
     private static DateTime TruncateToMicroseconds(DateTime value) =>
         new(value.Ticks - (value.Ticks % 10), value.Kind);
 }

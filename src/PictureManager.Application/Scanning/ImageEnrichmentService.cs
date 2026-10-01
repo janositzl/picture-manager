@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,15 +14,18 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
     private readonly IContentHasher _contentHasher;
     private readonly IExifReader _exifReader;
     private readonly IImageValidator _imageValidator;
+    private readonly IPerceptualHasher _perceptualHasher;
     private readonly IClock _clock;
 
     public ImageEnrichmentService(
-        IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IImageValidator imageValidator, IClock clock)
+        IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IImageValidator imageValidator,
+        IPerceptualHasher perceptualHasher, IClock clock)
     {
         _imageRepository = imageRepository;
         _contentHasher = contentHasher;
         _exifReader = exifReader;
         _imageValidator = imageValidator;
+        _perceptualHasher = perceptualHasher;
         _clock = clock;
     }
 
@@ -46,6 +50,21 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         var exif = await _exifReader.ReadAsync(physicalPath, cancellationToken);
         var isValid = await _imageValidator.IsValidAsync(physicalPath, cancellationToken);
 
+        // "" marks an image whose hash couldn't be computed (undecodable), so it isn't retried forever.
+        // A failing hash must never fail enrichment: only cancellation propagates.
+        string? perceptual = null;
+        if (isValid)
+        {
+            try
+            {
+                perceptual = await _perceptualHasher.ComputeAsync(physicalPath, exif.Orientation, cancellationToken) ?? string.Empty;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                perceptual = string.Empty;
+            }
+        }
+
         var possibleMove = await _imageRepository.GetMissingByContentHashAsync(hash, cancellationToken);
         if (possibleMove is not null && possibleMove.Id != image.Id)
         {
@@ -63,6 +82,7 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         image.Latitude = exif.Latitude;
         image.Longitude = exif.Longitude;
         image.RawMetadata = exif.RawMetadataJson;
+        image.PerceptualHash = perceptual;
         image.IndexState = isValid ? IndexState.Indexed : IndexState.Invalid;
         image.MissingSinceUtc = null;
         image.UpdatedAt = _clock.UtcNow;

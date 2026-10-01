@@ -76,4 +76,47 @@ public class ScanServiceRequeueTests
         _enrichmentQueue.Received(1).Enqueue(42, 6);
         _enrichmentQueue.Received(1).Enqueue(42, 7);
     }
+
+    [Fact]
+    public async Task RequeueMissingPerceptualHashAsync_JobAlreadyActive_DoesNothing()
+    {
+        _scanJobRepository.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().RequeueMissingPerceptualHashAsync()).Should().Be(0);
+        await _imageRepository.DidNotReceive().GetIdsMissingPerceptualHashAsync(Arg.Any<CancellationToken>());
+        await _scanJobRepository.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RequeueMissingPerceptualHashAsync_NothingMissing_ReturnsZero_AndCreatesNoJob()
+    {
+        _scanJobRepository.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _imageRepository.GetIdsMissingPerceptualHashAsync(Arg.Any<CancellationToken>()).Returns(new List<int>());
+
+        (await CreateService().RequeueMissingPerceptualHashAsync()).Should().Be(0);
+        await _scanJobRepository.DidNotReceive().AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RequeueMissingPerceptualHashAsync_EnqueuesIdsUnderOneEnrichingJob()
+    {
+        _scanJobRepository.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _imageRepository.GetIdsMissingPerceptualHashAsync(Arg.Any<CancellationToken>()).Returns(new List<int> { 5, 6, 7 });
+        _scanJobRepository.AddAsync(Arg.Any<Job>(), Arg.Any<CancellationToken>()).Returns(callInfo =>
+        {
+            var job = callInfo.Arg<Job>();
+            job.Id = 42;
+            return job;
+        });
+
+        (await CreateService().RequeueMissingPerceptualHashAsync()).Should().Be(3);
+
+        await _scanJobRepository.Received(1).AddAsync(
+            Arg.Is<Job>(j => j.Kind == JobKind.Scan && j.FolderId == null && j.Status == JobStatus.Enriching
+                && j.FilesFound == 3 && j.StartedUtc == _clock.UtcNow),
+            Arg.Any<CancellationToken>());
+        _enrichmentQueue.Received(1).Enqueue(42, 5);
+        _enrichmentQueue.Received(1).Enqueue(42, 6);
+        _enrichmentQueue.Received(1).Enqueue(42, 7);
+    }
 }

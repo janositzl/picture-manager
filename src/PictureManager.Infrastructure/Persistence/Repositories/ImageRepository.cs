@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using PictureManager.Application.Repositories;
+using PictureManager.Infrastructure.Persistence.Queries;
 using PictureManager.Model;
 
 namespace PictureManager.Infrastructure.Persistence.Repositories;
@@ -54,6 +55,17 @@ public sealed class ImageRepository : IImageRepository
     {
         return await _dbContext.Images
             .Where(i => i.IndexState == IndexState.Pending && i.MissingSinceUtc == null && i.Folder!.IsActive)
+            .Select(i => i.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<int>> GetIdsMissingPerceptualHashAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Images
+            .AsNoTracking()
+            .WhereVisible()
+            .Where(i => i.IndexState == IndexState.Indexed && i.PerceptualHash == null)
+            .OrderBy(i => i.Id)
             .Select(i => i.Id)
             .ToListAsync(cancellationToken);
     }
