@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<ICurrentUser, SystemCurrentUser>();
+        services.AddSingleton<IJobCancellationRegistry, JobCancellationRegistry>();
         services.AddScoped<IImageEnrichmentService, ImageEnrichmentService>();
         services.AddScoped<IScanService, ScanService>();
         services.AddScoped<IDiscoveryService, DiscoveryService>();
