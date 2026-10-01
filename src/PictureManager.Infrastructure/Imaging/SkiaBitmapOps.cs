@@ -21,14 +21,17 @@ internal static class SkiaBitmapOps
 
     /// <summary>
     /// Decodes at reduced size when the codec supports it (JPEG decodes at 1/2, 1/4 or 1/8 scale -- much faster
-    /// than a full 24MP decode). Other formats decode at full size. Always Rgba8888. Null if undecodable.
+    /// than a full 24MP decode). Other formats decode at full size. Always Rgba8888. Null if the content is
+    /// undecodable. I/O errors (missing file, NAS offline) are thrown, not swallowed, so callers can retry them.
     /// </summary>
     internal static SKBitmap? DecodeDownsampled(string path, int maxSide)
     {
+        // Read in managed code first: an IOException here is transient-or-missing, never "corrupt image".
+        var bytes = File.ReadAllBytes(path);
         try
         {
-            using var stream = File.OpenRead(path);
-            using var codec = SKCodec.Create(stream);
+            using var data = SKData.CreateCopy(bytes);
+            using var codec = SKCodec.Create(data);
             if (codec is null)
                 return null;
 
@@ -42,8 +45,9 @@ internal static class SkiaBitmapOps
 
             return SKBitmap.Decode(codec, info.WithColorType(SKColorType.Rgba8888).WithAlphaType(SKAlphaType.Premul));
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
+            // Decoding from memory: these mean bad or unsupported content, not I/O.
             return null;
         }
     }

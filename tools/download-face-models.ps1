@@ -3,6 +3,7 @@
 param([string]$Destination = (Join-Path $PSScriptRoot '..\models\buffalo_l'))
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'   # the progress bar slows Invoke-WebRequest down by orders of magnitude
 $url = 'https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip'
 $zip = Join-Path ([IO.Path]::GetTempPath()) 'buffalo_l.zip'
 $extract = Join-Path ([IO.Path]::GetTempPath()) 'buffalo_l'

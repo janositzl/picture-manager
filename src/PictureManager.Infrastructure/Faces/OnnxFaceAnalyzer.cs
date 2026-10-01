@@ -28,21 +28,24 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
     private static readonly SKSamplingOptions Sampling = new(SKFilterMode.Linear, SKMipmapMode.Linear);
 
     private readonly FaceRecognitionOptions _options;
-    private readonly Lazy<Sessions> _sessions;
     private readonly SemaphoreSlim _inference;
+
+    // Assigned only after a successful load: a failed load (models missing or corrupt) is retried on the next
+    // call, so models dropped in later are picked up without a restart.
+    private readonly Lock _loadLock = new();
+    private volatile Sessions? _sessions;
 
     public OnnxFaceAnalyzer(FaceRecognitionOptions options)
     {
         _options = options;
-        _sessions = new Lazy<Sessions>(LoadSessions, LazyThreadSafetyMode.ExecutionAndPublication);
         _inference = new SemaphoreSlim(Math.Max(1, options.InferenceConcurrency));
     }
 
-    public FaceModelDescriptor Model => _sessions.Value.Descriptor;
+    public FaceModelDescriptor Model => GetSessions().Descriptor;
 
     public async Task<FaceAnalysisResult?> AnalyzeAsync(string imagePath, int? orientation, CancellationToken cancellationToken = default)
     {
-        var sessions = _sessions.Value;
+        var sessions = GetSessions();
         cancellationToken.ThrowIfCancellationRequested();
 
         // Decoding is NAS I/O + CPU and runs outside the inference gate, so reads overlap model execution.
@@ -147,6 +150,14 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         return tensor;
     }
 
+    private Sessions GetSessions()
+    {
+        if (_sessions is { } loaded)
+            return loaded;
+        lock (_loadLock)
+            return _sessions ??= LoadSessions();
+    }
+
     private Sessions LoadSessions()
     {
         var detectorPath = Path.Combine(_options.ModelDirectory, DetectorFile);
@@ -176,18 +187,41 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         var hash = Convert.ToHexStringLower(sha.Hash!);
 
-        return new Sessions(
-            new InferenceSession(detectorPath, sessionOptions),
-            new InferenceSession(recognizerPath, sessionOptions),
-            new FaceModelDescriptor("insightface-buffalo_l", "det_10g+w600k_r50", 512, hash));
+        var detector = OpenSession(detectorPath, sessionOptions);
+        try
+        {
+            var recognizer = OpenSession(recognizerPath, sessionOptions);
+            return new Sessions(detector, recognizer, new FaceModelDescriptor("insightface-buffalo_l", "det_10g+w600k_r50", 512, hash));
+        }
+        catch
+        {
+            detector.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>A corrupt or incompatible model fails the job (FaceModelUnavailableException), not each image.</summary>
+    private static InferenceSession OpenSession(string path, SessionOptions sessionOptions)
+    {
+        try
+        {
+            return new InferenceSession(path, sessionOptions);
+        }
+        catch (Exception ex) when (ex is OnnxRuntimeException or DllNotFoundException or EntryPointNotFoundException or TypeInitializationException)
+        {
+            throw new FaceModelUnavailableException(
+                $"Face recognition model could not be loaded: {Path.GetFileName(path)} in '{Path.GetDirectoryName(path)}' ({ex.Message}). " +
+                "Re-run tools/download-face-models.ps1 (development) or rebuild the Docker image.", ex);
+        }
     }
 
     public void Dispose()
     {
-        if (_sessions.IsValueCreated)
+        lock (_loadLock)
         {
-            _sessions.Value.Detector.Dispose();
-            _sessions.Value.Recognizer.Dispose();
+            _sessions?.Detector.Dispose();
+            _sessions?.Recognizer.Dispose();
+            _sessions = null;
         }
         _inference.Dispose();
     }
