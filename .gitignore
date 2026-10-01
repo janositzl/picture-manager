@@ -48,3 +48,6 @@ desktop.ini
 
 # Test run output (coverage collectors)
 [Tt]est[Rr]esults/
+
+# Face recognition models (downloaded by tools/download-face-models.ps1; non-commercial license)
+/models/

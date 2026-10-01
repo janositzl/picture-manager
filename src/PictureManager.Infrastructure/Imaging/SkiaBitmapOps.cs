@@ -20,6 +20,35 @@ internal static class SkiaBitmapOps
     }
 
     /// <summary>
+    /// Decodes at reduced size when the codec supports it (JPEG decodes at 1/2, 1/4 or 1/8 scale -- much faster
+    /// than a full 24MP decode). Other formats decode at full size. Always Rgba8888. Null if undecodable.
+    /// </summary>
+    internal static SKBitmap? DecodeDownsampled(string path, int maxSide)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var codec = SKCodec.Create(stream);
+            if (codec is null)
+                return null;
+
+            var info = codec.Info;
+            var longest = Math.Max(info.Width, info.Height);
+            if (longest > maxSide)
+            {
+                var scaled = codec.GetScaledDimensions((float)maxSide / longest);
+                info = info.WithSize(scaled.Width, scaled.Height);
+            }
+
+            return SKBitmap.Decode(codec, info.WithColorType(SKColorType.Rgba8888).WithAlphaType(SKAlphaType.Premul));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Applies EXIF-orientation correction using plain canvas transforms (Translate/Scale/RotateDegrees)
     /// rather than raw SKMatrix composition, since SkiaSharp's matrix-concatenation API has shifted across
     /// package versions. Each canvas transform call post-concatenates onto the current transform, so for

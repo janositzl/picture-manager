@@ -3,6 +3,7 @@ using PictureManager.Api.Endpoints;
 using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
 using PictureManager.Application.Discovery;
+using PictureManager.Application.Faces;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Roots;
 using PictureManager.Application.Scanning;
@@ -52,6 +53,11 @@ try
 
     builder.Services.AddSingleton(ScanningOptions.FromConfig(
         builder.Configuration.GetSection("Scanning:SupportedExtensions").Get<List<string?>>()));
+
+    var faceRecognitionOptions = new FaceRecognitionOptions();
+    builder.Configuration.GetSection("FaceRecognition").Bind(faceRecognitionOptions);
+    faceRecognitionOptions.ModelDirectory = Path.GetFullPath(faceRecognitionOptions.ModelDirectory, builder.Environment.ContentRootPath);
+    builder.Services.AddSingleton(faceRecognitionOptions);
 
     var connectionString = builder.Configuration.GetConnectionString("PictureManagerDb")
         ?? throw new InvalidOperationException("Connection string 'PictureManagerDb' is not configured.");

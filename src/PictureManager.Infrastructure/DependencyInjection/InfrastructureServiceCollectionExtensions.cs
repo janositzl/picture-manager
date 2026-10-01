@@ -2,9 +2,11 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PictureManager.Application.Faces;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Scanning;
 using PictureManager.Application.Thumbnails;
+using PictureManager.Infrastructure.Faces;
 using PictureManager.Infrastructure.Persistence;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Infrastructure.Scanning;
@@ -38,6 +40,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IExifReader, MetadataExtractorExifReader>();
         services.AddSingleton<IImageValidator, SkiaImageValidator>();
         services.AddSingleton<IThumbnailService, SkiaSharpThumbnailService>();
+        services.AddSingleton<IFaceAnalyzer, OnnxFaceAnalyzer>();
 
         return services;
     }
