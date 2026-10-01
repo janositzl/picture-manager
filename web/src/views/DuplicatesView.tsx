@@ -34,13 +34,13 @@ export function DuplicatesView() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { image } = parseGridParams(searchParams)
   const mode: Mode = searchParams.get('mode') === 'similar' ? 'similar' : 'exact'
-  const exactQuery = useDuplicates()
+  const exactQuery = useDuplicates(mode === 'exact')
   const similarQuery = useSimilarDuplicates(mode === 'similar')
   const groups = mode === 'similar' ? similarQuery : exactQuery
   const setFavorite = useSetFavorite()
   const [tileSizeKey] = useTileSize()
-  const all = useMemo<ViewGroup[]>(
-    () =>
+  const all = useMemo<ViewGroup[]>(() => {
+    const flattened: ViewGroup[] =
       mode === 'similar'
         ? (similarQuery.data?.pages.flatMap((page) => page.items) ?? []).map((group) => ({
             key: group.key,
@@ -51,11 +51,13 @@ export function DuplicatesView() {
             key: group.contentHash,
             label: `${group.count} copies`,
             images: group.images,
-          })),
-    [mode, exactQuery.data, similarQuery.data],
-  )
+          }))
+    // Paging by offset over a re-clustered set can repeat a group; keep the first so keys/ids stay unique.
+    const seen = new Set<string>()
+    return flattened.filter((group) => !seen.has(group.key) && seen.add(group.key))
+  }, [mode, exactQuery.data, similarQuery.data])
   const ids = useMemo(() => all.flatMap((group) => group.images.map((item) => item.id)), [all])
-  const selection = useSelection(ids, 'duplicates')
+  const selection = useSelection(ids, `duplicates-${mode}`)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = groups
@@ -128,11 +130,15 @@ export function DuplicatesView() {
                   item={item}
                   size={TILE_MIN_WIDTH[tileSizeKey]}
                   caption={
-                    mode === 'similar'
+                    mode === 'similar' && item.width !== null && item.height !== null
                       ? `${item.folderPath} · ${item.width} × ${item.height}`
                       : item.folderPath
                   }
-                  badge={mode === 'similar' && index === 0 ? 'Largest' : undefined}
+                  badge={
+                    mode === 'similar' && index === 0 && item.width !== null && item.height !== null
+                      ? 'Largest'
+                      : undefined
+                  }
                   dimmed={false}
                   selecting={selection.isSelecting}
                   selected={selection.selected.has(item.id)}

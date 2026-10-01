@@ -150,7 +150,8 @@ export function useAlbumImages(id: number | null) {
   return query
 }
 
-export function useDuplicates() {
+/** Exact (identical-content) groups; pass enabled=false while Similar mode is shown. */
+export function useDuplicates(enabled = true) {
   return useInfiniteQuery({
     queryKey: queryKeys.duplicates(),
     queryFn: ({ pageParam, signal }) =>
@@ -160,6 +161,7 @@ export function useDuplicates() {
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: Page<DuplicateGroup>) => lastPage.nextCursor,
+    enabled,
   })
 }
 
