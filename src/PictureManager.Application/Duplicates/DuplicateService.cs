@@ -12,6 +12,7 @@ public sealed class DuplicateService : IDuplicateService
 {
     public const int DefaultLimit = 50;
     public const int MaxLimit = 100;
+    public const int DefaultSimilarThreshold = 6;
 
     private readonly IImageQueryRepository _images;
 
@@ -62,12 +63,79 @@ public sealed class DuplicateService : IDuplicateService
         return Result<PagedResult<DuplicateGroup>>.Ok(new PagedResult<DuplicateGroup>(groups, nextCursor));
     }
 
+    public async Task<Result<PagedResult<SimilarGroup>>> ListSimilarAsync(int? threshold, string? cursor, int? limit, CancellationToken cancellationToken = default)
+    {
+        var maxDistance = threshold ?? DefaultSimilarThreshold;
+        if (maxDistance < 0 || maxDistance > SimilarityClusterer.MaxThreshold)
+            return Result.Invalid("threshold", $"Must be between 0 and {SimilarityClusterer.MaxThreshold}.");
+
+        var take = limit ?? DefaultLimit;
+        if (take is < 1 or > MaxLimit)
+            return Result.Invalid("limit", $"Must be between 1 and {MaxLimit}.");
+
+        var offset = 0;
+        if (cursor is not null)
+        {
+            if (!CursorCodec.TryDecode<SimilarCursor>(cursor, out var decoded) || decoded.Offset < 0)
+                return Result.Invalid("cursor", "The cursor is malformed.");
+            offset = decoded.Offset;
+        }
+
+        var rows = await _images.GetPerceptualHashesAsync(cancellationToken);
+        var hashes = new Dictionary<int, ulong>(rows.Count);
+        var parsed = new List<(int Id, ulong Hash)>(rows.Count);
+        foreach (var row in rows)
+        {
+            if (PerceptualHash.Parse(row.PerceptualHash) is not { } hash)
+                continue;
+            hashes[row.Id] = hash;
+            parsed.Add((row.Id, hash));
+        }
+
+        var clusters = SimilarityClusterer.Cluster(parsed, maxDistance);
+        var pageClusters = clusters.Skip(offset).Take(take).ToList();
+
+        var members = pageClusters.Count == 0
+            ? Array.Empty<DuplicateMemberRow>()
+            : await _images.GetMembersByIdsAsync(pageClusters.SelectMany(c => c).ToList(), cancellationToken);
+        var byId = members.ToDictionary(m => m.Image.Id);
+
+        var groups = new List<SimilarGroup>(pageClusters.Count);
+        foreach (var cluster in pageClusters)
+        {
+            var images = cluster
+                .Where(byId.ContainsKey)
+                .Select(id => byId[id])
+                .OrderByDescending(m => (long)(m.Image.Width ?? 0) * (m.Image.Height ?? 0))
+                .ThenByDescending(m => m.FileSize)
+                .ThenBy(m => m.Image.Id)
+                .Select(ToItem)
+                .ToList();
+            groups.Add(new SimilarGroup("s" + cluster.Min(), cluster.Count, MaxPairwiseDistance(cluster, hashes), images));
+        }
+
+        var nextCursor = offset + take < clusters.Count
+            ? CursorCodec.Encode(new SimilarCursor(offset + take))
+            : null;
+
+        return Result<PagedResult<SimilarGroup>>.Ok(new PagedResult<SimilarGroup>(groups, nextCursor));
+    }
+
+    private static int MaxPairwiseDistance(IReadOnlyList<int> ids, Dictionary<int, ulong> hashes)
+    {
+        var max = 0;
+        for (var a = 0; a < ids.Count; a++)
+            for (var b = a + 1; b < ids.Count; b++)
+                max = Math.Max(max, PerceptualHash.Distance(hashes[ids[a]], hashes[ids[b]]));
+        return max;
+    }
+
     private static DuplicateImageItem ToItem(DuplicateMemberRow row)
     {
         var image = row.Image;
         return new DuplicateImageItem(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
             image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash), ImageUrls.Preview(image.Id, image.ContentHash),
-            FolderDisplayPath.For(row.RootName, row.RelativePath));
+            FolderDisplayPath.For(row.RootName, row.RelativePath), row.FileSize);
     }
 }

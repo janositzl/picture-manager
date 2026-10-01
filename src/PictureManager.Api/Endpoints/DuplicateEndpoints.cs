@@ -12,10 +12,15 @@ public static class DuplicateEndpoints
     public static IEndpointRouteBuilder MapDuplicateEndpoints(this IEndpointRouteBuilder user)
     {
         user.MapGet("/duplicates", ListAsync);
+        user.MapGet("/duplicates/similar", ListSimilarAsync);
         return user;
     }
 
     public static async Task<Results<Ok<PagedResult<DuplicateGroup>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListAsync(
         string? cursor, int? limit, IDuplicateService service, CancellationToken cancellationToken) =>
         (await service.ListAsync(cursor, limit, cancellationToken)).ToOk();
+
+    public static async Task<Results<Ok<PagedResult<SimilarGroup>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListSimilarAsync(
+        int? threshold, string? cursor, int? limit, IDuplicateService service, CancellationToken cancellationToken) =>
+        (await service.ListSimilarAsync(threshold, cursor, limit, cancellationToken)).ToOk();
 }

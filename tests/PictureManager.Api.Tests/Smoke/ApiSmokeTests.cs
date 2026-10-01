@@ -57,6 +57,7 @@ public class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
     [InlineData("GET", "/api/albums", ApiSurface.User)]
     [InlineData("GET", "/api/albums/{id:int}/export", ApiSurface.User)]
     [InlineData("GET", "/api/duplicates", ApiSurface.User)]
+    [InlineData("GET", "/api/duplicates/similar", ApiSurface.User)]
     [InlineData("GET", "/api/folders/roots", ApiSurface.User)]
     public void Endpoint_IsOnTheExpectedSurface(string method, string route, ApiSurface expected)
     {
@@ -110,6 +111,15 @@ public class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
 
         var export = await client.GetStringAsync($"/api/albums/{albumId}/export?prefix=/mnt");
         export.Should().Be("/mnt/smoke-browse/Trip/a.jpg\n/mnt/smoke-browse/Trip/b.jpg\n/mnt/smoke-browse/Trip/c.jpg\n");
+    }
+
+    [Fact]
+    public async Task SimilarDuplicates_EmptyList_Returns200_AndBadThreshold_Returns400()
+    {
+        var ok = await _fixture.Client.GetFromJsonAsync<JsonElement>("/api/duplicates/similar");
+        ok.GetProperty("items").GetArrayLength().Should().Be(0);
+
+        (await _fixture.Client.GetAsync("/api/duplicates/similar?threshold=99")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

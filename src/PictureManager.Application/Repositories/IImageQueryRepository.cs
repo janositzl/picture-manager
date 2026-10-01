@@ -30,4 +30,10 @@ public interface IImageQueryRepository
     Task<IReadOnlyList<DuplicateGroupKey>> GetDuplicateGroupsAsync(DuplicateGroupKey? after, int take, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<DuplicateMemberRow>> GetDuplicateMembersAsync(IReadOnlyCollection<string> contentHashes, CancellationToken cancellationToken = default);
+
+    /// <summary>Visible images with a computed (non-empty) perceptual hash.</summary>
+    Task<IReadOnlyList<PerceptualHashRow>> GetPerceptualHashesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Same projection as GetDuplicateMembersAsync, for visible images with the given ids.</summary>
+    Task<IReadOnlyList<DuplicateMemberRow>> GetMembersByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
 }

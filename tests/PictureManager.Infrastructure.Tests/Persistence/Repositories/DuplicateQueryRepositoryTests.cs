@@ -73,4 +73,40 @@ public class DuplicateQueryRepositoryTests
             (copy.Id, "nas", "")
         });
     }
+
+    [Fact]
+    public async Task GetPerceptualHashesAsync_ExcludesNullEmptyAndHidden()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var hashed = TestData.Image(folder, "hashed");
+        hashed.PerceptualHash = "0F0F0F0F0F0F0F0F";
+        var undecodable = TestData.Image(folder, "undecodable");
+        undecodable.PerceptualHash = "";
+        var gone = TestData.Image(folder, "gone", missingSinceUtc: TestData.Utc);
+        gone.PerceptualHash = "AAAAAAAAAAAAAAAA";
+        db.Context.Images.AddRange(hashed, undecodable, gone, TestData.Image(folder, "pending"));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new ImageQueryRepository(context).GetPerceptualHashesAsync();
+
+        rows.Should().Equal(new PerceptualHashRow(hashed.Id, "0F0F0F0F0F0F0F0F"));
+    }
+
+    [Fact]
+    public async Task GetMembersByIdsAsync_ReturnsVisibleMembersWithFileSize()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("nas"), "");
+        var a = TestData.Image(folder, "a");
+        var gone = TestData.Image(folder, "gone", missingSinceUtc: TestData.Utc);
+        db.Context.Images.AddRange(a, gone, TestData.Image(folder, "other"));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var members = await new ImageQueryRepository(context).GetMembersByIdsAsync(new[] { a.Id, gone.Id });
+
+        members.Select(m => (m.Image.Id, m.FileSize)).Should().Equal((a.Id, 1234L));
+    }
 }

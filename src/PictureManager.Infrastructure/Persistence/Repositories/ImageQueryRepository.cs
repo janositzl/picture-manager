@@ -128,13 +128,31 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         var hashes = contentHashes.ToList();
         return await _dbContext.Images.AsNoTracking().WhereVisible()
             .Where(i => hashes.Contains(i.ContentHash))
-            .Select(i => new DuplicateMemberRow(
-                new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
-                i.Folder!.Root!.Name,
-                i.Folder.RelativePath))
+            .Select(MemberProjection)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<PerceptualHashRow>> GetPerceptualHashesAsync(CancellationToken cancellationToken = default) =>
+        await _dbContext.Images.AsNoTracking().WhereVisible()
+            .Where(i => i.PerceptualHash != null && i.PerceptualHash != "")
+            .Select(i => new PerceptualHashRow(i.Id, i.PerceptualHash!))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<DuplicateMemberRow>> GetMembersByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        return await _dbContext.Images.AsNoTracking().WhereVisible()
+            .Where(i => idList.Contains(i.Id))
+            .Select(MemberProjection)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static readonly System.Linq.Expressions.Expression<Func<Image, DuplicateMemberRow>> MemberProjection = i => new DuplicateMemberRow(
+        new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
+            i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
+        i.Folder!.Root!.Name,
+        i.Folder.RelativePath,
+        i.FileSize);
 
     private static IQueryable<Image> ApplyKeyset(IQueryable<Image> query, ImageSort sort, SortDirection direction, ImageKeyset? after)
     {
