@@ -34,6 +34,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
         services.AddScoped<IImageQueryRepository, ImageQueryRepository>();
+        services.AddScoped<IFaceRepository, FaceRepository>();
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
         services.AddSingleton<IPerceptualHasher, SkiaDHashPerceptualHasher>();
