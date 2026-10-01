@@ -39,6 +39,9 @@ public interface IJobRepository
     /// <summary>Atomically flips Status from Enumerating straight to Completed (setting CompletedUtc). Discovery only: it has no enrichment phase.</summary>
     Task TryMarkCompletedFromEnumeratingAsync(int discoveryJobId, DateTime completedUtc, CancellationToken cancellationToken = default);
 
+    /// <summary>Atomically flips Status from fromStatus to Completed (setting CompletedUtc). Returns whether a row changed.</summary>
+    Task<bool> TryMarkCompletedAsync(int jobId, JobStatus fromStatus, DateTime completedUtc, CancellationToken cancellationToken = default);
+
     /// <summary>Atomically increments FilesEnriched by 1.</summary>
     Task IncrementFilesEnrichedAsync(int scanJobId, CancellationToken cancellationToken = default);
 

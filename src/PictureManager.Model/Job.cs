@@ -2,7 +2,7 @@ using System;
 
 namespace PictureManager.Model;
 
-/// <summary>A background job: an image scan or a folder discovery. Only one runs at a time.</summary>
+/// <summary>A background job: an image scan, a folder discovery or a face recognition. Only one runs at a time.</summary>
 public class Job
 {
     public int Id { get; set; }

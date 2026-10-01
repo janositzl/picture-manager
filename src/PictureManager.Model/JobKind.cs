@@ -4,5 +4,6 @@ namespace PictureManager.Model;
 public enum JobKind
 {
     Scan,
-    Discovery
+    Discovery,
+    FaceRecognition
 }

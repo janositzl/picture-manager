@@ -97,6 +97,17 @@ public sealed class JobRepository : IJobRepository
                 cancellationToken);
     }
 
+    public async Task<bool> TryMarkCompletedAsync(int jobId, JobStatus fromStatus, DateTime completedUtc, CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.Jobs
+            .Where(j => j.Id == jobId && j.Status == fromStatus)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(j => j.Status, JobStatus.Completed)
+                .SetProperty(j => j.CompletedUtc, completedUtc),
+                cancellationToken);
+        return rows > 0;
+    }
+
     public async Task IncrementFilesEnrichedAsync(int scanJobId, CancellationToken cancellationToken = default)
     {
         await _dbContext.Jobs
