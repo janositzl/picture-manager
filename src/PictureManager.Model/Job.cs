@@ -21,11 +21,13 @@ public class Job
     /// <summary>Folders visited so far, for both kinds.</summary>
     public int FoldersProcessed { get; set; }
 
-    /// <summary>Scan only; always 0 for a discovery job.</summary>
+    /// <summary>Scan: files found / enriched. Face recognition: candidate images / images processed. Always 0 for a discovery job.</summary>
     public int FilesFound { get; set; }
 
-    /// <summary>Scan only; always 0 for a discovery job.</summary>
+    /// <summary>Scan: files found / enriched. Face recognition: candidate images / images processed. Always 0 for a discovery job.</summary>
     public int FilesEnriched { get; set; }
+    /// <summary>Face recognition only: faces detected so far.</summary>
+    public int FacesFound { get; set; }
     public string? ErrorMessage { get; set; }
     public Folder? Folder { get; set; }
 }

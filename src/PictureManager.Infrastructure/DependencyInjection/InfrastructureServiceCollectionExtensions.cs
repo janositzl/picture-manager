@@ -22,7 +22,7 @@ public static class InfrastructureServiceCollectionExtensions
             ?? throw new InvalidOperationException(
                 "Connection string 'PictureManagerDb' is not configured.");
 
-        services.AddDbContext<PictureManagerDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDbContext<PictureManagerDbContext>(options => options.UseNpgsql(connectionString, o => o.UseVector()));
 
         services.AddScoped<IFolderRepository, FolderRepository>();
         services.AddScoped<IImageRepository, ImageRepository>();

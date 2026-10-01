@@ -41,7 +41,7 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
     public PictureManagerDbContext Context { get; }
 
     public PictureManagerDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<PictureManagerDbContext>().UseNpgsql(ConnectionString).Options);
+        new(new DbContextOptionsBuilder<PictureManagerDbContext>().UseNpgsql(ConnectionString, o => o.UseVector()).Options);
 
     public static async Task<PostgresTestDatabase> CreateAsync()
     {
@@ -74,13 +74,15 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
 
             var templateConnectionString = BuildConnectionString(TemplateName);
             await using (var context = new PictureManagerDbContext(
-                new DbContextOptionsBuilder<PictureManagerDbContext>().UseNpgsql(templateConnectionString).Options))
+                new DbContextOptionsBuilder<PictureManagerDbContext>().UseNpgsql(templateConnectionString, o => o.UseVector()).Options))
             {
                 await context.Database.MigrateAsync();
             }
 
-            // CREATE DATABASE ... TEMPLATE fails while any connection to the template is open.
+            // CREATE DATABASE ... TEMPLATE fails while any connection to the template is open. UseVector() makes EF keep its own
+            // NpgsqlDataSource whose pool ClearPool(connection) does not reach, so also terminate whatever sessions remain.
             NpgsqlConnection.ClearPool(new NpgsqlConnection(templateConnectionString));
+            await ExecuteOnServerAsync($"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{TemplateName}' AND pid <> pg_backend_pid()");
             _templateReady = true;
         }
         finally
