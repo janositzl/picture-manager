@@ -5,6 +5,8 @@ import { RootsPage } from '../admin/RootsPage'
 import { SettingsPage } from '../admin/SettingsPage'
 import { AlbumsPage } from '../albums/AlbumsPage'
 import { AlbumView } from '../albums/AlbumView'
+import { PeoplePage } from '../people/PeoplePage'
+import { PersonView } from '../people/PersonView'
 import { DuplicatesView } from '../views/DuplicatesView'
 import { FavoritesView } from '../views/FavoritesView'
 import { FolderView } from '../views/FolderView'
@@ -23,6 +25,8 @@ export const appRoutes: RouteObject[] = [
       { path: 'albums', element: <AlbumsPage /> },
       { path: 'albums/:albumId', element: <AlbumView /> },
       { path: 'duplicates', element: <DuplicatesView /> },
+      { path: 'people', element: <PeoplePage /> },
+      { path: 'people/:personId', element: <PersonView /> },
       { path: 'search', element: <SearchView /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

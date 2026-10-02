@@ -2,6 +2,7 @@ import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import KeyboardDoubleArrowLeftOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowLeftOutlined'
 import KeyboardDoubleArrowRightOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowRightOutlined'
+import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined'
 import PhotoLibraryOutlinedIcon from '@mui/icons-material/PhotoLibraryOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
@@ -40,6 +41,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; icon: ComponentType<{ fontSi
   [
     { to: '/', label: 'Folders', icon: FolderOutlinedIcon },
     { to: '/favorites', label: 'Favorites', icon: StarBorderIcon },
+    { to: '/people', label: 'People', icon: PeopleOutlinedIcon },
     { to: '/albums', label: 'Albums', icon: PhotoLibraryOutlinedIcon },
     { to: '/duplicates', label: 'Duplicates', icon: ContentCopyOutlinedIcon },
   ]

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { toImageQuery } from './imageFilter'
 
 describe('toImageQuery', () => {
@@ -21,5 +21,10 @@ describe('toImageQuery', () => {
       null,
     )
     expect(scoped.get('folderId')).toBe('7')
+  })
+
+  it('filters by person', () => {
+    const params = toImageQuery({ kind: 'person', personId: 7, sort: 'date', order: 'desc' }, null)
+    expect(params.get('personId')).toBe('7')
   })
 })

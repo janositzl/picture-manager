@@ -7,6 +7,7 @@ export type ImageFilter = (
   | { kind: 'folder'; folderId: number }
   | { kind: 'favorites' }
   | { kind: 'search'; q: string; in?: number }
+  | { kind: 'person'; personId: number }
 ) & { sort: Sort; order: Order }
 
 /** Query string for GET /api/images. */
@@ -22,6 +23,9 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
     case 'search':
       if (filter.q !== '') params.set('fileName', filter.q)
       if (filter.in !== undefined) params.set('folderId', String(filter.in))
+      break
+    case 'person':
+      params.set('personId', String(filter.personId))
       break
   }
   params.set('sort', filter.sort)
