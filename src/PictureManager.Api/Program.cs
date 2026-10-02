@@ -148,6 +148,7 @@ try
     user.MapFolderEndpoints(admin);
     user.MapAlbumEndpoints();
     user.MapDuplicateEndpoints();
+    user.MapPeopleEndpoints();
     admin.MapScanEndpoints();
     admin.MapDiscoveryEndpoints();
     admin.MapFaceRecognitionEndpoints();

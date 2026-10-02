@@ -1,0 +1,49 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using PictureManager.Application.Common;
+using PictureManager.Application.Repositories;
+
+namespace PictureManager.Application.Faces;
+
+public sealed class PeopleService : IPeopleService
+{
+    private const int MaxNameLength = 200;
+
+    private readonly IPeopleRepository _people;
+    private readonly IClock _clock;
+
+    public PeopleService(IPeopleRepository people, IClock clock)
+    {
+        _people = people;
+        _clock = clock;
+    }
+
+    public Task<IReadOnlyList<PersonSummary>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        _people.GetAllAsync(cancellationToken);
+
+    public async Task<Result<PersonSummary>> GetAsync(int id, CancellationToken cancellationToken = default) =>
+        await _people.GetAsync(id, cancellationToken) is { } person ? Result<PersonSummary>.Ok(person) : Result.NotFound();
+
+    public async Task<Result<PersonSummary>> NameAsync(int id, string? name, CancellationToken cancellationToken = default)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+            return Result.Invalid("name", "Enter a name.");
+        if (trimmed.Length > MaxNameLength)
+            return Result.Invalid("name", $"Names can be at most {MaxNameLength} characters.");
+
+        if (await _people.GetAsync(id, cancellationToken) is null)
+            return Result.NotFound();
+
+        var existingId = await _people.FindIdByNameAsync(trimmed, cancellationToken);
+        if (existingId is int targetId && targetId != id)
+        {
+            await _people.MergeAsync(id, targetId, _clock.UtcNow, cancellationToken);
+            return await GetAsync(targetId, cancellationToken);
+        }
+
+        await _people.SetNameAsync(id, trimmed, _clock.UtcNow, cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+}

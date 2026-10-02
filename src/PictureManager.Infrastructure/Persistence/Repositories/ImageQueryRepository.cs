@@ -45,6 +45,10 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         if (filter.FavoritesOnly)
             query = query.Where(i => i.IsFavorite);
 
+        if (filter.PersonId is int personId)
+            query = query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed)));
+
         query = ApplyKeyset(query, sort, direction, after);
         query = ApplyOrder(query, sort, direction);
 

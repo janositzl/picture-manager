@@ -19,10 +19,10 @@ public static class ImageQueryEndpoints
     }
 
     public static async Task<Results<Ok<PagedResult<ImageListItem>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListAsync(
-        int? folderId, string? folder, string? fileName, bool? favoritesOnly, string? sort, string? order, string? cursor, int? limit,
+        int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? sort, string? order, string? cursor, int? limit,
         IImageQueryService service, CancellationToken cancellationToken)
     {
-        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit);
+        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit, personId);
         return (await service.ListAsync(request, cancellationToken)).ToOk();
     }
 

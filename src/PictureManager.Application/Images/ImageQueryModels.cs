@@ -15,8 +15,8 @@ public enum SortDirection
     Desc
 }
 
-/// <summary>AND-combined listing filters. FolderId = images directly in that folder only.</summary>
-public sealed record ImageListFilter(int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly);
+/// <summary>AND-combined listing filters. FolderId = images directly in that folder only. PersonId = photos with that person's Auto/Confirmed face.</summary>
+public sealed record ImageListFilter(int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null);
 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);

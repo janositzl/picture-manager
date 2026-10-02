@@ -66,7 +66,7 @@ public sealed class ImageQueryService : IImageQueryService
         if (request.FolderId is int folderId && !await _folders.IsVisibleAsync(folderId, cancellationToken))
             return Result.NotFound();
 
-        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly);
+        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId);
         var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();
