@@ -33,7 +33,8 @@ public sealed class FaceCropService : IFaceCropService
     public async Task<string?> GetOrCreateCropPathAsync(int faceId, CancellationToken cancellationToken = default)
     {
         var cacheRoot = _cacheOptions.RootPath ?? Path.Combine(Path.GetTempPath(), "picturemanager-cache");
-        var cropPath = Path.Combine(cacheRoot, "faces", $"{faceId}.jpg");
+        // Absolute: Results.File treats a relative path as a virtual path under the web root, which breaks relative cache roots.
+        var cropPath = Path.GetFullPath(Path.Combine(cacheRoot, "faces", $"{faceId}.jpg"));
         if (File.Exists(cropPath))
             return cropPath;
 

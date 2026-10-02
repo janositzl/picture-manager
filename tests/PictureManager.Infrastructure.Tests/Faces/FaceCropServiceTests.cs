@@ -59,6 +59,33 @@ public class FaceCropServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOrCreateCropPathAsync_RelativeCacheRoot_ReturnsAbsoluteExistingPath()
+    {
+        var previewPath = Path.Combine(_dir, "preview.png");
+        using (var bitmap = new SKBitmap(400, 300))
+        {
+            bitmap.Erase(SKColors.Orange);
+            using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+            await File.WriteAllBytesAsync(previewPath, data.ToArray());
+        }
+        _people.GetFaceCropSourceAsync(11, Arg.Any<CancellationToken>())
+            .Returns(new FaceCropSource(11, "hash", "/mnt", "", "a", ".jpg", null, 0.25f, 0.25f, 0.5f, 0.5f));
+        _thumbnails.GetOrCreateDerivativePathAsync(default!, default!, default, default, default)
+            .ReturnsForAnyArgs(previewPath);
+        var relativeRoot = Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(_dir, "relcache"));
+        Path.IsPathRooted(relativeRoot).Should().BeFalse();
+        var service = new FaceCropService(_people, _thumbnails, new ThumbnailCacheOptions { RootPath = relativeRoot });
+
+        var created = await service.GetOrCreateCropPathAsync(11);
+        var cached = await service.GetOrCreateCropPathAsync(11);
+
+        Path.IsPathRooted(created).Should().BeTrue();
+        File.Exists(created).Should().BeTrue();
+        Path.IsPathRooted(cached).Should().BeTrue();
+        File.Exists(cached).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task GetOrCreateCropPathAsync_UnknownFace_ReturnsNull()
     {
         _people.GetFaceCropSourceAsync(9, Arg.Any<CancellationToken>()).Returns((FaceCropSource?)null);
