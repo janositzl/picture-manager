@@ -31,7 +31,8 @@ public sealed class FaceClusterer : IFaceClusterer
         foreach (var face in await _faces.GetUnassignedFacesAsync(faceModelId, minQuality: 0f, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var neighbors = await _faces.GetNearestAsync(face.Id, faceModelId, NeighborPool.Assigned, MatchNeighbors, cancellationToken);
+            var neighbors = await _faces.GetNearestAsync(
+                face.Id, faceModelId, NeighborPool.Assigned, MatchNeighbors, minQuality: 0f, cancellationToken);
             if (FaceClustering.MajorityPerson(neighbors, _options.AutoMatchDistance, MatchMinVotes) is int personId)
                 await _faces.AssignAsync(new[] { face.Id }, personId, cancellationToken);
         }
@@ -41,7 +42,8 @@ public sealed class FaceClusterer : IFaceClusterer
         var quality = remaining.ToDictionary(f => f.Id, f => f.Quality);
         var clusters = await FaceClustering.DbscanAsync(
             remaining.Select(f => f.Id).ToList(),
-            async id => (await _faces.GetNearestAsync(id, faceModelId, NeighborPool.Unassigned, ClusterNeighbors, cancellationToken))
+            async id => (await _faces.GetNearestAsync(
+                    id, faceModelId, NeighborPool.Unassigned, ClusterNeighbors, _options.MinQualityForClustering, cancellationToken))
                 .Where(n => n.Distance <= _options.ClusterDistance)
                 .Select(n => n.FaceId)
                 .ToList(),

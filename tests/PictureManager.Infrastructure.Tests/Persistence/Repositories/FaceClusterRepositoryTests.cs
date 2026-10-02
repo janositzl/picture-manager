@@ -40,7 +40,66 @@ public class FaceClusterRepositoryTests
         assigned.Select(n => n.FaceId).Should().Equal(assignedNear.Id, assignedFar.Id);
         assigned[0].PersonId.Should().Be(person.Id);
         unassigned.Select(n => n.FaceId).Should().Equal(unassignedNear.Id);
+        // Cosine distance between unit vectors tilted by t is 1 - cos(t) (an L2 distance would be 2 sin(t/2)).
+        assigned[0].Distance.Should().BeApproximately((float)(1 - Math.Cos(0.1)), 1e-5f);
+        assigned[1].Distance.Should().BeApproximately((float)(1 - Math.Cos(0.5)), 1e-5f);
+        unassigned[0].Distance.Should().BeApproximately((float)(1 - Math.Cos(0.05)), 1e-5f);
     }
+
+    [Fact]
+    public async Task GetNearestAsync_MinQuality_IsAppliedBeforeTheLimit()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var query = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0));
+        var blurryNear = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.01), quality: 0.2f);
+        var sharpFar = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.2), quality: 0.6f);
+        var repository = new FaceRepository(db.CreateContext());
+
+        (await repository.GetNearestAsync(query.Id, model, NeighborPool.Unassigned, 1, minQuality: 0.5f))
+            .Should().ContainSingle().Which.FaceId.Should().Be(sharpFar.Id);
+        (await repository.GetNearestAsync(query.Id, model, NeighborPool.Unassigned, 1))
+            .Should().ContainSingle().Which.FaceId.Should().Be(blurryNear.Id);
+    }
+
+    [Fact]
+    public async Task GetNearestAsync_ForcedIndexScan_StillReturnsKWhenTheNearestFacesBelongToAnotherModel()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context, "a");
+        var other = await FaceTestData.AddModelAsync(db.Context, "b");
+        var query = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0));
+        // 300 faces of the other model crowd the query's neighbourhood; this model's faces are all farther away.
+        db.Context.Faces.AddRange(Enumerable.Range(0, 300).Select(i => NewFace(image.Id, other, FaceTestData.Embedding(0, 0.0001 * i))));
+        db.Context.Faces.AddRange(Enumerable.Range(0, 10).Select(i => NewFace(image.Id, model, FaceTestData.Embedding(0, 0.3 + 0.01 * i))));
+        await db.Context.SaveChangesAsync();
+
+        // Make the planner use the HNSW index like it would on a big table (tiny tables are scanned sequentially).
+        await using var context = db.CreateContext();
+        await context.Database.OpenConnectionAsync();
+        await context.Database.ExecuteSqlRawAsync("SET enable_seqscan = off; SET enable_sort = off");
+
+        var neighbors = await new FaceRepository(context).GetNearestAsync(query.Id, model, NeighborPool.Unassigned, 5);
+
+        neighbors.Should().HaveCount(5);
+        neighbors.Select(n => n.Distance).Should().BeInAscendingOrder();
+        neighbors[0].Distance.Should().BeApproximately((float)(1 - Math.Cos(0.3)), 1e-4f);
+    }
+
+    private static Face NewFace(int imageId, int modelId, float[] embedding, float quality = 0.9f) => new()
+    {
+        ImageId = imageId,
+        FaceModelId = modelId,
+        X = 0.1f, Y = 0.1f, Width = 0.2f, Height = 0.2f,
+        DetectionConfidence = 0.9f,
+        QualityScore = quality,
+        Embedding = new Pgvector.Vector(embedding),
+        CreatedUtc = Now
+    };
 
     [Fact]
     public async Task AssignAsync_OnlyTouchesUnassignedFaces()

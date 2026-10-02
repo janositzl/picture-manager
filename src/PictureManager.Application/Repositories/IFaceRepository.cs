@@ -48,8 +48,12 @@ public interface IFaceRepository
     /// <summary>Unassigned faces of this model with QualityScore ≥ minQuality, best quality first.</summary>
     Task<IReadOnlyList<FaceCandidate>> GetUnassignedFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default);
 
-    /// <summary>The k nearest faces (cosine distance) of the same model in the given pool, nearest first, excluding faceId.</summary>
-    Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(int faceId, int faceModelId, NeighborPool pool, int k, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// The k nearest faces (cosine distance) of the same model in the given pool with QualityScore ≥ minQuality,
+    /// nearest first, excluding faceId. The filters apply before the limit (filtered-out faces never fill the k slots).
+    /// </summary>
+    Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(
+        int faceId, int faceModelId, NeighborPool pool, int k, float minQuality = 0f, CancellationToken cancellationToken = default);
 
     /// <summary>Sets PersonId and Auto on those of these faces that are still Unassigned. Never touches user decisions.</summary>
     Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, CancellationToken cancellationToken = default);

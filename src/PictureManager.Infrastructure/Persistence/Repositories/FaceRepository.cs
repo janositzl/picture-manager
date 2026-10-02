@@ -16,6 +16,13 @@ namespace PictureManager.Infrastructure.Persistence.Repositories;
 
 public sealed class FaceRepository : IFaceRepository
 {
+    /// <summary>
+    /// For kNN queries (pgvector ≥ 0.8): keep scanning the HNSW index until enough rows pass the WHERE filters, in
+    /// exact distance order; ef_search 100 is at least twice the largest k the clusterer asks for (32).
+    /// </summary>
+    private const string KnnSessionSettings =
+        "SET LOCAL hnsw.iterative_scan = strict_order; SET LOCAL hnsw.ef_search = 100";
+
     private readonly PictureManagerDbContext _dbContext;
 
     public FaceRepository(PictureManagerDbContext dbContext)
@@ -173,24 +180,36 @@ public sealed class FaceRepository : IFaceRepository
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(
-        int faceId, int faceModelId, NeighborPool pool, int k, CancellationToken cancellationToken = default)
+        int faceId, int faceModelId, NeighborPool pool, int k, float minQuality = 0f, CancellationToken cancellationToken = default)
     {
         var embedding = await _dbContext.Faces.AsNoTracking()
             .Where(f => f.Id == faceId).Select(f => f.Embedding).FirstOrDefaultAsync(cancellationToken);
         if (embedding is null)
             return Array.Empty<FaceNeighbor>();
 
-        var faces = _dbContext.Faces.AsNoTracking().Where(f => f.FaceModelId == faceModelId && f.Id != faceId);
+        var faces = _dbContext.Faces.AsNoTracking()
+            .Where(f => f.FaceModelId == faceModelId && f.Id != faceId && f.QualityScore >= minQuality);
         faces = pool == NeighborPool.Assigned
             ? faces.Where(f => f.PersonId != null
                                && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed))
             : faces.Where(f => f.AssignmentState == FaceAssignmentState.Unassigned);
 
-        return await faces
+        // The HNSW index scan yields only ef_search candidates and the filters run afterwards, so on a big table a
+        // plain scan can return fewer than k (or no) rows. An iterative scan keeps scanning until k rows pass the
+        // filters. SET LOCAL needs a transaction on this connection; it ends with it.
+        var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction ? await _dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        await _dbContext.Database.ExecuteSqlRawAsync(KnnSessionSettings, cancellationToken);
+
+        var neighbors = await faces
             .OrderBy(f => f.Embedding.CosineDistance(embedding))
             .Take(k)
             .Select(f => new FaceNeighbor(f.Id, f.PersonId, (float)f.Embedding.CosineDistance(embedding)))
             .ToListAsync(cancellationToken);
+
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+        return neighbors;
     }
 
     public async Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, CancellationToken cancellationToken = default)
