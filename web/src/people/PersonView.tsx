@@ -1,9 +1,10 @@
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { useState, type FormEvent } from 'react'
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
-import { useNamePerson, usePerson } from '../api/people'
+import { useNamePerson, usePeople, usePerson, type PersonSummary } from '../api/people'
 import { useNotify } from '../app/notify'
 import { parseGridParams } from '../routing/urlState'
+import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { GridHeader } from '../views/GridHeader'
 import { ImageBrowser } from '../views/ImageBrowser'
@@ -12,12 +13,13 @@ type NameFormProps = { personId: number; name: string | null }
 
 function NameForm({ personId, name }: NameFormProps) {
   const [draft, setDraft] = useState(name ?? '')
+  const [mergeTarget, setMergeTarget] = useState<PersonSummary | null>(null)
+  const people = usePeople()
   const namePerson = useNamePerson()
   const navigate = useNavigate()
   const notify = useNotify()
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
+  const save = () => {
     namePerson.mutate(
       { id: personId, name: draft },
       {
@@ -28,6 +30,15 @@ function NameForm({ personId, name }: NameFormProps) {
         onError: () => notify("Couldn't save the name."),
       },
     )
+  }
+
+  // Another person's name merges this one into it for good, so ask first (only when the list is known).
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    const typed = draft.trim().toLowerCase()
+    const existing = people.data?.find((p) => p.id !== personId && p.name?.trim().toLowerCase() === typed)
+    if (existing) setMergeTarget(existing)
+    else save()
   }
 
   return (
@@ -41,6 +52,18 @@ function NameForm({ personId, name }: NameFormProps) {
       <Button type="submit" variant="contained" disabled={draft.trim() === '' || namePerson.isPending}>
         Save name
       </Button>
+      {mergeTarget && (
+        <ConfirmDialog
+          title="Merge people?"
+          message={`Merge into existing '${mergeTarget.name}' (${mergeTarget.photoCount} ${mergeTarget.photoCount === 1 ? 'photo' : 'photos'})? This can't be undone.`}
+          confirmLabel="Merge"
+          onConfirm={() => {
+            setMergeTarget(null)
+            save()
+          }}
+          onClose={() => setMergeTarget(null)}
+        />
+      )}
     </form>
   )
 }
