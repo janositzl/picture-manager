@@ -204,7 +204,7 @@ A person, or an unnamed group created by clustering.
 |---|---|---|
 | Id | int (PK) | Row identifier |
 | Name | string?(200), indexed | Null = unnamed group |
-| CoverFaceId | int? | Face shown for this person. No foreign key on purpose (avoids a Faces/People cycle); may be stale |
+| CoverFaceId | int? | Face shown for this person. No foreign key on purpose (avoids a Faces/People cycle); may be stale, so reads use it only while it is still one of the person's Auto/Confirmed faces and otherwise fall back to the best-quality one |
 | CreatedUtc | timestamptz | Creation time |
 | ModifiedUtc | timestamptz | Last modification time |
 

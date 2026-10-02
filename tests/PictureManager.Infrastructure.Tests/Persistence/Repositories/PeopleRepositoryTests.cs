@@ -37,6 +37,70 @@ public class PeopleRepositoryTests
     }
 
     [Fact]
+    public async Task CoverFaceId_StaleCoverFallsBackToBestQualityAssignedFace()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        var cover = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Auto);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Auto, quality: 0.6f);
+        var best = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2), anna.Id, FaceAssignmentState.Confirmed, quality: 0.8f);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(3), anna.Id, FaceAssignmentState.Rejected, quality: 0.99f);
+        anna.CoverFaceId = cover.Id;
+        await db.Context.SaveChangesAsync();
+        await db.Context.Faces.Where(f => f.Id == cover.Id).ExecuteDeleteAsync();
+        var repository = new PeopleRepository(db.CreateContext());
+
+        (await repository.GetAsync(anna.Id))!.CoverFaceId.Should().Be(best.Id);
+        (await repository.GetAllAsync()).Should().ContainSingle().Which.CoverFaceId.Should().Be(best.Id);
+    }
+
+    [Fact]
+    public async Task CoverFaceId_CoverOfAnotherPersonOrRejectedFallsBack_ValidCoverIsKept()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        var bela = new Person { Name = "Bela", CreatedUtc = Now, ModifiedUtc = Now };
+        var cili = new Person { Name = "Cili", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(anna, bela, cili);
+        await db.Context.SaveChangesAsync();
+        var annaCover = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Auto, quality: 0.5f);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Confirmed, quality: 0.9f);
+        var belaBest = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2), bela.Id, FaceAssignmentState.Auto);
+        var ciliRejected = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(3), cili.Id, FaceAssignmentState.Rejected);
+        var ciliBest = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(4), cili.Id, FaceAssignmentState.Auto);
+        anna.CoverFaceId = annaCover.Id; // valid, although not the best quality
+        bela.CoverFaceId = annaCover.Id; // merged away / moved to another person
+        cili.CoverFaceId = ciliRejected.Id;
+        await db.Context.SaveChangesAsync();
+        var repository = new PeopleRepository(db.CreateContext());
+
+        (await repository.GetAsync(anna.Id))!.CoverFaceId.Should().Be(annaCover.Id);
+        (await repository.GetAsync(bela.Id))!.CoverFaceId.Should().Be(belaBest.Id);
+        (await repository.GetAsync(cili.Id))!.CoverFaceId.Should().Be(ciliBest.Id);
+    }
+
+    [Fact]
+    public async Task CoverFaceId_NoAssignedFaces_IsNull()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now, CoverFaceId = 12345 };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        var repository = new PeopleRepository(db.CreateContext());
+
+        (await repository.GetAsync(anna.Id))!.CoverFaceId.Should().BeNull();
+        (await repository.GetAllAsync()).Should().ContainSingle().Which.CoverFaceId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task SetNameAsync_NamesAndConfirmsAutoFaces()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

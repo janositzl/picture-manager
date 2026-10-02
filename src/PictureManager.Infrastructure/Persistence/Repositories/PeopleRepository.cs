@@ -18,6 +18,8 @@ public sealed class PeopleRepository : IPeopleRepository
         _dbContext = dbContext;
     }
 
+    // The stored CoverFaceId goes stale (re-processing, image deleted, faces merged away), so it is used only while
+    // it is still one of the person's Auto/Confirmed faces; otherwise the best-quality such face (then lowest Id).
     private static IQueryable<PersonSummary> Summaries(IQueryable<Person> people) =>
         people.Select(p => new PersonSummary(
             p.Id,
@@ -25,7 +27,13 @@ public sealed class PeopleRepository : IPeopleRepository
             p.Faces.Count(f => f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed),
             p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed)
                 .Select(f => f.ImageId).Distinct().Count(),
-            p.CoverFaceId));
+            p.Faces.Any(f => f.Id == p.CoverFaceId
+                             && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed))
+                ? p.CoverFaceId
+                : p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed)
+                    .OrderByDescending(f => f.QualityScore).ThenBy(f => f.Id)
+                    .Select(f => (int?)f.Id)
+                    .FirstOrDefault()));
 
     public async Task<IReadOnlyList<PersonSummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
