@@ -162,4 +162,49 @@ public class FaceClusterRepositoryTests
 
         faces.Should().ContainSingle().Which.Id.Should().Be(good.Id);
     }
+
+    [Fact]
+    public async Task GetUnclusteredFacesAsync_OnlyUnassignedNeverClusteredFacesOfTheModel()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context, "a");
+        var other = await FaceTestData.AddModelAsync(db.Context, "b");
+        var person = new Person { CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(person);
+        await db.Context.SaveChangesAsync();
+        var fresh = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), quality: 0.8f);
+        var freshBlurry = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), quality: 0.2f);
+        var oldNoise = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2), quality: 0.9f);
+        oldNoise.ClusteredUtc = Now;
+        await db.Context.SaveChangesAsync();
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(3), person.Id, FaceAssignmentState.Auto);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, other, FaceTestData.Embedding(4));
+        var repository = new FaceRepository(db.CreateContext());
+
+        (await repository.GetUnclusteredFacesAsync(model, 0f)).Select(f => f.Id).Should().Equal(fresh.Id, freshBlurry.Id);
+        (await repository.GetUnclusteredFacesAsync(model, 0.5f)).Select(f => f.Id).Should().Equal(fresh.Id);
+    }
+
+    [Fact]
+    public async Task MarkClusteredAsync_StampsOnlyTheGivenFaces()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var first = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0));
+        var second = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1));
+        var untouched = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2));
+
+        await new FaceRepository(db.CreateContext()).MarkClusteredAsync(new[] { first.Id, second.Id }, Now);
+
+        await using var read = db.CreateContext();
+        var stamps = await read.Faces.ToDictionaryAsync(f => f.Id, f => f.ClusteredUtc);
+        stamps[first.Id].Should().Be(Now);
+        stamps[second.Id].Should().Be(Now);
+        stamps[untouched.Id].Should().BeNull();
+        (await new FaceRepository(db.CreateContext()).GetUnclusteredFacesAsync(model, 0f)).Select(f => f.Id).Should().Equal(untouched.Id);
+    }
 }

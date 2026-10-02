@@ -22,6 +22,9 @@ public class Face
     public Vector Embedding { get; set; } = null!;
     public DateTime CreatedUtc { get; set; }
 
+    /// <summary>When clustering last used this face as a seed; null = not yet (new or re-created by re-processing).</summary>
+    public DateTime? ClusteredUtc { get; set; }
+
     public Image? Image { get; set; }
     public FaceModel? FaceModel { get; set; }
     public Person? Person { get; set; }

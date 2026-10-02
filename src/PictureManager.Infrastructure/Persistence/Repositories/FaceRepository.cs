@@ -179,6 +179,24 @@ public sealed class FaceRepository : IFaceRepository
             .Select(f => new FaceCandidate(f.Id, f.QualityScore))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<FaceCandidate>> GetUnclusteredFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
+        await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.FaceModelId == faceModelId && f.ClusteredUtc == null
+                        && f.AssignmentState == FaceAssignmentState.Unassigned && f.QualityScore >= minQuality)
+            .OrderByDescending(f => f.QualityScore).ThenBy(f => f.Id)
+            .Select(f => new FaceCandidate(f.Id, f.QualityScore))
+            .ToListAsync(cancellationToken);
+
+    public async Task MarkClusteredAsync(IReadOnlyCollection<int> faceIds, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        if (faceIds.Count == 0)
+            return;
+
+        await _dbContext.Faces
+            .Where(f => faceIds.Contains(f.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.ClusteredUtc, nowUtc), cancellationToken);
+    }
+
     public async Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(
         int faceId, int faceModelId, NeighborPool pool, int k, float minQuality = 0f, CancellationToken cancellationToken = default)
     {

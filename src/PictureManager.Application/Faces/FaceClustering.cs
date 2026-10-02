@@ -25,24 +25,24 @@ public static class FaceClustering
     }
 
     /// <summary>
-    /// DBSCAN over ids. neighbors(id) returns ids within eps (it may include ids outside the set, which are
-    /// ignored). A point is core when it has ≥ minPoints − 1 neighbours in the set (so the cluster, including
-    /// itself, reaches minPoints). Clusters smaller than minPoints are dropped as noise.
+    /// DBSCAN seeded from seedIds. neighbors(id) returns ids within eps; clusters start only at seeds but expand into
+    /// any id it returns (seed or not), so a new face can group with older faces. A point is core when it has
+    /// ≥ minPoints − 1 neighbours (so the cluster, including itself, reaches minPoints). Clusters smaller than
+    /// minPoints are dropped as noise. Every cluster contains at least one seed.
     /// </summary>
     public static async Task<List<List<int>>> DbscanAsync(
-        IReadOnlyList<int> ids, Func<int, Task<IReadOnlyList<int>>> neighbors, int minPoints, CancellationToken cancellationToken)
+        IReadOnlyList<int> seedIds, Func<int, Task<IReadOnlyList<int>>> neighbors, int minPoints, CancellationToken cancellationToken)
     {
-        var inSet = ids.ToHashSet();
         var visited = new HashSet<int>();
         var clustered = new HashSet<int>();
         var clusters = new List<List<int>>();
 
-        foreach (var id in ids)
+        foreach (var id in seedIds)
         {
             if (!visited.Add(id))
                 continue;
 
-            var seeds = (await neighbors(id)).Where(inSet.Contains).ToList();
+            var seeds = (await neighbors(id)).ToList();
             if (seeds.Count + 1 < minPoints)
                 continue;
 
@@ -58,7 +58,7 @@ public static class FaceClustering
                 if (!visited.Add(current))
                     continue;
 
-                var next = (await neighbors(current)).Where(inSet.Contains).ToList();
+                var next = await neighbors(current);
                 if (next.Count + 1 >= minPoints)
                     foreach (var n in next.Where(n => !clustered.Contains(n)))
                         queue.Enqueue(n);

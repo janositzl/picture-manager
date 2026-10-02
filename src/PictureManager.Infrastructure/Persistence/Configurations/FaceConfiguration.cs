@@ -12,6 +12,7 @@ public class FaceConfiguration : IEntityTypeConfiguration<Face>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Embedding).HasColumnType("vector(512)").IsRequired();
         builder.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+        builder.Property(x => x.ClusteredUtc).HasColumnType("timestamp with time zone");
 
         builder.HasOne(x => x.Image).WithMany().HasForeignKey(x => x.ImageId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(x => x.FaceModel).WithMany().HasForeignKey(x => x.FaceModelId).OnDelete(DeleteBehavior.Restrict);
@@ -20,6 +21,7 @@ public class FaceConfiguration : IEntityTypeConfiguration<Face>
         builder.HasIndex(x => x.ImageId);
         builder.HasIndex(x => x.PersonId);
         builder.HasIndex(x => new { x.FaceModelId, x.AssignmentState });
+        builder.HasIndex(x => new { x.FaceModelId, x.ClusteredUtc });
         builder.HasIndex(x => x.Embedding).HasMethod("hnsw").HasOperators("vector_cosine_ops");
     }
 }

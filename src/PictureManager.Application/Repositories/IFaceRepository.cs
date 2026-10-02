@@ -49,6 +49,15 @@ public interface IFaceRepository
     Task<IReadOnlyList<FaceCandidate>> GetUnassignedFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Unassigned faces of this model with QualityScore ≥ minQuality that no clustering pass has used as a seed yet
+    /// (ClusteredUtc null), best quality first.
+    /// </summary>
+    Task<IReadOnlyList<FaceCandidate>> GetUnclusteredFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets ClusteredUtc on these faces so later passes no longer use them as seeds.</summary>
+    Task MarkClusteredAsync(IReadOnlyCollection<int> faceIds, DateTime nowUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The k nearest faces (cosine distance) of the same model in the given pool with QualityScore ≥ minQuality,
     /// nearest first, excluding faceId. The filters apply before the limit (filtered-out faces never fill the k slots).
     /// </summary>
