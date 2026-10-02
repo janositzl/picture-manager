@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -9,12 +10,13 @@ using NSubstitute.ExceptionExtensions;
 using PictureManager.Application.Common;
 using PictureManager.Application.Faces;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Scanning;
 using PictureManager.Model;
 using Xunit;
 
 namespace PictureManager.Application.Tests.Faces;
 
-public class FaceRecognitionServiceTests
+public class FaceRecognitionServiceTests : IDisposable
 {
     private static readonly FaceModelDescriptor Descriptor = new("m", "1", 512, "hash");
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
@@ -27,6 +29,7 @@ public class FaceRecognitionServiceTests
     private readonly IFaceImageProcessor _processor = Substitute.For<IFaceImageProcessor>();
     private readonly JobCancellationRegistry _cancellations = new();
     private readonly IClock _clock = Substitute.For<IClock>();
+    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"pm-face-roots-{Guid.NewGuid():N}");
 
     public FaceRecognitionServiceTests()
     {
@@ -40,6 +43,27 @@ public class FaceRecognitionServiceTests
             return job;
         });
         _processor.ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>()).Returns(new FaceImageResult(FaceImageOutcome.Processed, 1));
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempDir))
+            Directory.Delete(_tempDir, recursive: true);
+    }
+
+    /// <summary>A root whose mount folder exists with a file in it (mounted) or doesn't exist (share offline).</summary>
+    private ImageRoot Root(int id, string name, bool mounted)
+    {
+        var mountPath = Path.Combine(_tempDir, name);
+        if (mounted)
+        {
+            Directory.CreateDirectory(mountPath);
+            File.WriteAllText(Path.Combine(mountPath, "a.jpg"), "x");
+        }
+
+        var root = new ImageRoot { Id = id, Name = name, MountPath = mountPath, IsActive = true };
+        _roots.GetByIdAsync(id, Arg.Any<CancellationToken>()).Returns(root);
+        return root;
     }
 
     private FaceRecognitionService Create()
@@ -133,5 +157,70 @@ public class FaceRecognitionServiceTests
 
         await act.Should().ThrowAsync<FaceModelUnavailableException>();
         await _jobs.Received(1).SetFailureResultAsync(50, 0, 0, "Face recognition models not found", JobStatus.Failed, Arg.Any<DateTime>(), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RunAsync_AllRootsUnavailable_FailsAtOnceWithTheMessage_ProcessesNothing()
+    {
+        var roots = new List<ImageRoot> { Root(1, "nas", mounted: false), Root(2, "usb", mounted: false) };
+        _roots.GetAllAsync(Arg.Any<CancellationToken>()).Returns(roots);
+        _faces.GetCandidateImageIdsAsync(3, null, true, Arg.Any<CancellationToken>()).Returns(new List<int> { 1, 2 });
+
+        var act = () => Create().RunAsync(new QueuedFaceRecognition(50, null, true));
+
+        var thrown = await act.Should().ThrowAsync<ScanRootsUnavailableException>();
+        thrown.Which.RootNames.Should().Equal("nas", "usb");
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default);
+        await _clusterer.DidNotReceiveWithAnyArgs().ClusterAsync(default, default);
+        await _jobs.Received(1).SetFailureResultAsync(
+            50, 0, 0, Arg.Is<string?>(m => m!.Contains("'nas'") && m.Contains("'usb'")), JobStatus.Failed, Arg.Any<DateTime>(), CancellationToken.None);
+        await _jobs.DidNotReceiveWithAnyArgs().TryMarkCompletedAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task RunAsync_FolderOnUnavailableRoot_FailsAtOnce()
+    {
+        Root(1, "nas", mounted: false);
+        _folders.GetByIdAsync(20, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 20, RootId = 1, RelativePath = "Trips" });
+
+        var act = () => Create().RunAsync(new QueuedFaceRecognition(50, 20, true));
+
+        (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("nas");
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default);
+        await _clusterer.DidNotReceiveWithAnyArgs().ClusterAsync(default, default);
+    }
+
+    [Fact]
+    public async Task RunAsync_SomeRootsUnavailable_ProcessesAndClusters_ThenFailsNamingThem()
+    {
+        var inactive = Root(3, "old", mounted: false);
+        inactive.IsActive = false;
+        var roots = new List<ImageRoot> { Root(1, "nas", mounted: true), Root(2, "usb", mounted: false), inactive };
+        _roots.GetAllAsync(Arg.Any<CancellationToken>()).Returns(roots);
+        _faces.GetCandidateImageIdsAsync(3, null, true, Arg.Any<CancellationToken>()).Returns(new List<int> { 1, 2 });
+
+        var act = () => Create().RunAsync(new QueuedFaceRecognition(50, null, true));
+
+        (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("usb");
+        await _processor.Received(2).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>());
+        await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
+        await _jobs.Received(1).SetFailureResultAsync(
+            50, 0, 2, Arg.Is<string?>(m => m!.Contains("'usb'") && !m.Contains("'nas'")), JobStatus.Failed, Arg.Any<DateTime>(), CancellationToken.None);
+        await _jobs.DidNotReceiveWithAnyArgs().TryMarkCompletedAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task RunAsync_AllRootsAvailable_Completes()
+    {
+        Root(1, "nas", mounted: true);
+        _folders.GetByIdAsync(20, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 20, RootId = 1, RelativePath = "Trips" });
+        _faces.GetCandidateImageIdsAsync(3, 20, true, Arg.Any<CancellationToken>()).Returns(new List<int> { 1 });
+
+        await Create().RunAsync(new QueuedFaceRecognition(50, 20, true));
+
+        await _processor.Received(1).ProcessAsync(1, 3, Arg.Any<CancellationToken>());
+        await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
+        await _jobs.Received(1).TryMarkCompletedAsync(50, JobStatus.Enriching, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _jobs.DidNotReceiveWithAnyArgs().SetFailureResultAsync(default, default, default, default, default, default, default);
     }
 }

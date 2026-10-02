@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -85,6 +86,13 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Same semantics as a scan: with every in-scope share offline, fail at once (each image would only be
+            // skipped); with some offline, process the rest and fail at the end so the user sees the warning.
+            var (inScopeRoots, unavailableRoots) = await CheckRootsAsync(job.FolderId, cancellationToken);
+            if (inScopeRoots > 0 && unavailableRoots.Count == inScopeRoots)
+                throw new ScanRootsUnavailableException(unavailableRoots);
+
             var faceModelId = await _faceRepository.GetOrCreateModelIdAsync(_analyzer.Model, _clock.UtcNow, cancellationToken);
 
             var imageIds = await _faceRepository.GetCandidateImageIdsAsync(faceModelId, job.FolderId, job.IsRecursive, cancellationToken);
@@ -110,6 +118,9 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
             // Global, current model only. Runs after every job so newly detected faces join people at once.
             await _clusterer.ClusterAsync(faceModelId, cancellationToken);
 
+            if (unavailableRoots.Count > 0)
+                throw new ScanRootsUnavailableException(unavailableRoots);
+
             await _jobRepository.TryMarkCompletedAsync(job.JobId, JobStatus.Enriching, _clock.UtcNow, cancellationToken);
         }
         catch (Exception ex)
@@ -133,6 +144,25 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
 
         var faceModelId = await _faceRepository.GetOrCreateModelIdAsync(model, _clock.UtcNow, cancellationToken);
         return await _faceRepository.GetPermanentFailuresAsync(faceModelId, cancellationToken);
+    }
+
+    /// <summary>How many active roots the job covers (the folder's root, or all active roots) and which are unmounted.</summary>
+    private async Task<(int InScope, IReadOnlyList<string> Unavailable)> CheckRootsAsync(int? folderId, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ImageRoot> roots;
+        if (folderId is int id)
+        {
+            var folder = await _folderRepository.GetByIdAsync(id, cancellationToken);
+            var root = folder is null ? null : await _imageRootRepository.GetByIdAsync(folder.RootId, cancellationToken);
+            roots = root is { IsActive: true } ? new[] { root } : Array.Empty<ImageRoot>();
+        }
+        else
+        {
+            roots = (await _imageRootRepository.GetAllAsync(cancellationToken)).Where(r => r.IsActive).ToList();
+        }
+
+        var unavailable = roots.Where(r => !ScanTargets.IsRootAvailable(r.MountPath)).Select(r => r.Name).ToList();
+        return (roots.Count, unavailable);
     }
 
     private async Task FinalizeFailureAsync(int jobId, Exception ex, int candidates)
