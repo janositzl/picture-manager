@@ -116,20 +116,21 @@ Seeded with a system user (Id 1, "System") as a v1 placeholder album owner until
 
 ## Jobs
 
-Background jobs (scan or discovery); only one runs at a time.
+Background jobs (scan, discovery or face recognition); only one runs at a time.
 
 | Property | Type | Description |
 |---|---|---|
 | Id | int (PK) | Row identifier |
-| Kind | enum (Scan/Discovery) | Job type |
+| Kind | enum (Scan/Discovery/FaceRecognition) | Job type |
 | FolderId | int? (FK → Folders) | Scope: null = all active roots, else starting folder |
 | IsRecursive | bool | Whether the job recurses into subfolders |
 | Status | enum (Pending/Enumerating/Enriching/Completed/Failed/Cancelled), indexed | Current status |
 | StartedUtc | timestamptz | Start time |
 | CompletedUtc | timestamptz? | Completion time |
 | FoldersProcessed | int | Folders visited so far |
-| FilesFound | int | Scan only; always 0 for discovery |
-| FilesEnriched | int | Scan only; always 0 for discovery |
+| FilesFound | int | Scan: files found. Face recognition: images to process. Always 0 for discovery |
+| FilesEnriched | int | Scan: files enriched. Face recognition: images processed. Always 0 for discovery |
+| FacesFound | int | Face recognition only: faces detected so far; 0 otherwise |
 | ErrorMessage | string?(4000) | Error detail on failure |
 
 Deleting the referenced folder sets FolderId to null.
@@ -146,3 +147,67 @@ Singleton row of global scan settings.
 | IncludedExtensions | jsonb (List\<string\>?) | If set, only these extensions are scanned |
 
 Seeded singleton: excluded folders `raw`, `backup`, `@eaDir`; excluded extension `.heic`; no included-extensions filter.
+
+## FaceModels
+
+The face model that produced a set of embeddings. Embeddings from different models are never compared.
+
+| Property | Type | Description |
+|---|---|---|
+| Id | int (PK) | Row identifier |
+| Name | string(100) | Model name |
+| Version | string(100) | Model version |
+| EmbeddingDimensions | int | Length of the embedding vectors |
+| ModelHash | string(64), unique index | SHA-256 (hex) of the model files; identifies the model across restarts |
+| CreatedUtc | timestamptz | When the model was first registered |
+
+## FaceProcessingStates
+
+Face analysis outcome for one image. Valid only while FaceModelId is the current model and ImageFingerprint still equals the image's ContentHash; otherwise the image is a candidate again.
+
+| Property | Type | Description |
+|---|---|---|
+| ImageId | int (PK, FK → Images) | The analysed image |
+| FaceModelId | int (FK → FaceModels), indexed with Status | Model used |
+| ImageFingerprint | string | The image's ContentHash at analysis time |
+| Status | enum (Completed/Failed/PermanentlyFailed) | Failed is retried by the next run; PermanentlyFailed means given up (undecodable or too many attempts) |
+| Attempts | int | Number of attempts so far |
+| ErrorMessage | string?(4000) | Error detail on failure |
+| ProcessedUtc | timestamptz | When the image was last processed |
+
+Deleting the image cascades. Deleting a face model is restricted while states reference it.
+
+## Faces
+
+A detected face. The box is normalized (0-1) against the orientation-corrected image.
+
+| Property | Type | Description |
+|---|---|---|
+| Id | int (PK) | Row identifier |
+| ImageId | int (FK → Images), indexed | Image containing the face |
+| FaceModelId | int (FK → FaceModels), indexed with AssignmentState | Model that produced the embedding |
+| PersonId | int? (FK → People), indexed | Assigned person; null = unassigned |
+| AssignmentState | enum (Unassigned/Auto/Confirmed/Rejected) | Auto = set by clustering/matching; Confirmed/Rejected = set by the user and never changed by automation |
+| X, Y, Width, Height | float | Normalized bounding box |
+| DetectionConfidence | float | Detector score |
+| QualityScore | float | Face quality score; decides whether the face takes part in clustering |
+| Embedding | vector(512), HNSW index (vector_cosine_ops) | L2-normalized embedding, compared with cosine distance. Biometric data |
+| CreatedUtc | timestamptz | Creation time |
+
+Deleting the image cascades; deleting the person sets PersonId to null; deleting a face model is restricted while faces reference it.
+
+## People
+
+A person, or an unnamed group created by clustering.
+
+| Property | Type | Description |
+|---|---|---|
+| Id | int (PK) | Row identifier |
+| Name | string?(200), indexed | Null = unnamed group |
+| CoverFaceId | int? | Face shown for this person. No foreign key on purpose (avoids a Faces/People cycle); may be stale |
+| CreatedUtc | timestamptz | Creation time |
+| ModifiedUtc | timestamptz | Last modification time |
+
+## Extensions
+
+The database requires the PostgreSQL `vector` extension (pgvector), enabled by migration. It provides the `vector(512)` column type and the HNSW index on `Faces.Embedding`.

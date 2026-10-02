@@ -157,3 +157,77 @@ docker compose -f docker-compose.prod.yml down -v
 - **Images don't show up** — confirm `IMAGE_LIBRARY_PATH` is an absolute path
   and that the container's `/data/images` mount actually contains files
   (`docker compose -f docker-compose.prod.yml exec api ls /data/images`).
+
+## 8. Face recognition
+
+PictureManager can detect faces and group them into people. Everything runs
+inside the `api` container (ONNX, CPU only); no image or face data leaves the
+server.
+
+### Database image
+
+The `db` service is now built from `docker/postgres/Dockerfile`
+(`postgres:17-alpine` plus the pgvector extension) instead of pulling a stock
+image. Existing `pgdata` volumes keep working: the OS family (Alpine) and text
+collation are unchanged, so no dump/restore is needed.
+
+- `docker compose pull` cannot pull the `db` service because it is built
+  locally. Use `docker compose build db`, or
+  `docker compose pull --ignore-buildable`.
+- Moving a database between servers requires the **same PostgreSQL major
+  version (17)** and **pgvector installed on the target** before you restore a
+  dump that contains `vector` columns. The easiest way is to use this repo's
+  `db` image on the target as well.
+
+### Models and licence
+
+The image downloads the InsightFace `buffalo_l` models (`det_10g.onnx`
+detector and `w600k_r50.onnx` recognizer) at build time, verifies the zip
+against a pinned SHA-256 (`BUFFALO_L_SHA256` in the `Dockerfile`), and stores
+them in `/app/models/buffalo_l`. `FaceRecognition__ModelDirectory` points
+there. **The InsightFace pretrained weights are for non-commercial use only.**
+
+### Privacy
+
+Face embeddings are biometric data. Treat database backups (and the
+`pgdata` volume) as sensitive. Nothing is sent off the server.
+
+### Tuning
+
+Set these as environment variables on the `api` service. Defaults come from
+`FaceRecognitionOptions`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `FaceRecognition__ReadConcurrency` | `2` | Images decoded (NAS reads) concurrently, on top of inference |
+| `FaceRecognition__InferenceConcurrency` | half the CPU cores (at least 1) | Concurrent model executions (CPU-bound) |
+| `FaceRecognition__DetectionThreshold` | `0.6` | Minimum detector score for a face |
+| `FaceRecognition__MinFaceSizePx` | `40` | Faces whose shorter side is below this many pixels (in the decoded image, at most 1600 px) are ignored |
+| `FaceRecognition__MaxAttempts` | `3` | Attempts per image before it is marked permanently failed |
+| `FaceRecognition__ClusterDistance` | `0.5` | Cosine distance for grouping unassigned faces |
+| `FaceRecognition__AutoMatchDistance` | `0.4` | Stricter cosine distance for attaching a new face to an existing person |
+| `FaceRecognition__MinFacesPerGroup` | `3` | Minimum faces to form an unnamed group |
+| `FaceRecognition__MinQualityForClustering` | `0.5` | Minimum face quality score to take part in clustering |
+| `FaceRecognition__ModelDirectory` | `models/buffalo_l` (the image sets `/app/models/buffalo_l`) | Folder holding the two model files; relative paths resolve against the app's content root |
+
+### Usage
+
+1. Scan your library first; only scanned images are processed.
+2. Choose **Recognize faces** in a folder's menu, or use the People page to
+   process everything.
+3. Progress shows in the banner. **Cancel** stops the job. A cancelled or
+   interrupted job resumes where it stopped when you start it again (only the
+   remaining images are processed).
+4. On the People page, name an unnamed group to turn it into a person. Giving
+   a group the name of an existing person merges it into that person.
+5. Images that cannot be decoded are listed at
+   `GET /api/face-recognitions/failures`.
+
+Only one job (scan, discovery or face recognition) runs at a time.
+
+### Development
+
+- `tools/download-face-models.ps1` downloads the models to `./models/buffalo_l`
+  (gitignored). The dev `appsettings.json` default points there.
+- The dev database must use the pgvector image:
+  `docker compose up -d --build db`.

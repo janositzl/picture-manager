@@ -9,6 +9,7 @@
 
 ARG DOTNET_VERSION=10.0
 ARG NODE_VERSION=22-alpine
+ARG BUFFALO_L_SHA256=80ffe37d8a5940d59a7384c201a2a38d4741f2f3c51eef46ebb28218a7b0ca2f
 
 FROM node:${NODE_VERSION} AS web-build
 WORKDIR /web
@@ -43,6 +44,18 @@ RUN dotnet tool install --global dotnet-ef --version 10.* \
         --self-contained -r linux-x64 \
         -o /app/publish/efbundle --force
 
+# InsightFace buffalo_l: SCRFD-10G detector + ArcFace R50 recognizer (non-commercial use only).
+FROM alpine:3.20 AS models
+ARG BUFFALO_L_SHA256
+RUN apk add --no-cache curl unzip \
+    && curl -fsSL -o /tmp/buffalo_l.zip https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip \
+    && echo "${BUFFALO_L_SHA256}  /tmp/buffalo_l.zip" | sha256sum -c - \
+    && mkdir -p /models/buffalo_l /tmp/buffalo_l \
+    && unzip -q /tmp/buffalo_l.zip -d /tmp/buffalo_l \
+    && find /tmp/buffalo_l -name det_10g.onnx -exec cp {} /models/buffalo_l/ \; \
+    && find /tmp/buffalo_l -name w600k_r50.onnx -exec cp {} /models/buffalo_l/ \; \
+    && test -f /models/buffalo_l/det_10g.onnx && test -f /models/buffalo_l/w600k_r50.onnx
+
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
 WORKDIR /app
 
@@ -52,12 +65,14 @@ RUN groupadd --system picturemanager && useradd --system --gid picturemanager pi
 
 COPY --from=build /app/publish/ ./
 COPY --from=web-build /web/dist/ ./wwwroot/
+COPY --from=models /models/ ./models/
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh /app/efbundle
 
 USER picturemanager
 ENV ASPNETCORE_URLS=http://+:8080 \
-    ASPNETCORE_ENVIRONMENT=Production
+    ASPNETCORE_ENVIRONMENT=Production \
+    FaceRecognition__ModelDirectory=/app/models/buffalo_l
 EXPOSE 8080
 
 ENTRYPOINT ["/app/entrypoint.sh"]
