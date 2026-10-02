@@ -71,6 +71,7 @@ RUN chmod +x /app/entrypoint.sh /app/efbundle
 
 USER picturemanager
 ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp/bundle \
     ASPNETCORE_ENVIRONMENT=Production \
     FaceRecognition__ModelDirectory=/app/models/buffalo_l
 EXPOSE 8080
