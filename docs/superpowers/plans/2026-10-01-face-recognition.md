@@ -10,7 +10,7 @@
 - Backend: .NET 10 Minimal APIs, EF Core 10 + Npgsql, Pgvector.EntityFrameworkCore, Microsoft.ML.OnnxRuntime (CPU), SkiaSharp. Tests use xUnit, FluentAssertions and NSubstitute.
 - Frontend: React 19, TypeScript, TanStack Query, MUI, Tailwind v4. Tests use Vitest and msw.
 
-**Spec:** Approved design at `C:\Users\LorandJanositz\.claude\plans\plan-a-facerecogtition-module-humming-treehouse.md`. Background: `Documents/PictureManager_Face_Recognition_Architecture.md`. Executors read both.
+**Spec:** `~/.claude/plans/plan-a-facerecogtition-module-humming-treehouse.md` (approved design, kept outside the repo). Background: `Documents/PictureManager_Face_Recognition_Architecture.md`. Executors read both.
 
 ## Global Constraints
 
