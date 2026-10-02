@@ -1,4 +1,4 @@
-﻿import { screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { peopleList } from '../test/peopleHandlers'
 import { renderApp } from '../test/render'

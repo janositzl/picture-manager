@@ -1,4 +1,4 @@
-﻿import { http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 
 export type PersonDto = {
   id: number

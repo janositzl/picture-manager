@@ -1,6 +1,6 @@
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useNamePerson, usePerson } from '../api/people'
 import { useNotify } from '../app/notify'
 import { parseGridParams } from '../routing/urlState'
@@ -45,12 +45,25 @@ function NameForm({ personId, name }: NameFormProps) {
   )
 }
 
-export function PersonView() {
-  const params = useParams()
-  const personId = Number(params.personId)
+function PersonNotFound() {
+  return (
+    <Box sx={{ p: 3 }}>
+      <EmptyMessage>Person not found</EmptyMessage>
+      <Button component={RouterLink} to="/people" sx={{ ml: 3 }}>
+        Back to People
+      </Button>
+    </Box>
+  )
+}
+
+type PersonContentProps = { personId: number }
+
+function PersonContent({ personId }: PersonContentProps) {
   const person = usePerson(personId)
   const [searchParams] = useSearchParams()
   const { sort, order } = parseGridParams(searchParams)
+
+  if (person.isError) return <PersonNotFound />
 
   return (
     <ImageBrowser
@@ -71,4 +84,11 @@ export function PersonView() {
       emptyState={<EmptyMessage>No photos for this person.</EmptyMessage>}
     />
   )
+}
+
+export function PersonView() {
+  const params = useParams()
+  const personId = Number(params.personId)
+  if (!Number.isInteger(personId) || personId <= 0) return <PersonNotFound />
+  return <PersonContent personId={personId} />
 }

@@ -1,4 +1,4 @@
-﻿import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { peopleFixture, person } from '../test/peopleHandlers'
@@ -39,4 +39,36 @@ describe('PersonView', () => {
     await waitFor(() => expect(requested).toBe('1'))
     expect(await screen.findByText('12 faces · 10 photos')).toBeInTheDocument()
   })
-})
+
+  it('shows not found, without the grid, when the person does not exist', async () => {
+    server.use(
+      http.get('/api/people/9999', () => HttpResponse.json({ title: 'Not found' }, { status: 404 })),
+      http.get('/api/images', () => {
+        return HttpResponse.json({ items: [], nextCursor: null })
+      }),
+    )
+    renderApp('/people/9999')
+
+    expect(await screen.findByText('Person not found')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to People' })).toHaveAttribute('href', '/people')
+    // the grid is not rendered (it may have started loading while the person query was pending)
+    expect(screen.queryByText('No photos for this person.')).not.toBeInTheDocument()
+  })
+
+  it('shows not found without any request for a non-numeric id', async () => {
+    const requested: string[] = []
+    server.use(
+      http.get('/api/people/:id', ({ request }) => {
+        requested.push(request.url)
+        return HttpResponse.json({}, { status: 404 })
+      }),
+      http.get('/api/images', ({ request }) => {
+        requested.push(request.url)
+        return HttpResponse.json({ items: [], nextCursor: null })
+      }),
+    )
+    renderApp('/people/abc')
+
+    expect(await screen.findByText('Person not found')).toBeInTheDocument()
+    expect(requested).toEqual([])
+  })})
