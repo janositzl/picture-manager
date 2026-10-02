@@ -1,0 +1,51 @@
+using System.Threading;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
+using PictureManager.Api.Endpoints;
+using PictureManager.Application.Faces;
+using PictureManager.Application.Scanning;
+using Xunit;
+
+namespace PictureManager.Api.Tests.Endpoints;
+
+public class FaceRecognitionEndpointsTests
+{
+    [Fact]
+    public async Task StartAsync_Queued_ReturnsJobId()
+    {
+        var service = Substitute.For<IFaceRecognitionService>();
+        service.QueueAsync(null, 20, true, Arg.Any<CancellationToken>()).Returns(77);
+
+        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true), service, CancellationToken.None);
+
+        result.Should().BeOfType<Ok<FaceRecognitionStartedResponse>>().Which.Value.Should().Be(new FaceRecognitionStartedResponse(77));
+    }
+
+    [Fact]
+    public async Task StartAsync_AnotherJobActive_ReturnsConflict()
+    {
+        var service = Substitute.For<IFaceRecognitionService>();
+        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new FaceRecognitionAlreadyInProgressException());
+
+        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, null, true), service, CancellationToken.None);
+
+        result.Should().BeAssignableTo<IStatusCodeHttpResult>().Which.StatusCode.Should().Be(409);
+    }
+
+    [Fact]
+    public async Task StartAsync_UnavailableFolder_ReturnsValidationProblemOnFolderId()
+    {
+        var service = Substitute.For<IFaceRecognitionService>();
+        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(FolderUnavailableException.Missing(20));
+
+        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true), service, CancellationToken.None);
+
+        result.Should().BeOfType<ValidationProblem>().Which.ProblemDetails.Errors.Should().ContainKey("folderId");
+    }
+}

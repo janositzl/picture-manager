@@ -22,7 +22,7 @@ public static class JobEndpoints
 
         return Results.Ok(new ActiveJobDto(
             job.Kind.ToString(), job.Id, job.FolderId, job.Status.ToString(),
-            job.FoldersProcessed, job.FilesFound, job.FilesEnriched, job.ErrorMessage));
+            job.FoldersProcessed, job.FilesFound, job.FilesEnriched, job.ErrorMessage, job.FacesFound));
     }
 
     /// <summary>
@@ -45,4 +45,4 @@ public static class JobEndpoints
 
 public sealed record ActiveJobDto(
     string Kind, int Id, int? FolderId, string Status,
-    int FoldersProcessed, int FilesFound, int FilesEnriched, string? ErrorMessage);
+    int FoldersProcessed, int FilesFound, int FilesEnriched, string? ErrorMessage, int FacesFound);

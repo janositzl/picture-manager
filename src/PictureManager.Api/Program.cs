@@ -150,6 +150,7 @@ try
     user.MapDuplicateEndpoints();
     admin.MapScanEndpoints();
     admin.MapDiscoveryEndpoints();
+    admin.MapFaceRecognitionEndpoints();
     admin.MapJobEndpoints();
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();

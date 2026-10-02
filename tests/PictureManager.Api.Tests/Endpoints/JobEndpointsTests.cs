@@ -41,7 +41,7 @@ public class JobEndpointsTests
         var result = await JobEndpoints.GetActiveJobAsync(jobs, CancellationToken.None);
 
         var ok = result.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.Ok<ActiveJobDto>>().Subject;
-        ok.Value.Should().Be(new ActiveJobDto("Scan", 7, 20, "Enumerating", 3, 5, 1, null));
+        ok.Value.Should().Be(new ActiveJobDto("Scan", 7, 20, "Enumerating", 3, 5, 1, null, 0));
     }
 
     [Fact]
