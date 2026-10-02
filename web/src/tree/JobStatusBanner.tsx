@@ -1,4 +1,4 @@
-import { Alert, CircularProgress, Link } from '@mui/material'
+import { Alert, Button, CircularProgress, Link } from '@mui/material'
 import { Link as RouterLink } from 'react-router'
 import { useFolder } from '../api/queries'
 import { useFolderJobs, type ActiveJob } from './FolderJobsContext'
@@ -7,6 +7,13 @@ import { useFolderJobs, type ActiveJob } from './FolderJobsContext'
 export function progressLabel(activeJob: ActiveJob): string {
   if (activeJob.kind === 'discoveries') {
     return `Discovering… ${activeJob.progress?.foldersDiscovered ?? 0} folders found`
+  }
+  if (activeJob.kind === 'face-recognitions') {
+    const progress = activeJob.progress
+    if (progress !== null && progress.imagesFound > 0 && progress.imagesProcessed >= progress.imagesFound) {
+      return 'Grouping faces…'
+    }
+    return `Recognizing faces… ${progress?.imagesProcessed ?? 0}/${progress?.imagesFound ?? 0} images, ${progress?.facesFound ?? 0} faces`
   }
   const progress = activeJob.progress
   if (progress?.status === 'Enriching') {
@@ -17,7 +24,7 @@ export function progressLabel(activeJob: ActiveJob): string {
 
 /** App-wide banner for the single discovery/scan job the backend allows at a time. */
 export function JobStatusBanner() {
-  const { activeJob } = useFolderJobs()
+  const { activeJob, cancelActiveJob } = useFolderJobs()
   const folder = useFolder(activeJob?.folderId ?? null)
 
   if (activeJob === null) return null
@@ -27,6 +34,13 @@ export function JobStatusBanner() {
       severity="info"
       icon={<CircularProgress size={16} />}
       sx={{ borderRadius: 0 }}
+      action={
+        activeJob.kind === 'face-recognitions' ? (
+          <Button color="inherit" size="small" onClick={cancelActiveJob}>
+            Cancel
+          </Button>
+        ) : undefined
+      }
     >
       {progressLabel(activeJob)}
       {folder.data && (

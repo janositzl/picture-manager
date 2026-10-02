@@ -34,7 +34,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     return undefined as T
   }
 
-  return (await response.json()) as T
+  // Some endpoints (e.g. a 202 Accepted) answer with no body at all.
+  const text = await response.text()
+  return (text === '' ? undefined : JSON.parse(text)) as T
 }
 
 async function readProblem(response: Response): Promise<ProblemDetails | null> {

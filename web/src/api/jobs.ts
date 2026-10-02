@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './client'
-import type { ActiveJobDto, DiscoveryProgress, JobStatus, ScanProgress } from './types'
+import type {
+  ActiveJobDto,
+  DiscoveryProgress,
+  FaceRecognitionProgress,
+  JobStatus,
+  ScanProgress,
+} from './types'
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set(['Completed', 'Failed', 'Cancelled'])
 
@@ -25,6 +31,19 @@ export function startScan(folderId: number, isRecursive: boolean): Promise<numbe
   }).then((response) => response.scanJobId)
 }
 
+export function startFaceRecognition(folderId: number | null, isRecursive: boolean): Promise<number> {
+  return apiFetch<{ faceRecognitionJobId: number }>('/api/face-recognitions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(folderId === null ? { isRecursive } : { folderId, isRecursive }),
+  }).then((response) => response.faceRecognitionJobId)
+}
+
+/** Asks the backend to cancel a running face recognition job; it reports Cancelled on its event stream. */
+export function cancelJob(id: number): Promise<void> {
+  return apiFetch<void>(`/api/jobs/${id}/cancel`, { method: 'POST' })
+}
+
 type RawDiscoveryEvent = {
   Id: number
   Status: JobStatus
@@ -37,6 +56,15 @@ type RawScanEvent = {
   FoldersScanned: number
   FilesFound: number
   FilesEnriched: number
+  ErrorMessage: string | null
+}
+
+type RawFaceEvent = {
+  Id: number
+  Status: JobStatus
+  ImagesFound: number
+  ImagesProcessed: number
+  FacesFound: number
   ErrorMessage: string | null
 }
 
@@ -62,9 +90,20 @@ function toScanProgress(raw: RawScanEvent): ScanProgress {
   }
 }
 
-export type JobKind = 'discoveries' | 'scans'
+function toFaceProgress(raw: RawFaceEvent): FaceRecognitionProgress {
+  return {
+    id: raw.Id,
+    status: raw.Status,
+    imagesFound: raw.ImagesFound,
+    imagesProcessed: raw.ImagesProcessed,
+    facesFound: raw.FacesFound,
+    errorMessage: raw.ErrorMessage,
+  }
+}
 
-type Progress = DiscoveryProgress | ScanProgress
+export type JobKind = 'discoveries' | 'scans' | 'face-recognitions'
+
+type Progress = DiscoveryProgress | ScanProgress | FaceRecognitionProgress
 
 /**
  * Follows a discovery/scan job's SSE stream, returning its latest progress until a terminal
@@ -122,11 +161,13 @@ export function useJobEvents(
           if (!dataLine) continue
 
           const raw = JSON.parse(dataLine.slice('data: '.length)) as
-            RawDiscoveryEvent | RawScanEvent
+            RawDiscoveryEvent | RawScanEvent | RawFaceEvent
           const event =
             kind === 'discoveries'
               ? toDiscoveryProgress(raw as RawDiscoveryEvent)
-              : toScanProgress(raw as RawScanEvent)
+              : kind === 'scans'
+                ? toScanProgress(raw as RawScanEvent)
+                : toFaceProgress(raw as RawFaceEvent)
           setProgress(event)
           onEventRef.current?.(event)
           if (TERMINAL.has(event.status)) return

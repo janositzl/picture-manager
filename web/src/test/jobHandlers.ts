@@ -34,6 +34,14 @@ export function scanEvents(id: number, events: Array<Record<string, unknown>>) {
   )
 }
 
+/** Overrides the face recognition job `id`'s event stream with `events`, sent one SSE message per item. */
+export function faceRecognitionEvents(id: number, events: Array<Record<string, unknown>>) {
+  return http.get(
+    `/api/face-recognitions/${id}/events`,
+    () => new HttpResponse(sseStream(events), { headers: { 'Content-Type': 'text/event-stream' } }),
+  )
+}
+
 /**
  * A discovery/scan event stream the test drives by hand: `send` only resolves once the message
  * has actually been written to the response body, so a test can assert on one transient progress
@@ -64,13 +72,14 @@ export function controllableEvents(path: string, id: number) {
 
 /** Overrides GET /api/jobs/active to report `dto` as the currently running job. */
 export function activeJob(dto: {
-  kind: 'Scan' | 'Discovery'
+  kind: 'Scan' | 'Discovery' | 'FaceRecognition'
   id: number
   folderId: number | null
   status?: string
   foldersProcessed?: number
   filesFound?: number
   filesEnriched?: number
+  facesFound?: number
 }) {
   return http.get('/api/jobs/active', () =>
     HttpResponse.json({
@@ -78,6 +87,7 @@ export function activeJob(dto: {
       foldersProcessed: 0,
       filesFound: 0,
       filesEnriched: 0,
+      facesFound: 0,
       errorMessage: null,
       ...dto,
     }),

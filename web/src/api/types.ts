@@ -102,13 +102,23 @@ export type JobStatus =
   'Pending' | 'Enumerating' | 'Enriching' | 'Completed' | 'Failed' | 'Cancelled'
 
 export type ActiveJobDto = {
-  kind: 'Scan' | 'Discovery'
+  kind: 'Scan' | 'Discovery' | 'FaceRecognition'
   id: number
   folderId: number | null
   status: JobStatus
   foldersProcessed: number
   filesFound: number
   filesEnriched: number
+  facesFound: number
+  errorMessage: string | null
+}
+
+export type FaceRecognitionProgress = {
+  id: number
+  status: JobStatus
+  imagesFound: number
+  imagesProcessed: number
+  facesFound: number
   errorMessage: string | null
 }
 

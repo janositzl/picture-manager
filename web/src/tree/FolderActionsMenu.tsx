@@ -42,7 +42,7 @@ export function FolderActionsMenu({
   isRootFolder,
   parentId,
 }: Props) {
-  const { activeJob, refreshFolder, scanFolder } = useFolderJobs()
+  const { activeJob, refreshFolder, scanFolder, recognizeFaces } = useFolderJobs()
   const setExcluded = useSetFolderExcluded()
   const removeFolder = useRemoveFolder()
   const notify = useNotify()
@@ -125,6 +125,9 @@ export function FolderActionsMenu({
           disabled={scanDisabled}
         >
           Scan folder + subfolders
+        </MenuItem>
+        <MenuItem onClick={() => runAction(() => recognizeFaces(folderId))} disabled={scanDisabled}>
+          Recognize faces
         </MenuItem>
         <MenuItem onClick={toggleExcluded} disabled={ancestorExcluded}>
           {isExcluded && (

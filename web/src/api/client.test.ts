@@ -14,6 +14,11 @@ describe('apiFetch', () => {
     await expect(apiFetch<void>('/api/thing', { method: 'PUT' })).resolves.toBeUndefined()
   })
 
+  it('returns undefined for an empty 202 body', async () => {
+    server.use(http.post('/api/thing', () => new HttpResponse(null, { status: 202 })))
+    await expect(apiFetch<void>('/api/thing', { method: 'POST' })).resolves.toBeUndefined()
+  })
+
   it('throws ApiError carrying the status and ProblemDetails', async () => {
     server.use(
       http.get('/api/thing', () =>
