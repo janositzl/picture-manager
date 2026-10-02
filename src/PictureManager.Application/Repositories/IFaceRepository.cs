@@ -34,8 +34,10 @@ public interface IFaceRepository
     Task<FaceProcessingState?> GetStateAsync(int imageId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// In one transaction: replaces all of the image's faces with these (Unassigned) and records Completed state.
-    /// False when the image no longer exists (deleted while the job ran).
+    /// In one transaction: replaces all of the image's faces with these and records Completed state. A new face
+    /// whose box overlaps an old face (IoU ≥ 0.5, greedy one-to-one, see FaceMatching) keeps that face's PersonId
+    /// and AssignmentState; other new faces are Unassigned. False when the image no longer exists (deleted while
+    /// the job ran).
     /// </summary>
     Task<bool> SaveResultAsync(int imageId, int faceModelId, string fingerprint, IReadOnlyList<DetectedFace> faces, DateTime nowUtc, CancellationToken cancellationToken = default);
 

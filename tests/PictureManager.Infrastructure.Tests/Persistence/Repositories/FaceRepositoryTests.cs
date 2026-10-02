@@ -92,6 +92,97 @@ public class FaceRepositoryTests
         state.Attempts.Should().Be(0);
     }
 
+    private static DetectedFace FaceAt(float x, float y, int axis) =>
+        new(x, y, 0.2f, 0.2f, 0.95f, 0.8f, FaceTestData.Embedding(axis));
+
+    private static async Task<Face> AddFaceAtAsync(
+        PostgresTestDatabase db, int imageId, int modelId, float x, float y, int? personId, FaceAssignmentState state)
+    {
+        var face = await FaceTestData.AddFaceAsync(db.Context, imageId, modelId, FaceTestData.Embedding(9), personId, state);
+        face.X = x;
+        face.Y = y;
+        face.Width = 0.2f;
+        face.Height = 0.2f;
+        await db.Context.SaveChangesAsync();
+        return face;
+    }
+
+    private static async Task<(int ImageId, int Model, int PersonId)> SeedImageWithPersonAsync(PostgresTestDatabase db)
+    {
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a", hash: "h");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        return (image.Id, model, anna.Id);
+    }
+
+    [Fact]
+    public async Task SaveResultAsync_Reprocess_ConfirmedFaceWithOverlappingBoxKeepsPersonAndState()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
+        var confirmed = await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Confirmed);
+        await AddFaceAtAsync(db, imageId, model, 0.6f, 0.6f, anna, FaceAssignmentState.Auto); // gone on re-processing
+
+        var saved = await new FaceRepository(db.CreateContext()).SaveResultAsync(
+            imageId, model, "h2", new[] { FaceAt(0.11f, 0.1f, 0), FaceAt(0.6f, 0.1f, 1) }, Now);
+
+        saved.Should().BeTrue();
+        await using var read = db.CreateContext();
+        var faces = await read.Faces.Where(f => f.ImageId == imageId).OrderBy(f => f.X).ToListAsync();
+        faces.Should().HaveCount(2).And.NotContain(f => f.Id == confirmed.Id);
+        faces[0].Should().BeEquivalentTo(new { X = 0.11f, PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Confirmed });
+        faces[1].Should().BeEquivalentTo(new { X = 0.6f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+    }
+
+    [Fact]
+    public async Task SaveResultAsync_Reprocess_RejectedFaceStaysRejected()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
+        await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Rejected);
+
+        await new FaceRepository(db.CreateContext()).SaveResultAsync(imageId, model, "h2", new[] { FaceAt(0.1f, 0.12f, 0) }, Now);
+
+        await using var read = db.CreateContext();
+        (await read.Faces.SingleAsync(f => f.ImageId == imageId))
+            .Should().BeEquivalentTo(new { PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Rejected });
+    }
+
+    [Fact]
+    public async Task SaveResultAsync_Reprocess_ClearlyDifferentBoxDoesNotInherit()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
+        await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Confirmed);
+
+        // Shifted by half a width: IoU 1/3, below the 0.5 minimum.
+        await new FaceRepository(db.CreateContext()).SaveResultAsync(imageId, model, "h2", new[] { FaceAt(0.2f, 0.1f, 0) }, Now);
+
+        await using var read = db.CreateContext();
+        (await read.Faces.SingleAsync(f => f.ImageId == imageId))
+            .Should().BeEquivalentTo(new { PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+    }
+
+    [Fact]
+    public async Task SaveResultAsync_Reprocess_TwoNewFacesCompeteForOneOld_OnlyTheBestOverlapInherits()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
+        await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Confirmed);
+
+        await new FaceRepository(db.CreateContext()).SaveResultAsync(
+            imageId, model, "h2", new[] { FaceAt(0.13f, 0.1f, 0), FaceAt(0.11f, 0.1f, 1) }, Now);
+
+        await using var read = db.CreateContext();
+        var faces = await read.Faces.Where(f => f.ImageId == imageId).OrderBy(f => f.X).ToListAsync();
+        faces.Should().HaveCount(2);
+        faces[0].Should().BeEquivalentTo(new { X = 0.11f, PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Confirmed });
+        faces[1].Should().BeEquivalentTo(new { X = 0.13f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+    }
+
     [Fact]
     public async Task SaveResultAsync_NoFaces_RecordsCompletedState()
     {

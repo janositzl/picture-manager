@@ -187,7 +187,7 @@ A detected face. The box is normalized (0-1) against the orientation-corrected i
 | ImageId | int (FK → Images), indexed | Image containing the face |
 | FaceModelId | int (FK → FaceModels), indexed with AssignmentState | Model that produced the embedding |
 | PersonId | int? (FK → People), indexed | Assigned person; null = unassigned |
-| AssignmentState | enum (Unassigned/Auto/Confirmed/Rejected) | Auto = set by clustering/matching; Confirmed/Rejected = set by the user and never changed by automation |
+| AssignmentState | enum (Unassigned/Auto/Confirmed/Rejected) | Auto = set by clustering/matching; Confirmed/Rejected = set by the user and never changed by automation (re-processing an image carries PersonId and AssignmentState over to the new face whose box overlaps the old one, IoU ≥ 0.5) |
 | X, Y, Width, Height | float | Normalized bounding box |
 | DetectionConfidence | float | Detector score |
 | QualityScore | float | Face quality score; decides whether the face takes part in clustering |

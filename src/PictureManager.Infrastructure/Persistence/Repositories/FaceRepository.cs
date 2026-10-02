@@ -80,16 +80,32 @@ public sealed class FaceRepository : IFaceRepository
         if (!await _dbContext.Images.AnyAsync(i => i.Id == imageId, cancellationToken))
             return false;
 
+        // A new face that overlaps an old one is the same face: it keeps the person and the user's decision.
+        var previous = await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.ImageId == imageId)
+            .OrderBy(f => f.Id)
+            .Select(f => new { f.PersonId, f.AssignmentState, f.X, f.Y, f.Width, f.Height })
+            .ToListAsync(cancellationToken);
+        var matches = FaceMatching.MatchByOverlap(
+            previous.Select(p => new FaceBox(p.X, p.Y, p.Width, p.Height)).ToList(),
+            faces.Select(f => new FaceBox(f.X, f.Y, f.Width, f.Height)).ToList());
+
         await _dbContext.Faces.Where(f => f.ImageId == imageId).ExecuteDeleteAsync(cancellationToken);
-        _dbContext.Faces.AddRange(faces.Select(f => new Face
+        _dbContext.Faces.AddRange(faces.Select((f, index) =>
         {
-            ImageId = imageId,
-            FaceModelId = faceModelId,
-            X = f.X, Y = f.Y, Width = f.Width, Height = f.Height,
-            DetectionConfidence = f.DetectionConfidence,
-            QualityScore = f.QualityScore,
-            Embedding = new Vector(f.Embedding),
-            CreatedUtc = nowUtc
+            var inherited = matches.TryGetValue(index, out var match) ? previous[match] : null;
+            return new Face
+            {
+                ImageId = imageId,
+                FaceModelId = faceModelId,
+                PersonId = inherited?.PersonId,
+                AssignmentState = inherited?.AssignmentState ?? FaceAssignmentState.Unassigned,
+                X = f.X, Y = f.Y, Width = f.Width, Height = f.Height,
+                DetectionConfidence = f.DetectionConfidence,
+                QualityScore = f.QualityScore,
+                Embedding = new Vector(f.Embedding),
+                CreatedUtc = nowUtc
+            };
         }));
         await UpsertStateAsync(imageId, faceModelId, fingerprint, FaceProcessingStatus.Completed, 0, null, nowUtc, cancellationToken);
 
