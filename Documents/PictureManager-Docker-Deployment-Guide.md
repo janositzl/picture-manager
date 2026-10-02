@@ -183,7 +183,7 @@ collation are unchanged, so no dump/restore is needed.
 
 The image downloads the InsightFace `buffalo_l` models (`det_10g.onnx`
 detector and `w600k_r50.onnx` recognizer) at build time, verifies the zip
-against a pinned SHA-256 (`BUFFALO_L_SHA256` in the `Dockerfile`), and stores
+against a pinned SHA-256 (`BUFFALO_L_SHA256` in both `Dockerfile` and `Dockerfile.nginx`), and stores
 them in `/app/models/buffalo_l`. `FaceRecognition__ModelDirectory` points
 there. **The InsightFace pretrained weights are for non-commercial use only.**
 
