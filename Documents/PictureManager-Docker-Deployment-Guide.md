@@ -219,11 +219,52 @@ Set these as environment variables on the `api` service. Defaults come from
    interrupted job resumes where it stopped when you start it again (only the
    remaining images are processed).
 4. On the People page, name an unnamed group to turn it into a person. Giving
-   a group the name of an existing person merges it into that person.
+   a group the name of an existing person merges it into that person, after a
+   confirmation (a merge cannot be undone).
 5. Images that cannot be decoded are listed at
    `GET /api/face-recognitions/failures`.
 
 Only one job (scan, discovery or face recognition) runs at a time.
+
+If the share holding a root is not mounted, a face job over that root fails at
+once with "Root '…' is unavailable" and processes nothing. When only some of
+the job's roots are unavailable, the others are processed and the job then
+ends Failed naming the unavailable ones (same as a scan).
+
+### How faces and people are kept up to date
+
+- **Re-processing keeps your decisions.** An image is analysed again when its
+  content hash changes (any metadata write such as keywords or rotation
+  changes it) or the model changes. Its faces are re-created, and each new face
+  whose box overlaps an old face (intersection-over-union ≥ 0.5, best overlap
+  first, one-to-one) keeps that face's person and state, including Confirmed
+  and Rejected. A face that no longer overlaps any old face starts Unassigned.
+- **Clustering looks only at new faces.** After each job, faces that no earlier
+  clustering pass has seen (`Faces.ClusteredUtc` is null) are first matched
+  against existing people, then grouped into new unnamed people. A new face may
+  still group with older unassigned faces (they remain neighbours), but an
+  older face is never the starting point of a group again. Every face a pass
+  looked at gets `ClusteredUtc` set, so a job's cost follows the number of new
+  faces, not the size of the library. Faces existing before this column was
+  added have it null, so the first job after the upgrade looks at all
+  unassigned faces once.
+
+### Troubleshooting
+
+- **After updating, the `api` container restarts in a loop and the whole app is
+  down; the log shows `extension "vector" is not available`.** The database
+  still runs the old stock `postgres:17-alpine` image, which has no pgvector,
+  so the face-recognition migration fails at `CREATE EXTENSION vector`. The
+  entrypoint (`set -e`) stops before starting the API, so nothing is served,
+  not just faces. The migration runs in a transaction, so the database is left
+  untouched. Fix: rebuild and recreate the `db` service from this repo's image
+  (the `pgdata` volume is kept):
+
+  ```bash
+  docker compose -f docker-compose.prod.yml up -d --build db
+  ```
+
+  The `api` container retries on its next restart and applies the migration.
 
 ### Development
 

@@ -193,6 +193,7 @@ A detected face. The box is normalized (0-1) against the orientation-corrected i
 | QualityScore | float | Face quality score; decides whether the face takes part in clustering |
 | Embedding | vector(512), HNSW index (vector_cosine_ops) | L2-normalized embedding, compared with cosine distance. Biometric data |
 | CreatedUtc | timestamptz | Creation time |
+| ClusteredUtc | timestamptz?, indexed with FaceModelId | When a clustering pass last used this face as a seed; null = not yet (new, or re-created by re-processing). Clustering seeds only from Unassigned faces with null here and then sets it |
 
 Deleting the image cascades; deleting the person sets PersonId to null; deleting a face model is restricted while faces reference it.
 
