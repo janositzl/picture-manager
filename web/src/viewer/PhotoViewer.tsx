@@ -100,12 +100,18 @@ export function PhotoViewer({
   const items = list.items
   const index = imageId === null ? -1 : items.findIndex((item) => item.id === imageId)
   const inList = index >= 0
+  // Where the photo last sat in the list. If it then drops out (e.g. its last person was just assigned and it no
+  // longer belongs to this unknown group), its neighbours are still the items on either side of that spot.
+  const [anchor, setAnchor] = useState<{ id: number; index: number } | null>(null)
+  if (inList && imageId !== null && (anchor?.id !== imageId || anchor.index !== index)) setAnchor({ id: imageId, index })
+  const gap = !inList && anchor !== null && anchor.id === imageId ? Math.min(anchor.index, items.length) : -1
+  const placed = inList || gap >= 0
   const current = inList ? items[index] : detail.data
-  const prev = inList ? items[index - 1] : undefined
-  const next = inList ? items[index + 1] : undefined
+  const prev = inList ? items[index - 1] : gap >= 0 ? items[gap - 1] : undefined
+  const next = inList ? items[index + 1] : gap >= 0 ? items[gap] : undefined
   const canGoPrev = prev !== undefined
-  const canGoNext = inList && (next !== undefined || list.hasNextPage)
-  const notFound = !inList && isNotFound(detail.error)
+  const canGoNext = placed && (next !== undefined || list.hasNextPage)
+  const notFound = !placed && isNotFound(detail.error)
 
   const review = useFaceReview(current?.id ?? null, faceReview)
   const canAdd = current !== undefined && !isMissingItem(current)
@@ -186,7 +192,7 @@ export function PhotoViewer({
   const goNext = () => {
     if (next !== undefined) {
       show(next.id)
-    } else if (inList && list.hasNextPage) {
+    } else if (placed && list.hasNextPage) {
       pendingNext.current = true
       void list.fetchNextPage()
     }

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import type { ImageFace } from '../api/people'
-import { madeiraImages } from '../test/fixtures'
+import { image, madeiraImages } from '../test/fixtures'
 import { peopleFixture, peopleList, person } from '../test/peopleHandlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
@@ -126,5 +126,29 @@ describe('viewer faces', () => {
     await user.click(within(section).getByRole('button', { name: 'Assign person' }))
     await user.type(await screen.findByLabelText('Person name'), 'Cili{Enter}')
     await waitFor(() => expect(bodies).toEqual([{ personId: 1 }, { name: 'Cili' }]))
+  })
+})
+
+describe('viewer navigation in an unknown group', () => {
+  it('keeps the arrows when the photo leaves the group after its people are assigned', async () => {
+    let items = [image(20, 3), image(21, 3), image(22, 3)]
+    server.use(
+      peopleList(),
+      person(peopleFixture[1]),
+      faces([suggested]),
+      http.get('/api/images', () => HttpResponse.json({ items, nextCursor: null })),
+    )
+    const { queryClient } = renderApp('/people/2?image=21')
+
+    expect(await screen.findByRole('button', { name: 'Previous photo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next photo' })).toBeInTheDocument()
+
+    // The photo no longer belongs to the group, so the refreshed list drops it.
+    items = items.filter((item) => item.id !== 21)
+    await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'images' })
+
+    await waitFor(() => expect(screen.queryByRole('img', { name: /IMG_0021/ })).toBeDefined())
+    expect(await screen.findByRole('button', { name: 'Previous photo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next photo' })).toBeInTheDocument()
   })
 })
