@@ -9,8 +9,14 @@ public sealed class FaceRecognitionOptions
     public string ModelDirectory { get; set; } = "models/buffalo_l";
     public float DetectionThreshold { get; set; } = 0.6f;
 
+    /// <summary>
+    /// Side of the square the detector sees (the photo is letterboxed into it). Larger finds smaller faces but costs
+    /// roughly size². Must be a multiple of 32; photos are decoded to at most 1600px, so more than that adds nothing.
+    /// </summary>
+    public int DetectorInputSize { get; set; } = 1280;
+
     /// <summary>Shorter box side, in pixels of the decoded (≤1600px) image, below which a face is ignored.</summary>
-    public int MinFaceSizePx { get; set; } = 40;
+    public int MinFaceSizePx { get; set; } = 24;
 
     /// <summary>Images decoded (NAS reads) concurrently on top of InferenceConcurrency.</summary>
     public int ReadConcurrency { get; set; } = 2;

@@ -22,7 +22,6 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
 {
     private const string DetectorFile = "det_10g.onnx";
     private const string RecognizerFile = "w600k_r50.onnx";
-    private const int DetectorInputSize = 640;
     private const int MaxDecodeSide = 1600;
     private const float NmsThreshold = 0.4f;
     private static readonly SKSamplingOptions Sampling = new(SKFilterMode.Linear, SKMipmapMode.Linear);
@@ -95,8 +94,9 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
     private List<RawDetection> Detect(InferenceSession detector, SKBitmap image)
     {
         // Letterbox to the top-left of a 640² canvas, keeping the aspect ratio (as InsightFace does).
-        var scale = (float)DetectorInputSize / Math.Max(image.Width, image.Height);
-        using var input = new SKBitmap(new SKImageInfo(DetectorInputSize, DetectorInputSize, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var size = _options.DetectorInputSize;
+        var scale = (float)size / Math.Max(image.Width, image.Height);
+        using var input = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(input))
         {
             canvas.Clear(SKColors.Black);
@@ -104,12 +104,12 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
             canvas.DrawImage(source, new SKRect(0, 0, image.Width * scale, image.Height * scale), Sampling);
         }
 
-        var tensor = ToTensor(new[] { input }, DetectorInputSize, mean: 127.5f, std: 128f);
+        var tensor = ToTensor(new[] { input }, size, mean: 127.5f, std: 128f);
         using var results = detector.Run(new[] { NamedOnnxValue.CreateFromTensor(detector.InputMetadata.Keys.First(), tensor) });
 
         // det_10g output order: scores (strides 8, 16, 32), then boxes, then landmarks.
         var outputs = results.Select(r => r.AsEnumerable<float>().ToArray()).ToList();
-        var raw = ScrfdDecoder.Decode(DetectorInputSize, outputs.GetRange(0, 3), outputs.GetRange(3, 3), outputs.GetRange(6, 3), _options.DetectionThreshold);
+        var raw = ScrfdDecoder.Decode(size, outputs.GetRange(0, 3), outputs.GetRange(3, 3), outputs.GetRange(6, 3), _options.DetectionThreshold);
         return ScrfdDecoder.NonMaxSuppression(raw, NmsThreshold).Select(d => d.Scale(1 / scale)).ToList();
     }
 
