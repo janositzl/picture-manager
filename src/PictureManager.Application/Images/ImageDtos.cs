@@ -62,7 +62,8 @@ public sealed record ImageListRequest(
     string? Cursor = null,
     int? Limit = null,
     int? PersonId = null,
-    string? PersonState = null);
+    string? PersonState = null,
+    string? Faces = null);
 
 /// <summary>Cursor payload. Key = SortDate ticks (date sort) or the DB's lower(FileName) (name sort).</summary>
 public sealed record ImageCursor(

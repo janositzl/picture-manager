@@ -81,6 +81,29 @@ describe('folder actions', () => {
     await waitFor(() => expect(body).toEqual({ folderId: 2, isRecursive: true }))
   })
 
+  it('offers "Re-analyse faces" instead of "Recognize faces" once a folder is analysed, after confirming', async () => {
+    let body: unknown = null
+    server.use(
+      http.post('/api/face-recognitions', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ faceRecognitionJobId: 9 })
+      }),
+      faceRecognitionEvents(9, [
+        { Id: 9, Status: 'Completed', ImagesFound: 0, ImagesProcessed: 0, FacesFound: 0, ErrorMessage: null },
+      ]),
+    )
+    const { user } = renderApp('/folders/3')
+    await openMenu(user, 'Madeira')
+    expect(screen.queryByRole('menuitem', { name: 'Recognize faces' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('menuitem', { name: 'Re-analyse faces' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Re-analyse faces?' })
+    expect(body).toBeNull()
+    await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))
+
+    await waitFor(() => expect(body).toEqual({ folderId: 3, isRecursive: true, reanalyze: true }))
+  })
+
   it('shows scan progress while enumerating, then while enriching', async () => {
     const events = controllableEvents('/api/scans', 1)
     server.use(events.handler)

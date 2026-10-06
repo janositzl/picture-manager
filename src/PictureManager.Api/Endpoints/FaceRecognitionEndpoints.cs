@@ -23,7 +23,7 @@ public static class FaceRecognitionEndpoints
     {
         try
         {
-            var jobId = await service.QueueAsync(request.RootId, request.FolderId, request.IsRecursive, cancellationToken);
+            var jobId = await service.QueueAsync(request.RootId, request.FolderId, request.IsRecursive, request.Reanalyze, cancellationToken);
             return TypedResults.Ok(new FaceRecognitionStartedResponse(jobId));
         }
         catch (FaceRecognitionAlreadyInProgressException ex)
@@ -73,6 +73,6 @@ public static class FaceRecognitionEndpoints
         TypedResults.Ok(await service.GetFolderCoverageAsync(cancellationToken));
 }
 
-public sealed record FaceRecognitionRequest(int? RootId, int? FolderId, bool IsRecursive = true);
+public sealed record FaceRecognitionRequest(int? RootId, int? FolderId, bool IsRecursive = true, bool Reanalyze = false);
 public sealed record FaceRecognitionStartedResponse(int FaceRecognitionJobId);
 public sealed record FaceRecognitionProgress(int Id, string Status, int ImagesFound, int ImagesProcessed, int FacesFound, string? ErrorMessage);

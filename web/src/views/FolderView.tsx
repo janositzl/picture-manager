@@ -1,5 +1,6 @@
+import AutorenewIcon from '@mui/icons-material/Autorenew'
 import CreateNewFolderOutlinedIcon from '@mui/icons-material/CreateNewFolderOutlined'
-import { Alert, Box, Button, Link, Typography } from '@mui/material'
+import { Alert, Box, Button, IconButton, Link, Tooltip, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
@@ -7,9 +8,13 @@ import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useFolder } from '../api/queries'
 import { BORDER } from '../design/accent'
-import { parseGridParams, parseId } from '../routing/urlState'
+import { parseFacesParam, parseGridParams, parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { useFolderJobs } from '../tree/FolderJobsContext'
+import { ReanalyseFacesConfirm } from '../tree/ReanalyseFacesConfirm'
 import { GridHeader } from './GridHeader'
+import { EmptyMessage } from '../shared/EmptyMessage'
+import { FacesFilterToggle } from './FacesFilterToggle'
 import { GridSkeleton } from './GridSkeleton'
 import { ImageBrowser } from './ImageBrowser'
 import { writeLastFolderId } from './preferences'
@@ -19,8 +24,11 @@ export function FolderView() {
   const folderId = parseId(params.folderId ?? null)
   const [searchParams] = useSearchParams()
   const { sort, order } = parseGridParams(searchParams)
+  const faces = parseFacesParam(searchParams)
   const folder = useFolder(folderId)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
+  const [confirmingReanalyse, setConfirmingReanalyse] = useState(false)
+  const { activeJob, recognizeFaces } = useFolderJobs()
 
   // Only once the folder is confirmed to exist, so a dead/typo'd id in the URL isn't remembered.
   useEffect(() => {
@@ -68,7 +76,7 @@ export function FolderView() {
   return (
     <>
       <ImageBrowser
-        filter={{ kind: 'folder', folderId, sort, order }}
+        filter={{ kind: 'folder', folderId, sort, order, ...(faces !== undefined && { faces }) }}
         header={
           <GridHeader
             title={detail.name}
@@ -79,30 +87,67 @@ export function FolderView() {
             order={order}
             actions={
               !detail.isMissing && detail.imageCount > 0 ? (
-                <Button
-                  size="small"
-                  startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
-                  onClick={() => setPickerTarget({ folderId })}
-                  sx={{
-                    color: 'text.primary',
-                    border: `1px solid ${BORDER}`,
-                    borderRadius: '10px',
-                    textTransform: 'none',
-                    fontWeight: 700,
-                    px: 1.5,
-                    py: '7px',
-                    '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
-                  }}
-                >
-                  Add folder to album…
-                </Button>
+                <>
+                  <Tooltip title="Re-analyse faces in this folder">
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label="Re-analyse faces"
+                        disabled={activeJob !== null}
+                        onClick={() => setConfirmingReanalyse(true)}
+                        sx={{
+                          border: `1px solid ${BORDER}`,
+                          borderRadius: '10px',
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <AutorenewIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <FacesFilterToggle value={faces} />
+                  <Button
+                    size="small"
+                    startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
+                    onClick={() => setPickerTarget({ folderId })}
+                    sx={{
+                      color: 'text.primary',
+                      border: `1px solid ${BORDER}`,
+                      borderRadius: '10px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      px: 1.5,
+                      py: '7px',
+                      '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
+                    }}
+                  >
+                    Add folder to album…
+                  </Button>
+                </>
               ) : undefined
             }
           />
         }
         banner={banner}
-        emptyState={null}
+        emptyState={
+          faces === undefined ? null : (
+            <EmptyMessage>
+              {faces === 'with' ? 'No photos with a face here.' : 'No photos without a face here.'}
+            </EmptyMessage>
+          )
+        }
       />
+      {confirmingReanalyse && (
+        <ReanalyseFacesConfirm
+          folderName={detail.name}
+          recursive={false}
+          onConfirm={() => {
+            setConfirmingReanalyse(false)
+            recognizeFaces(folderId, { isRecursive: false, reanalyze: true })
+          }}
+          onClose={() => setConfirmingReanalyse(false)}
+        />
+      )}
       {pickerTarget !== null && (
         <AlbumPicker target={pickerTarget} onClose={() => setPickerTarget(null)} />
       )}

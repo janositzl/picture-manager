@@ -57,6 +57,29 @@ public class ImageQueryRepositoryTests
     }
 
     [Fact]
+    public async Task ListAsync_HasFacesFilter_SplitsPhotosByNonIgnoredFaces()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var withFace = TestData.Image(folder, "with");
+        var onlyIgnored = TestData.Image(folder, "ignored");
+        var none = TestData.Image(folder, "none");
+        db.Context.Images.AddRange(withFace, onlyIgnored, none);
+        await db.Context.SaveChangesAsync();
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        await FaceTestData.AddFaceAsync(db.Context, withFace.Id, model, FaceTestData.Embedding(0), null, FaceAssignmentState.Unknown);
+        await FaceTestData.AddFaceAsync(db.Context, onlyIgnored.Id, model, FaceTestData.Embedding(1), null, FaceAssignmentState.Ignored);
+
+        await using var context = db.CreateContext();
+        var repository = new ImageQueryRepository(context);
+        var with = await repository.ListAsync(new ImageListFilter(null, null, null, false, HasFaces: true), ImageSort.Name, SortDirection.Asc, null, 50);
+        var without = await repository.ListAsync(new ImageListFilter(null, null, null, false, HasFaces: false), ImageSort.Name, SortDirection.Asc, null, 50);
+
+        with.Select(r => r.Id).Should().Equal(withFace.Id);
+        without.Select(r => r.Id).Should().BeEquivalentTo(new[] { onlyIgnored.Id, none.Id });
+    }
+
+    [Fact]
     public async Task ListAsync_FolderIdFilter_ReturnsOnlyDirectImages()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

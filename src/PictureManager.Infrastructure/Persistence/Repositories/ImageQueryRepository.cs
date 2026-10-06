@@ -60,6 +60,13 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             };
         }
 
+        if (filter.HasFaces is bool hasFaces)
+        {
+            query = hasFaces
+                ? query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.AssignmentState != FaceAssignmentState.Ignored))
+                : query.Where(i => !_dbContext.Faces.Any(f => f.ImageId == i.Id && f.AssignmentState != FaceAssignmentState.Ignored));
+        }
+
         query = ApplyKeyset(query, sort, direction, after);
         query = ApplyOrder(query, sort, direction);
 

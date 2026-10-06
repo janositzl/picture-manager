@@ -168,6 +168,7 @@ export function FolderTreeNode({
           ancestorExcluded={ancestorExcluded}
           isRootFolder={depth === 0}
           parentId={parentId}
+          faceState={faceState}
         />
       </ListItemButton>
       {expanded && children.isError && (

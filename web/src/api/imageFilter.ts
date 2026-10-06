@@ -2,9 +2,12 @@ import type { Order, Sort } from '../routing/urlState'
 
 export const PAGE_SIZE = 100
 
+/** Folder view: only photos that have (or lack) a detected face. */
+export type FacesFilter = 'with' | 'without'
+
 /** What a grid shows. It is also the query key, so each view caches separately. */
 export type ImageFilter = (
-  | { kind: 'folder'; folderId: number }
+  | { kind: 'folder'; folderId: number; faces?: FacesFilter }
   | { kind: 'favorites' }
   | { kind: 'search'; q: string; in?: number }
   | { kind: 'person'; personId: number; state?: 'confirmed' | 'suggested' }
@@ -16,6 +19,7 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
   switch (filter.kind) {
     case 'folder':
       params.set('folderId', String(filter.folderId))
+      if (filter.faces !== undefined) params.set('faces', filter.faces)
       break
     case 'favorites':
       params.set('favoritesOnly', 'true')

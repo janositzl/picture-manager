@@ -24,6 +24,12 @@ export function parseGridParams(params: URLSearchParams): GridParams {
   return { sort, order, image: parseId(params.get('image')) }
 }
 
+/** The folder view's faces filter; anything but with/without means no filter. */
+export function parseFacesParam(params: URLSearchParams): 'with' | 'without' | undefined {
+  const value = params.get('faces')
+  return value === 'with' || value === 'without' ? value : undefined
+}
+
 export function parseSearchState(params: URLSearchParams): SearchParamsState {
   return { q: (params.get('q') ?? '').trim(), in: parseId(params.get('in')) }
 }

@@ -39,6 +39,12 @@ public interface IFaceRepository
     /// </summary>
     Task<IReadOnlyList<FolderFaceCounts>> GetFolderFaceCountsAsync(int faceModelId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Forgets that the images in scope (same scope as GetCandidateImageIdsAsync) were analysed, so the next run analyses
+    /// them again. Their faces and assignments stay until each image is re-analysed. Returns how many states were removed.
+    /// </summary>
+    Task<int> ResetProcessingStatesAsync(int? folderId, bool isRecursive, CancellationToken cancellationToken = default);
+
     Task<FaceProcessingState?> GetStateAsync(int imageId, CancellationToken cancellationToken = default);
 
     /// <summary>

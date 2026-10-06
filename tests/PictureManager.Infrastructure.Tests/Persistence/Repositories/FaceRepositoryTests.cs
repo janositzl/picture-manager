@@ -72,6 +72,34 @@ public class FaceRepositoryTests
     }
 
     [Fact]
+    public async Task ResetProcessingStatesAsync_ForgetsOnlyTheScopesStates_SoTheyBecomeCandidatesAgain()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var trips = await FaceTestData.AddFolderAsync(db.Context, top, "Trips");
+        var madeira = await FaceTestData.AddFolderAsync(db.Context, trips, "Madeira");
+        var other = await FaceTestData.AddFolderAsync(db.Context, top, "Other");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var inTrips = await FaceTestData.AddImageAsync(db.Context, trips, "a", hash: "h1");
+        var inMadeira = await FaceTestData.AddImageAsync(db.Context, madeira, "b", hash: "h2");
+        var inOther = await FaceTestData.AddImageAsync(db.Context, other, "c", hash: "h3");
+        db.Context.FaceProcessingStates.AddRange(
+            new FaceProcessingState { ImageId = inTrips.Id, FaceModelId = model, ImageFingerprint = "h1", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = inMadeira.Id, FaceModelId = model, ImageFingerprint = "h2", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = inOther.Id, FaceModelId = model, ImageFingerprint = "h3", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now });
+        await db.Context.SaveChangesAsync();
+
+        (await new FaceRepository(db.CreateContext()).ResetProcessingStatesAsync(trips.Id, isRecursive: false)).Should().Be(1);
+        (await new FaceRepository(db.CreateContext()).GetCandidateImageIdsAsync(model, null, isRecursive: true))
+            .Should().BeEquivalentTo(new[] { inTrips.Id });
+
+        (await new FaceRepository(db.CreateContext()).ResetProcessingStatesAsync(trips.Id, isRecursive: true)).Should().Be(1);
+        (await new FaceRepository(db.CreateContext()).GetCandidateImageIdsAsync(model, null, isRecursive: true))
+            .Should().BeEquivalentTo(new[] { inTrips.Id, inMadeira.Id });
+        (await new FaceRepository(db.CreateContext()).ResetProcessingStatesAsync(folderId: 999_999, isRecursive: true)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task GetCandidateImageIdsAsync_SkipsImagesInOrBeneathAnExcludedFolder()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

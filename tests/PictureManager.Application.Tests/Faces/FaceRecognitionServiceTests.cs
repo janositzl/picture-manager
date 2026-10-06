@@ -92,13 +92,30 @@ public class FaceRecognitionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task QueueAsync_Reanalyze_ForgetsTheScopesProcessingStatesBeforeQueueing()
+    {
+        await Create().QueueAsync(rootId: null, folderId: null, isRecursive: false, reanalyze: true);
+
+        await _faces.Received(1).ResetProcessingStatesAsync(null, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task QueueAsync_WithoutReanalyze_KeepsProcessingStates()
+    {
+        await Create().QueueAsync(rootId: null, folderId: null, isRecursive: true);
+
+        await _faces.DidNotReceiveWithAnyArgs().ResetProcessingStatesAsync(default, default, default);
+    }
+
+    [Fact]
     public async Task QueueAsync_AnotherJobActive_Throws()
     {
         _jobs.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
 
-        var act = () => Create().QueueAsync(null, null, true);
+        var act = () => Create().QueueAsync(null, null, true, true);
 
         await act.Should().ThrowAsync<FaceRecognitionAlreadyInProgressException>();
+        await _faces.DidNotReceiveWithAnyArgs().ResetProcessingStatesAsync(default, default, default);
         _queue.DidNotReceiveWithAnyArgs().Enqueue(default!);
     }
 

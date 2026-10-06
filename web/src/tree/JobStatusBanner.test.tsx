@@ -5,6 +5,14 @@ import { activeJob, discoveryEvents, faceRecognitionEvents, scanEvents } from '.
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
+/** The job banner. The folder view can show its own notice (an alert too), e.g. "No photos directly in this folder". */
+const jobBanner = () =>
+  waitFor(() => {
+    const banner = screen.getAllByRole('alert').find((alert) => !alert.textContent?.startsWith('No photos directly'))
+    if (banner === undefined) throw new Error('No job banner yet')
+    return banner
+  })
+
 describe('JobStatusBanner', () => {
   it('shows nothing when no job is running', async () => {
     renderApp('/folders/1')
@@ -21,7 +29,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    const banner = await screen.findByRole('alert')
+    const banner = await jobBanner()
     await waitFor(() => expect(banner).toHaveTextContent('Scanning… 3 folders, 40 files'))
     expect(screen.getByRole('link', { name: 'Holidays' })).toHaveAttribute(
       'href',
@@ -38,7 +46,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    const banner = await screen.findByRole('alert')
+    const banner = await jobBanner()
     await waitFor(() => expect(banner).toHaveTextContent('Enriching… 4/12 files'))
     expect(screen.queryByRole('link', { name: 'Holidays' })).not.toBeInTheDocument()
   })
@@ -50,7 +58,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    const banner = await screen.findByRole('alert')
+    const banner = await jobBanner()
     await waitFor(() => expect(banner).toHaveTextContent('Discovering… 5 folders found'))
   })
 
@@ -68,7 +76,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    const banner = await screen.findByRole('alert')
+    const banner = await jobBanner()
     await waitFor(() => expect(banner).toHaveTextContent('Recognizing faces… 3/10 images, 7 faces'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(cancelled).toBe(true))
@@ -83,7 +91,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    const banner = await screen.findByRole('alert')
+    const banner = await jobBanner()
     await waitFor(() => expect(banner).toHaveTextContent('Grouping faces…'))
   })
 
@@ -96,7 +104,7 @@ describe('JobStatusBanner', () => {
     )
     renderApp('/folders/1')
 
-    await screen.findByRole('alert')
+    await jobBanner()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 })

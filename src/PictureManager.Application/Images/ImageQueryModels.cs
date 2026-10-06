@@ -25,9 +25,11 @@ public enum PersonFaceState
 /// <summary>
 /// AND-combined listing filters. FolderId = images directly in that folder only. PersonId = photos with that person's
 /// Suggested/Confirmed face; PersonState narrows that to Confirmed, or to Suggested-only (no Confirmed face of that person in the photo).
+/// HasFaces true = at least one detected face that is not Ignored, false = none (including photos not analysed yet), null = no filter.
 /// </summary>
 public sealed record ImageListFilter(
-    int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null, PersonFaceState? PersonState = null);
+    int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null, PersonFaceState? PersonState = null,
+    bool? HasFaces = null);
 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);

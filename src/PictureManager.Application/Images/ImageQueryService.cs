@@ -79,7 +79,18 @@ public sealed class ImageQueryService : IImageQueryService
             }
         }
 
-        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState);
+        bool? hasFaces = null;
+        if (request.Faces is not null)
+        {
+            switch (request.Faces.ToLowerInvariant())
+            {
+                case "with": hasFaces = true; break;
+                case "without": hasFaces = false; break;
+                default: return Result.Invalid("faces", "Must be 'with' or 'without'.");
+            }
+        }
+
+        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces);
         var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();

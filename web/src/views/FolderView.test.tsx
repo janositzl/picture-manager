@@ -3,6 +3,7 @@ import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { folderDetails, madeiraImages } from '../test/fixtures'
 import { pagedImages } from '../test/handlers'
+import { faceRecognitionEvents } from '../test/jobHandlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
@@ -68,6 +69,53 @@ describe('FolderView', () => {
     expect(firstDateRequest.get('order')).toBe('desc')
     expect(firstDateRequest.get('cursor')).toBeNull()
     expect(router.state.location.search).toBe('?sort=date')
+  })
+
+  it('filters photos by face with the icon toggle, keeping the choice in the URL', async () => {
+    const requests: URLSearchParams[] = []
+    server.use(
+      http.get('/api/images', ({ request }) => {
+        const query = new URL(request.url).searchParams
+        requests.push(query)
+        return HttpResponse.json({ items: query.get('faces') === 'without' ? [] : madeiraImages, nextCursor: null })
+      }),
+    )
+    const { user, router } = renderApp('/folders/3')
+    await screen.findByRole('button', { name: 'IMG_0001.jpg' })
+    expect(requests[0]?.get('faces')).toBeNull()
+    expect(screen.getByRole('button', { name: 'All photos' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Photos with a face' }))
+    await waitFor(() => expect(requests.some((q) => q.get('faces') === 'with')).toBe(true))
+    expect(router.state.location.search).toBe('?faces=with')
+
+    await user.click(screen.getByRole('button', { name: 'Photos without a face' }))
+    expect(await screen.findByText('No photos without a face here.')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?faces=without')
+
+    await user.click(screen.getByRole('button', { name: 'All photos' }))
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+  })
+
+  it('re-analyses the folder own photos after confirming, from the header button', async () => {
+    let body: unknown = null
+    server.use(
+      http.post('/api/face-recognitions', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ faceRecognitionJobId: 9 })
+      }),
+      faceRecognitionEvents(9, [
+        { Id: 9, Status: 'Completed', ImagesFound: 0, ImagesProcessed: 0, FacesFound: 0, ErrorMessage: null },
+      ]),
+    )
+    const { user } = renderApp('/folders/3')
+
+    await user.click(await screen.findByRole('button', { name: 'Re-analyse faces' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Re-analyse faces?' })
+    expect(body).toBeNull()
+    await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))
+
+    await waitFor(() => expect(body).toEqual({ folderId: 3, isRecursive: false, reanalyze: true }))
   })
 
   it('toggles the direction', async () => {

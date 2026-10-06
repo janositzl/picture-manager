@@ -47,7 +47,18 @@ public sealed class FaceRepository : IFaceRepository
         return row.Id;
     }
 
-    public async Task<IReadOnlyList<int>> GetCandidateImageIdsAsync(int faceModelId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
+    public async Task<int> ResetProcessingStatesAsync(int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
+    {
+        if (await ScopeAsync(folderId, isRecursive, cancellationToken) is not { } scoped)
+            return 0;
+
+        return await _dbContext.FaceProcessingStates
+            .Where(s => scoped.Select(i => i.Id).Contains(s.ImageId))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    /// <summary>The in-scope images of a folder (recursively or not) or of everything; null when the folder doesn't exist.</summary>
+    private async Task<IQueryable<Image>?> ScopeAsync(int? folderId, bool isRecursive, CancellationToken cancellationToken)
     {
         var query = FaceScopeImages();
 
@@ -55,7 +66,7 @@ public sealed class FaceRepository : IFaceRepository
         {
             var folder = await _dbContext.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
             if (folder is null)
-                return Array.Empty<int>();
+                return null;
 
             if (!isRecursive)
                 query = query.Where(i => i.FolderId == id);
@@ -68,6 +79,14 @@ public sealed class FaceRepository : IFaceRepository
                                          && (i.FolderId == id || i.Folder.RelativePath.StartsWith(prefix)));
             }
         }
+
+        return query;
+    }
+
+    public async Task<IReadOnlyList<int>> GetCandidateImageIdsAsync(int faceModelId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
+    {
+        if (await ScopeAsync(folderId, isRecursive, cancellationToken) is not { } query)
+            return Array.Empty<int>();
 
         // Done = a Completed or PermanentlyFailed state for this model AND this exact content.
         query = query.Where(i => !_dbContext.FaceProcessingStates.Any(s =>

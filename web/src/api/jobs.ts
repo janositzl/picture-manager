@@ -31,11 +31,20 @@ export function startScan(folderId: number, isRecursive: boolean): Promise<numbe
   }).then((response) => response.scanJobId)
 }
 
-export function startFaceRecognition(folderId: number | null, isRecursive: boolean): Promise<number> {
+/** reanalyze: forget that the photos in scope were analysed, so every one is analysed again. */
+export function startFaceRecognition(
+  folderId: number | null,
+  isRecursive: boolean,
+  reanalyze = false,
+): Promise<number> {
   return apiFetch<{ faceRecognitionJobId: number }>('/api/face-recognitions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(folderId === null ? { isRecursive } : { folderId, isRecursive }),
+    body: JSON.stringify({
+      ...(folderId === null ? {} : { folderId }),
+      isRecursive,
+      ...(reanalyze && { reanalyze }),
+    }),
   }).then((response) => response.faceRecognitionJobId)
 }
 

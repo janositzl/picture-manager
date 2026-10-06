@@ -21,7 +21,9 @@ import { useNotify } from '../app/notify'
 import { parseId } from '../routing/urlState'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { useFolderJobs } from './FolderJobsContext'
+import type { FaceCoverageState } from './faceCoverage'
 import { progressLabel } from './JobStatusBanner'
+import { ReanalyseFacesConfirm } from './ReanalyseFacesConfirm'
 
 type Props = {
   folderId: number
@@ -32,6 +34,8 @@ type Props = {
   isRootFolder: boolean
   /** Null only for a root's top folder, which can't be removed. */
   parentId: number | null
+  /** Face-detection state of this folder's own photos; once completed, "Recognize faces" becomes "Re-analyse faces". */
+  faceState: FaceCoverageState
 }
 
 export function FolderActionsMenu({
@@ -41,6 +45,7 @@ export function FolderActionsMenu({
   ancestorExcluded,
   isRootFolder,
   parentId,
+  faceState,
 }: Props) {
   const { activeJob, refreshFolder, scanFolder, recognizeFaces } = useFolderJobs()
   const setExcluded = useSetFolderExcluded()
@@ -51,6 +56,8 @@ export function FolderActionsMenu({
   const viewedFolderId = parseId(params.folderId ?? null)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [confirmingReanalyse, setConfirmingReanalyse] = useState(false)
+  const analysed = faceState === 'completed'
   const excluded = isExcluded || ancestorExcluded
   const scanDisabled = activeJob !== null || excluded
 
@@ -117,7 +124,10 @@ export function FolderActionsMenu({
         <MenuItem onClick={() => runAction(() => refreshFolder(folderId))} disabled={scanDisabled}>
           Refresh structure
         </MenuItem>
-        <MenuItem onClick={() => runAction(() => scanFolder(folderId, false))} disabled={scanDisabled}>
+        <MenuItem
+          onClick={() => runAction(() => scanFolder(folderId, false))}
+          disabled={scanDisabled}
+        >
           Scan folder
         </MenuItem>
         <MenuItem
@@ -126,8 +136,13 @@ export function FolderActionsMenu({
         >
           Scan folder + subfolders
         </MenuItem>
-        <MenuItem onClick={() => runAction(() => recognizeFaces(folderId))} disabled={scanDisabled}>
-          Recognize faces
+        <MenuItem
+          onClick={() =>
+            runAction(() => (analysed ? setConfirmingReanalyse(true) : recognizeFaces(folderId)))
+          }
+          disabled={scanDisabled}
+        >
+          {analysed ? 'Re-analyse faces' : 'Recognize faces'}
         </MenuItem>
         <MenuItem onClick={toggleExcluded} disabled={ancestorExcluded}>
           {isExcluded && (
@@ -150,6 +165,19 @@ export function FolderActionsMenu({
           </MenuItem>
         )}
       </Menu>
+      {confirmingReanalyse && (
+        <div onClick={(event: MouseEvent) => event.stopPropagation()}>
+          <ReanalyseFacesConfirm
+            folderName={folderName}
+            recursive
+            onConfirm={() => {
+              setConfirmingReanalyse(false)
+              recognizeFaces(folderId, { reanalyze: true })
+            }}
+            onClose={() => setConfirmingReanalyse(false)}
+          />
+        </div>
+      )}
       {confirmingRemove && (
         // MUI's Dialog portals its DOM elsewhere, but synthetic events still bubble through the React
         // tree; without this, confirming would also fire the tree row's onClick and navigate to it.

@@ -10,9 +10,10 @@ public interface IFaceRecognitionService
     /// <summary>
     /// Validates the scope, creates the job (Enumerating, so any other job is refused), registers it for
     /// cancellation and queues it. folderId = that folder; rootId = that root; neither = all active roots.
+    /// reanalyze = forget that the photos in scope were analysed first, so every one of them is analysed again.
     /// Throws FaceRecognitionAlreadyInProgressException, ScanRootUnavailableException or FolderUnavailableException.
     /// </summary>
-    Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default);
+    Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Selects candidates, analyzes them, clusters, and records the outcome (Completed, Failed or Cancelled).

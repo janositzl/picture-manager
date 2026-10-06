@@ -15,7 +15,12 @@ import type { DiscoveryProgress, FaceRecognitionProgress, ScanProgress } from '.
 import { useNotify } from '../app/notify'
 
 export type ActiveJob =
-  | { kind: 'discoveries'; folderId: number | null; jobId: number; progress: DiscoveryProgress | null }
+  | {
+      kind: 'discoveries'
+      folderId: number | null
+      jobId: number
+      progress: DiscoveryProgress | null
+    }
   | { kind: 'scans'; folderId: number | null; jobId: number; progress: ScanProgress | null }
   | {
       kind: 'face-recognitions'
@@ -28,7 +33,11 @@ type FolderJobs = {
   activeJob: ActiveJob | null
   refreshFolder: (folderId: number) => void
   scanFolder: (folderId: number, isRecursive: boolean) => void
-  recognizeFaces: (folderId: number | null) => void
+  /** Recursive by default; reanalyze runs the detector again on photos that were already analysed. */
+  recognizeFaces: (
+    folderId: number | null,
+    options?: { isRecursive?: boolean; reanalyze?: boolean },
+  ) => void
   cancelActiveJob: () => void
 }
 
@@ -45,7 +54,9 @@ function startErrorMessage(error: unknown): string {
 
 /** Tracks the single discovery/scan job the backend allows at a time, shared by the whole tree. */
 export function FolderJobsProvider({ children }: { children: ReactNode }) {
-  const [job, setJob] = useState<{ kind: JobKind; folderId: number | null; jobId: number } | null>(null)
+  const [job, setJob] = useState<{ kind: JobKind; folderId: number | null; jobId: number } | null>(
+    null,
+  )
   const queryClient = useQueryClient()
   const notify = useNotify()
 
@@ -56,14 +67,20 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   // be tracked so the banner shows it and HasActiveJobAsync's 409 isn't a silent surprise.
   useEffect(() => {
     let cancelled = false
-    getActiveJob().then((active) => {
-      if (cancelled || active === null) return
-      const kind: JobKind =
-        active.kind === 'Discovery' ? 'discoveries' : active.kind === 'Scan' ? 'scans' : 'face-recognitions'
-      setJob({ kind, folderId: active.folderId, jobId: active.id })
-    }).catch(() => {
-      // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.
-    })
+    getActiveJob()
+      .then((active) => {
+        if (cancelled || active === null) return
+        const kind: JobKind =
+          active.kind === 'Discovery'
+            ? 'discoveries'
+            : active.kind === 'Scan'
+              ? 'scans'
+              : 'face-recognitions'
+        setJob({ kind, folderId: active.folderId, jobId: active.id })
+      })
+      .catch(() => {
+        // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.
+      })
     return () => {
       cancelled = true
     }
@@ -103,8 +120,10 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   )
 
   const recognizeFaces = useCallback(
-    (folderId: number | null) =>
-      run('face-recognitions', folderId, () => startFaceRecognition(folderId, true)),
+    (folderId: number | null, { isRecursive = true, reanalyze = false } = {}) =>
+      run('face-recognitions', folderId, () =>
+        startFaceRecognition(folderId, isRecursive, reanalyze),
+      ),
     [run],
   )
   const cancelActiveJob = useCallback(() => {
@@ -141,7 +160,9 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   const activeJob = buildActiveJob()
 
   return (
-    <FolderJobsContext.Provider value={{ activeJob, refreshFolder, scanFolder, recognizeFaces, cancelActiveJob }}>
+    <FolderJobsContext.Provider
+      value={{ activeJob, refreshFolder, scanFolder, recognizeFaces, cancelActiveJob }}
+    >
       {children}
     </FolderJobsContext.Provider>
   )

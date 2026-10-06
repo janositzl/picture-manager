@@ -49,6 +49,27 @@ public class ImageQueryServiceTests
             ImageSort.Date, SortDirection.Desc, null, 101, Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("with", true)]
+    [InlineData("Without", false)]
+    public async Task ListAsync_FacesFilter_MapsToHasFaces(string faces, bool expected)
+    {
+        await CreateService().ListAsync(new ImageListRequest(Faces: faces));
+
+        await _images.Received(1).ListAsync(
+            Arg.Is<ImageListFilter>(f => f.HasFaces == expected),
+            Arg.Any<ImageSort>(), Arg.Any<SortDirection>(), null, 101, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListAsync_UnknownFacesValue_IsInvalid()
+    {
+        var result = await CreateService().ListAsync(new ImageListRequest(Faces: "some"));
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        await _images.DidNotReceiveWithAnyArgs().ListAsync(default!, default, default, default, default);
+    }
+
     [Fact]
     public async Task ListAsync_NameSort_DefaultsToAscending()
     {

@@ -55,12 +55,15 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         _clock = clock;
     }
 
-    public async Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
+    public async Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, CancellationToken cancellationToken = default)
     {
         if (await _jobRepository.HasActiveJobAsync(cancellationToken))
             throw new FaceRecognitionAlreadyInProgressException();
 
         var jobFolderId = await ScanTargets.ResolveJobFolderIdAsync(_folderRepository, _imageRootRepository, rootId, folderId, cancellationToken);
+
+        if (reanalyze)
+            await _faceRepository.ResetProcessingStatesAsync(jobFolderId, isRecursive, cancellationToken);
 
         // Created as Enumerating (not Pending) so HasActiveJobAsync refuses any other job while this one waits.
         var job = await _jobRepository.AddAsync(new Job
