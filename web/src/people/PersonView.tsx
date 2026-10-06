@@ -59,6 +59,7 @@ function PersonContent({ personId }: PersonContentProps) {
         banner={
           !isGroup && (
             <SuggestedStrip
+              key={personId}
               personId={personId}
               sort={sort}
               order={order}

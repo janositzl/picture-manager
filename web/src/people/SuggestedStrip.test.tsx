@@ -56,6 +56,28 @@ describe('Suggested strip', () => {
     expect(await screen.findByText('Accepted 1 suggestion.')).toBeInTheDocument()
   })
 
+  it('reviews with the keyboard: A accepts and R rejects the focused photo, and progress is shown', async () => {
+    const sent: string[] = []
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      personImages,
+      http.post('/api/people/1/images/:imageId/:action', ({ params }) => {
+        sent.push(`${params.imageId}/${params.action}`)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const { user } = renderApp('/people/1')
+    const strip = await screen.findByRole('region', { name: 'Suggested' })
+    const open = await within(strip).findByRole('button', { name: `Open ${first.fileName}${first.extension}` })
+
+    open.focus()
+    await user.keyboard('a')
+
+    await waitFor(() => expect(sent).toEqual([`${first.id}/accept`]))
+    expect(await within(strip).findByText(/1 reviewed/)).toBeInTheDocument()
+  })
+
   it('has no strip for an unknown group, whose grid is the suggestions', async () => {
     const states: string[] = []
     server.use(

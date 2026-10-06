@@ -2,8 +2,8 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { Box, Button, IconButton, Tooltip, Typography } from '@mui/material'
-import { useMemo, useState } from 'react'
+import { Box, Button, IconButton, LinearProgress, Tooltip, Typography } from '@mui/material'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl, useAcceptAllSuggestions, useImageSuggestion } from '../api/people'
@@ -17,6 +17,12 @@ import { FaceModeToggle } from './FaceModeToggle'
 import { openedFromStrip } from './openedFromStrip'
 
 const TILE = 112
+
+/** The tile's neighbour, as the element to focus: a tile wrapper's first button, or a plain button (Show more). */
+function focusTarget(sibling: Element | null): HTMLElement | null {
+  if (sibling === null) return null
+  return sibling.matches('button') ? (sibling as HTMLElement) : sibling.querySelector<HTMLElement>('button')
+}
 
 type Props = {
   personId: number
@@ -32,6 +38,7 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
   const images = useImages(filter)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const [open, setOpen] = useState(true)
+  const [reviewed, setReviewed] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const { image } = parseGridParams(searchParams)
@@ -44,8 +51,38 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
   const act = (item: ImageListItem, action: 'accept' | 'reject') =>
     suggestion.mutate(
       { personId, imageId: item.id, action },
-      { onError: () => notify("Couldn't save that decision.") },
+      {
+        onSuccess: () => setReviewed((count) => count + 1),
+        onError: () => notify("Couldn't save that decision."),
+      },
     )
+
+  // Arrow keys move between tiles; A / R decide the focused one and hand focus to its neighbour.
+  const onTileKeyDown = (event: KeyboardEvent<HTMLElement>, item: ImageListItem) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    const tile = event.currentTarget
+    const next = focusTarget(tile.nextElementSibling)
+    const previous = focusTarget(tile.previousElementSibling)
+    switch (event.key.toLowerCase()) {
+      case 'arrowright':
+        event.preventDefault()
+        next?.focus()
+        break
+      case 'arrowleft':
+        event.preventDefault()
+        previous?.focus()
+        break
+      case 'a':
+      case 'r':
+        event.preventDefault()
+        ;(next ?? previous)?.focus()
+        act(item, event.key.toLowerCase() === 'a' ? 'accept' : 'reject')
+        break
+    }
+  }
+
+  const remaining = items.length
+  const total = reviewed + remaining
 
   const openViewer = (id: number) =>
     setSearchParams(withParams(searchParams, { image: id }), {
@@ -73,6 +110,12 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
           {images.hasNextPage ? '+' : ''}
         </span>
         <Box sx={{ flex: 1 }} />
+        {open && (
+          <span className="hidden text-xs text-zinc-400 lg:inline">
+            <kbd className="font-sans">←</kbd> <kbd className="font-sans">→</kbd> move ·{' '}
+            <kbd className="font-sans">A</kbd> accept · <kbd className="font-sans">R</kbd> reject
+          </span>
+        )}
         <FaceModeToggle value={mode} onChange={onModeChange} label="Suggested view" />
         <Button
           size="small"
@@ -84,8 +127,10 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
           disabled={acceptAll.isPending}
           onClick={() =>
             acceptAll.mutate(personId, {
-              onSuccess: ({ count }) =>
-                notify(`Accepted ${count} ${count === 1 ? 'suggestion' : 'suggestions'}.`),
+              onSuccess: ({ count }) => {
+                setReviewed((value) => value + count)
+                notify(`Accepted ${count} ${count === 1 ? 'suggestion' : 'suggestions'}.`)
+              },
               onError: () => notify("Couldn't accept the suggestions."),
             })
           }
@@ -93,6 +138,20 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
           Accept all
         </Button>
       </Box>
+      {reviewed > 0 && (
+        <div className="mb-2 flex items-center gap-3">
+          <LinearProgress
+            variant="determinate"
+            value={(reviewed / total) * 100}
+            aria-label="Review progress"
+            sx={{ flex: 1, height: 6, borderRadius: 3 }}
+          />
+          <span className="shrink-0 text-xs tabular-nums text-zinc-500">
+            {reviewed} reviewed · {remaining}
+            {images.hasNextPage ? '+' : ''} left
+          </span>
+        </div>
+      )}
       {open && (
         <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 0.5, pt: 0.25 }}>
           {items.map((item) => {
@@ -103,7 +162,8 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
             return (
               <Box
                 key={item.id}
-                className="group transition-all duration-200 ease-in-out hover:scale-[1.03]"
+                className="group transition-all duration-200 ease-in-out hover:scale-[1.03] focus-within:scale-[1.03]"
+                onKeyDown={(event) => onTileKeyDown(event, item)}
                 sx={{ position: 'relative', width: TILE, height: TILE, flexShrink: 0 }}
               >
                 <Box

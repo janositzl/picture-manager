@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { peopleList } from '../test/peopleHandlers'
@@ -35,8 +35,39 @@ describe('PeoplePage', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search people' }), { target: { value: 'ann' } })
 
-    expect(screen.getByRole('link', { name: /Anna/ })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Unknown #1/ })).not.toBeInTheDocument()
+    const list = within(screen.getByRole('complementary', { name: 'People' }))
+    expect(list.getByRole('link', { name: /Anna/ })).toBeInTheDocument()
+    expect(list.queryByRole('link', { name: /Unknown #1/ })).not.toBeInTheDocument()
+  })
+
+  it('filters to people needing review, and lists those with suggestions first', async () => {
+    server.use(
+      peopleList([
+        { id: 1, name: 'Peter', confirmedImageCount: 12, suggestedImageCount: 0, coverFaceId: null },
+        { id: 2, name: 'Anna', confirmedImageCount: 3, suggestedImageCount: 4, coverFaceId: null },
+      ]),
+    )
+    const { user } = renderApp('/people')
+    const list = within(await screen.findByRole('complementary', { name: 'People' }))
+    await list.findByRole('link', { name: /Peter/ })
+
+    const links = list.getAllByRole('link').map((link) => link.getAttribute('aria-label'))
+    expect(links[0]).toMatch(/^Anna/)
+
+    await user.click(list.getByRole('button', { name: /Needs review/ }))
+
+    expect(list.getByRole('link', { name: /Anna/ })).toBeInTheDocument()
+    expect(list.queryByRole('link', { name: /Peter/ })).not.toBeInTheDocument()
+  })
+
+  it('shows a review dashboard when nobody is selected', async () => {
+    server.use(peopleList())
+    renderApp('/people')
+
+    const next = await screen.findByRole('link', { name: /Review next: Unknown #1 \(5\)/ })
+    expect(next).toHaveAttribute('href', '/people/2')
+    expect(screen.getByText('Suggestions waiting')).toBeInTheDocument()
+    expect(screen.getByText('Biggest unknown groups')).toBeInTheDocument()
   })
 
   it('explains what to do when there are no people yet', async () => {
