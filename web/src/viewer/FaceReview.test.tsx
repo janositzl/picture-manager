@@ -129,6 +129,62 @@ describe('viewer faces', () => {
   })
 })
 
+describe('face review from the normal viewer', () => {
+  it('can be switched on for a photo, which shows the faces and the re-check action', async () => {
+    server.use(faces([unknown]))
+    const { user } = renderApp('/folders/3?image=20')
+
+    expect(screen.queryByRole('region', { name: 'People in photo' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Review faces' }))
+
+    const section = await screen.findByRole('region', { name: 'People in photo' })
+    expect(await within(section).findByRole('button', { name: 'Unknown' })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Assign person' })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Re-check faces' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Hide face review' }))
+    expect(screen.queryByRole('region', { name: 'People in photo' })).not.toBeInTheDocument()
+  })
+
+  it('is not offered when the viewer was opened from a person', async () => {
+    server.use(peopleList(), person(peopleFixture[0]), personImages, faces([confirmed]))
+    renderApp('/people/1?image=20')
+
+    await screen.findByRole('region', { name: 'People in photo' })
+    expect(screen.queryByRole('button', { name: 'Review faces' })).not.toBeInTheDocument()
+  })
+})
+
+describe('re-checking faces', () => {
+  it('asks the server to re-match the photo and reports how many faces were suggested', async () => {
+    let sent = ''
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      personImages,
+      faces([confirmed, unknown]),
+      http.post('/api/images/:id/faces/recheck', ({ params }) => {
+        sent = String(params.id)
+        return HttpResponse.json({ count: 1 })
+      }),
+    )
+    const { user } = renderApp('/people/1?image=20')
+
+    await user.click(await screen.findByRole('button', { name: 'Re-check faces' }))
+
+    await waitFor(() => expect(sent).toBe('20'))
+    expect(await screen.findByText('1 face now suggested.')).toBeInTheDocument()
+  })
+
+  it('is not offered when no face is unidentified', async () => {
+    server.use(peopleList(), person(peopleFixture[0]), personImages, faces([confirmed, suggested]))
+    renderApp('/people/1?image=20')
+
+    await screen.findByRole('region', { name: 'People in photo' })
+    expect(screen.queryByRole('button', { name: 'Re-check faces' })).not.toBeInTheDocument()
+  })
+})
+
 describe('viewer navigation in an unknown group', () => {
   it('keeps the arrows when the photo leaves the group after its people are assigned', async () => {
     let items = [image(20, 3), image(21, 3), image(22, 3)]

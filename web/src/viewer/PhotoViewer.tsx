@@ -1,6 +1,7 @@
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import CloseIcon from '@mui/icons-material/Close'
+import FaceRetouchingNaturalIcon from '@mui/icons-material/FaceRetouchingNatural'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import StarIcon from '@mui/icons-material/Star'
@@ -71,7 +72,7 @@ const isMissingItem = (item: object): boolean => 'isMissing' in item && item.isM
 export function PhotoViewer({
   list,
   onRemoveFromAlbum,
-  faceReview,
+  faceReview: openedFor,
 }: {
   /** Set when opened from a person: shows the detected faces and lets the user decide about them. */
   faceReview?: { personId: number }
@@ -85,8 +86,12 @@ export function PhotoViewer({
   const imageId = parseGridParams(searchParams).image
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
-  const infoKey = faceReview !== undefined ? REVIEW_INFO_PANEL_KEY : INFO_PANEL_KEY
-  const [infoOpen, setInfoOpen] = useState(() => readInfoOpen(infoKey, faceReview === undefined))
+  // Any viewer can switch to face review (for photos no person's grid leads to); opened from a person it starts on.
+  const [reviewing, setReviewing] = useState(false)
+  const faceReview: { personId: number | null } | undefined =
+    openedFor ?? (reviewing ? { personId: null } : undefined)
+  const infoKey = openedFor !== undefined ? REVIEW_INFO_PANEL_KEY : INFO_PANEL_KEY
+  const [infoOpen, setInfoOpen] = useState(() => readInfoOpen(infoKey, openedFor === undefined))
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null)
   const pendingNext = useRef(false)
@@ -201,6 +206,11 @@ export function PhotoViewer({
   const toggleFavorite = () => {
     if (current !== undefined)
       setFavorite.mutate({ id: current.id, isFavorite: !current.isFavorite })
+  }
+
+  const toggleReview = () => {
+    if (!reviewing) setInfoOpen(false)
+    setReviewing(!reviewing)
   }
 
   const toggleInfo = () => {
@@ -420,6 +430,24 @@ export function PhotoViewer({
                     }}
                   >
                     <PlaylistAddIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {openedFor === undefined && (
+                <Tooltip title={reviewing ? 'Hide face review' : 'Review faces'}>
+                  <IconButton
+                    aria-label={reviewing ? 'Hide face review' : 'Review faces'}
+                    aria-pressed={reviewing}
+                    onClick={toggleReview}
+                    className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                    sx={{
+                      color: 'common.white',
+                      bgcolor: reviewing ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(4px)',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                    }}
+                  >
+                    <FaceRetouchingNaturalIcon />
                   </IconButton>
                 </Tooltip>
               )}
