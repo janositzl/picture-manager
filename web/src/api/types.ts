@@ -2,11 +2,22 @@ export type FolderNode = {
   id: number
   name: string
   hasChildren: boolean
-  imageCount: number
   isMissing: boolean
   isExcluded: boolean
   /** True once a scan of this folder has completed. */
   isScanned: boolean
+}
+
+/**
+ * Face-detection coverage of a folder and its subfolders for the current face model. Folders with no
+ * photos beneath them have no entry. stale = processed earlier, but by another model or for older content.
+ */
+export type FolderFaceCoverage = {
+  folderId: number
+  total: number
+  done: number
+  failed: number
+  stale: number
 }
 
 export type BreadcrumbItem = { id: number; name: string }

@@ -4,6 +4,7 @@ import { adminHandlers } from './adminHandlers'
 import { albumHandlers, duplicateHandlers } from './albumHandlers'
 import {
   childrenById,
+  faceCoverage,
   folderDetails,
   holidaysImages,
   imageDetail,
@@ -20,6 +21,7 @@ const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { 
  * the generic /:id, which would otherwise treat "removed" as a folder id.
  */
 export const handlers = [
+  http.get('/api/face-recognitions/coverage', () => HttpResponse.json(faceCoverage)),
   http.get('/api/folders/roots', () => HttpResponse.json(rootFolders)),
   http.get('/api/folders/:id/children', ({ params }) =>
     HttpResponse.json(childrenById[Number(params.id)] ?? []),

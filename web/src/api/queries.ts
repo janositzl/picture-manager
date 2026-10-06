@@ -3,12 +3,14 @@ import {
   queryOptions,
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { apiFetch } from './client'
 import { toImageQuery, type ImageFilter } from './imageFilter'
 import type {
+  FolderFaceCoverage,
   AlbumDetail,
   AlbumImageItem,
   AlbumSummary,
@@ -42,6 +44,8 @@ export const queryKeys = {
   settings: () => ['settings'] as const,
   roots: () => ['roots'] as const,
   removedFolders: () => ['folders', 'removed'] as const,
+  // Under 'folders' so every invalidation that refreshes the tree (job done, exclusion, removal) refreshes it too.
+  faceCoverage: () => ['folders', 'face-coverage'] as const,
 }
 
 export function useRootFolders() {
@@ -51,11 +55,36 @@ export function useRootFolders() {
   })
 }
 
-export function useFolderChildren(id: number, enabled: boolean) {
-  return useQuery({
+const folderChildrenOptions = (id: number) =>
+  queryOptions({
     queryKey: queryKeys.folderChildren(id),
     queryFn: ({ signal }) => apiFetch<FolderNode[]>(`/api/folders/${id}/children`, { signal }),
-    enabled,
+  })
+
+export function useFolderChildren(id: number, enabled: boolean) {
+  return useQuery({ ...folderChildrenOptions(id), enabled })
+}
+
+/** Starts loading a folder's children ahead of the click (e.g. on hover); a no-op while the cache is fresh. */
+export function usePrefetchFolderChildren() {
+  const queryClient = useQueryClient()
+  return (id: number) => void queryClient.prefetchQuery(folderChildrenOptions(id))
+}
+
+const FACE_COVERAGE_POLL_MS = 10_000
+
+function toCoverageMap(rows: FolderFaceCoverage[]): ReadonlyMap<number, FolderFaceCoverage> {
+  return new Map(rows.map((row) => [row.folderId, row]))
+}
+
+/** Face coverage by folder id. Polls while a face job runs so the tree shows progress as it happens. */
+export function useFaceCoverage(isFaceJobRunning: boolean) {
+  return useQuery({
+    queryKey: queryKeys.faceCoverage(),
+    queryFn: ({ signal }) =>
+      apiFetch<FolderFaceCoverage[]>('/api/face-recognitions/coverage', { signal }),
+    select: toCoverageMap,
+    refetchInterval: isFaceJobRunning ? FACE_COVERAGE_POLL_MS : false,
   })
 }
 

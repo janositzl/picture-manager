@@ -206,7 +206,6 @@ public sealed class FolderRepository : IFolderRepository
                 f.Id,
                 f.Name,
                 f.Children.Any(c => c.IsActive),
-                f.Images.Count(i => i.MissingSinceUtc == null),
                 f.MissingSinceUtc != null,
                 f.IsExcluded,
                 f.LastScannedAt != null));

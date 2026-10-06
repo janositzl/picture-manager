@@ -7,7 +7,7 @@ namespace PictureManager.Application.Folders;
 /// folder that is what its grid shows; for a missing folder (IsMissing) it is what comes back if the folder
 /// reappears, and what "remove from collection" would purge. IsScanned = a scan of this folder has completed.
 /// </summary>
-public sealed record FolderNode(int Id, string Name, bool HasChildren, int ImageCount, bool IsMissing, bool IsExcluded, bool IsScanned = false);
+public sealed record FolderNode(int Id, string Name, bool HasChildren, bool IsMissing, bool IsExcluded, bool IsScanned = false);
 
 public sealed record BreadcrumbItem(int Id, string Name);
 

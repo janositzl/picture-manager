@@ -1,6 +1,7 @@
 import type {
   DuplicateGroup,
   FolderDetail,
+  FolderFaceCoverage,
   FolderNode,
   ImageDetail,
   ImageListItem,
@@ -10,7 +11,6 @@ export const devRoot: FolderNode = {
   id: 1,
   name: 'dev',
   hasChildren: true,
-  imageCount: 0,
   isMissing: false,
   isExcluded: false,
   isScanned: false,
@@ -19,7 +19,6 @@ export const holidays: FolderNode = {
   id: 2,
   name: 'Holidays',
   hasChildren: true,
-  imageCount: 2,
   isMissing: false,
   isExcluded: false,
   isScanned: false,
@@ -28,7 +27,6 @@ export const madeira: FolderNode = {
   id: 3,
   name: 'Madeira',
   hasChildren: false,
-  imageCount: 3,
   isMissing: false,
   isExcluded: false,
   isScanned: true,
@@ -37,7 +35,6 @@ export const old: FolderNode = {
   id: 4,
   name: 'Old',
   hasChildren: false,
-  imageCount: 1,
   isMissing: true,
   isExcluded: false,
   isScanned: false,
@@ -46,7 +43,6 @@ export const excludedFolder: FolderNode = {
   id: 5,
   name: 'Excluded',
   hasChildren: true,
-  imageCount: 0,
   isMissing: false,
   isExcluded: true,
   isScanned: false,
@@ -55,13 +51,19 @@ export const excludedChild: FolderNode = {
   id: 6,
   name: 'Nested',
   hasChildren: false,
-  imageCount: 0,
   isMissing: false,
   isExcluded: false,
   isScanned: false,
 }
 
 export const rootFolders: FolderNode[] = [devRoot]
+
+/** dev: partially scanned; Holidays: needs rescan; Madeira: completed (one unreadable photo). */
+export const faceCoverage: FolderFaceCoverage[] = [
+  { folderId: 1, total: 6, done: 2, failed: 0, stale: 0 },
+  { folderId: 2, total: 5, done: 1, failed: 0, stale: 2 },
+  { folderId: 3, total: 3, done: 2, failed: 1, stale: 0 },
+]
 
 export const childrenById: Record<number, FolderNode[]> = {
   1: [holidays],

@@ -1,16 +1,23 @@
 import { Box, CircularProgress, List } from '@mui/material'
 import { useState } from 'react'
 import { useMatch } from 'react-router'
-import { useFolder, useRootFolders } from '../api/queries'
+import { useFaceCoverage, useFolder, useRootFolders } from '../api/queries'
+import type { FolderFaceCoverage } from '../api/types'
 import { parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { useFolderJobs } from './FolderJobsContext'
 import { FolderTreeNode } from './FolderTreeNode'
+
+const NO_COVERAGE: ReadonlyMap<number, FolderFaceCoverage> = new Map()
 
 export function FolderTree() {
   const match = useMatch('/folders/:folderId')
   const selectedId = parseId(match?.params.folderId ?? null)
   const roots = useRootFolders()
   const selected = useFolder(selectedId)
+  const { activeJob } = useFolderJobs()
+  // Failures and loading just mean no face status; the tree itself never waits for this.
+  const faceCoverage = useFaceCoverage(activeJob?.kind === 'face-recognitions').data ?? NO_COVERAGE
   // Explicit user toggles win; otherwise the selected folder and its ancestors start expanded,
   // so a deep link opens the tree down to the folder.
   const [toggled, setToggled] = useState<ReadonlyMap<number, boolean>>(new Map())
@@ -44,6 +51,7 @@ export function FolderTree() {
           onToggle={toggle}
           ancestorExcluded={false}
           parentId={null}
+          faceCoverage={faceCoverage}
         />
       ))}
     </List>

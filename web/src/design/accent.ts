@@ -2,6 +2,8 @@
 export const ACCENT = '#5b5bd6'
 export const ACCENT_SOFT = '#ecebfb'
 export const ACCENT_TEXT = '#4b46c4'
+/** Folder icon colour for a folder whose images have been scanned. */
+export const SCANNED_BLUE = '#1e88e5'
 export const SURFACE_MUTED = '#edeef3'
 export const BORDER = '#e3e5ec'
 

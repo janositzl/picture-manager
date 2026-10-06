@@ -1,7 +1,7 @@
 import BlockIcon from '@mui/icons-material/Block'
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import FolderIcon from '@mui/icons-material/Folder'
+import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
@@ -15,10 +15,12 @@ import {
 } from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
-import { useFolderChildren } from '../api/queries'
-import type { FolderNode } from '../api/types'
-import { ACCENT, ACCENT_SOFT, ACCENT_TEXT } from '../design/accent'
+import { useFolderChildren, usePrefetchFolderChildren } from '../api/queries'
+import type { FolderFaceCoverage, FolderNode } from '../api/types'
+import { ACCENT_SOFT, ACCENT_TEXT, SCANNED_BLUE } from '../design/accent'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
+import { FaceStatusIcon } from './FaceStatusIcon'
+import { faceCoverageLabel, faceCoverageState } from './faceCoverage'
 import { FolderActionsMenu } from './FolderActionsMenu'
 
 type Props = {
@@ -31,6 +33,8 @@ type Props = {
   ancestorExcluded: boolean
   /** Null for a root's top folder (depth 0), which has no parent. */
   parentId: number | null
+  /** Face-detection coverage by folder id, for this node and its descendants. */
+  faceCoverage: ReadonlyMap<number, FolderFaceCoverage>
 }
 
 export function FolderTreeNode({
@@ -41,14 +45,22 @@ export function FolderTreeNode({
   onToggle,
   ancestorExcluded,
   parentId,
+  faceCoverage,
 }: Props) {
   const navigate = useNavigate()
   const expanded = node.hasChildren && isExpanded(node.id)
   const children = useFolderChildren(node.id, expanded)
+  const prefetchChildren = usePrefetchFolderChildren()
+  // Hover/focus warms the cache, so by the time the chevron is clicked the subfolders are usually already there.
+  const warmChildren = () => {
+    if (node.hasChildren && !expanded) prefetchChildren(node.id)
+  }
   const selected = node.id === selectedId
   const ref = useRef<HTMLDivElement>(null)
   const excluded = node.isExcluded || ancestorExcluded
   const dimmed = node.isMissing || excluded
+  const faceState = faceCoverageState(faceCoverage.get(node.id))
+  const faceLabel = faceCoverageLabel(faceCoverage.get(node.id))
 
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest' })
@@ -71,6 +83,8 @@ export function FolderTreeNode({
         aria-expanded={node.hasChildren ? expanded : undefined}
         selected={selected}
         onClick={() => navigate(`/folders/${node.id}`)}
+        onPointerEnter={warmChildren}
+        onFocus={warmChildren}
         className="transition-colors duration-200 ease-in-out"
         sx={{
           pl: 1 + depth * 2,
@@ -92,29 +106,43 @@ export function FolderTreeNode({
           className="transition-transform duration-200 ease-in-out"
           sx={{ mr: 0.5, visibility: node.hasChildren ? 'visible' : 'hidden' }}
         >
-          {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+          {expanded && children.isPending ? (
+            <CircularProgress size={18} />
+          ) : (
+            <ChevronRightIcon
+              fontSize="small"
+              sx={{
+                transform: expanded ? 'rotate(90deg)' : 'none',
+                transition: 'transform 150ms ease-in-out',
+              }}
+            />
+          )}
         </IconButton>
-        {excluded ? (
-          <Tooltip
-            title={
-              node.isExcluded
+        <Tooltip
+          title={
+            excluded
+              ? node.isExcluded
                 ? 'Excluded from scan'
                 : 'Excluded from scan (parent folder is excluded)'
-            }
-          >
+              : node.isScanned
+                ? 'Scanned'
+                : ''
+          }
+        >
+          {excluded ? (
             <BlockIcon fontSize="small" color="disabled" sx={{ mr: 0.75 }} />
-          </Tooltip>
-        ) : expanded ? (
-          <FolderOpenOutlinedIcon
-            fontSize="small"
-            sx={{ mr: 0.75, color: selected ? ACCENT : 'text.secondary' }}
-          />
-        ) : (
-          <FolderOutlinedIcon
-            fontSize="small"
-            sx={{ mr: 0.75, color: selected ? ACCENT : 'text.secondary' }}
-          />
-        )}
+          ) : node.isScanned ? (
+            expanded ? (
+              <FolderOpenIcon fontSize="small" sx={{ mr: 0.75, color: SCANNED_BLUE }} />
+            ) : (
+              <FolderIcon fontSize="small" sx={{ mr: 0.75, color: SCANNED_BLUE }} />
+            )
+          ) : expanded ? (
+            <FolderOpenOutlinedIcon fontSize="small" sx={{ mr: 0.75, color: 'text.primary' }} />
+          ) : (
+            <FolderOutlinedIcon fontSize="small" sx={{ mr: 0.75, color: 'text.primary' }} />
+          )}
+        </Tooltip>
         {node.isMissing && <WarningAmberIcon fontSize="small" color="warning" sx={{ mr: 0.5 }} />}
         <Tooltip title={node.name} enterDelay={500} disableInteractive>
           <ListItemText
@@ -130,12 +158,9 @@ export function FolderTreeNode({
             }}
           />
         </Tooltip>
-        {node.isScanned && !excluded && (
-          <Tooltip title="Scanned">
-            <CheckCircleOutlinedIcon fontSize="inherit" color="success" sx={{ ml: 0.5, fontSize: 14 }} />
-          </Tooltip>
+        {!excluded && faceState !== 'none' && faceLabel && (
+          <FaceStatusIcon state={faceState} label={faceLabel} />
         )}
-        {expanded && children.isFetching && <CircularProgress size={14} />}
         <FolderActionsMenu
           folderId={node.id}
           folderName={node.name}
@@ -163,6 +188,7 @@ export function FolderTreeNode({
               onToggle={onToggle}
               ancestorExcluded={excluded}
               parentId={node.id}
+              faceCoverage={faceCoverage}
             />
           ))}
         </List>

@@ -50,4 +50,45 @@ describe('FolderTree', () => {
     expect(await screen.findByText("Couldn't load folders.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
+
+  it('shows a face-detection status per folder', async () => {
+    renderApp('/folders/3')
+    await screen.findByRole('treeitem', { name: 'Madeira' })
+    const partial = await screen.findByRole('img', {
+      name: 'Face detection: partially scanned (2 of 6 photos)',
+    })
+    expect(partial).toHaveAttribute('data-face-state', 'partial')
+    expect(
+      screen.getByRole('img', { name: 'Face detection: needs rescan (2 of 5 photos out of date)' }),
+    ).toHaveAttribute('data-face-state', 'needsRescan')
+    expect(
+      screen.getByRole('img', {
+        name: "Face detection: completed (3 photos, 1 couldn't be read)",
+      }),
+    ).toHaveAttribute('data-face-state', 'completed')
+  })
+
+  it('shows not scanned for a folder whose photos were never processed', async () => {
+    server.use(
+      http.get('/api/face-recognitions/coverage', () =>
+        HttpResponse.json([{ folderId: 3, total: 3, done: 0, failed: 0, stale: 0 }]),
+      ),
+    )
+    renderApp('/folders/3')
+    expect(
+      await screen.findByRole('img', { name: 'Face detection: not scanned (3 photos)' }),
+    ).toHaveAttribute('data-face-state', 'notScanned')
+  })
+
+  it('renders the tree without face status when coverage fails to load', async () => {
+    server.use(
+      http.get('/api/face-recognitions/coverage', () =>
+        HttpResponse.json({ title: 'boom' }, { status: 500 }),
+      ),
+    )
+    renderApp('/folders/3')
+    expect(await screen.findByRole('treeitem', { name: 'Madeira' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /^Face detection:/ })).not.toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load folders.")).not.toBeInTheDocument()
+  })
 })
