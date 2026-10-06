@@ -172,6 +172,43 @@ describe('PersonView', () => {
     expect(await screen.findByText('Select a person to see their photos.')).toBeInTheDocument()
   })
 
+  it('assigns an unknown group to a named person after confirming, then opens that person', async () => {
+    let body: unknown = null
+    server.use(
+      peopleList(),
+      person(peopleFixture[1]),
+      person(peopleFixture[0]),
+      http.get('/api/images', () => HttpResponse.json({ items: [], nextCursor: null })),
+      http.post('/api/people/2/assign', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json(peopleFixture[0])
+      }),
+    )
+    renderApp('/people/2')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Assign to person' }))
+    const picker = await screen.findByRole('dialog', { name: 'Assign to person' })
+    fireEvent.click(await within(picker).findByRole('button', { name: /Anna/ }))
+    const confirm = await screen.findByRole('dialog', { name: 'Assign to person?' })
+    expect(body).toBeNull()
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Assign' }))
+
+    await waitFor(() => expect(body).toEqual({ personId: peopleFixture[0].id }))
+    expect(await screen.findByRole('heading', { name: 'Anna' })).toBeInTheDocument()
+  })
+
+  it('offers no assign for a named person', async () => {
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      http.get('/api/images', () => HttpResponse.json({ items: [], nextCursor: null })),
+    )
+    renderApp('/people/1')
+
+    await screen.findByRole('button', { name: 'Edit person' })
+    expect(screen.queryByRole('button', { name: 'Assign to person' })).not.toBeInTheDocument()
+  })
+
   it('offers no ignore for a named person', async () => {
     server.use(
       peopleList(),

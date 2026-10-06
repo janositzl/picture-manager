@@ -1,7 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import HideSourceIcon from '@mui/icons-material/HideSource'
-import { Button, Dialog, DialogContent, DialogTitle, IconButton, TextField } from '@mui/material'
+import { Autocomplete, Button, Dialog, DialogContent, DialogTitle, IconButton, TextField } from '@mui/material'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useDeletePerson, useIgnoreGroup, useNamePerson, usePeople, type PersonSummary } from '../api/people'
@@ -52,6 +52,9 @@ export function PersonEditDialog({ person, label, onClose }: Props) {
   const [pending, setPending] = useState<Pending>(null)
   const people = usePeople()
   const namePerson = useNamePerson()
+  const suggestions = (people.data ?? [])
+    .flatMap((p) => (p.name !== null && p.id !== person.id ? [p.name] : []))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   const deletePerson = useDeletePerson()
   const navigate = useNavigate()
   const notify = useNotify()
@@ -111,15 +114,39 @@ export function PersonEditDialog({ person, label, onClose }: Props) {
             : `${person.confirmedImageCount} confirmed · ${person.suggestedImageCount} suggested`}
         </p>
         <form onSubmit={submit} className="flex items-center gap-2">
-          <TextField
-            size="small"
-            fullWidth
-            autoFocus
-            label={isGroup ? 'Name this person' : 'Name'}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
-          />
+          {isGroup ? (
+            // Typing offers the existing people whose names match; picking one fills the box (saving still asks to merge).
+            <Autocomplete
+              freeSolo
+              fullWidth
+              size="small"
+              options={suggestions}
+              inputValue={draft}
+              onInputChange={(_, value) => setDraft(value)}
+              filterOptions={(options, { inputValue }) => {
+                const needle = inputValue.trim().toLowerCase()
+                return needle === '' ? [] : options.filter((name) => name.toLowerCase().includes(needle))
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  autoFocus
+                  label="Name this person"
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                />
+              )}
+            />
+          ) : (
+            <TextField
+              size="small"
+              fullWidth
+              autoFocus
+              label="Name"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+            />
+          )}
           <Button
             type="submit"
             variant="contained"

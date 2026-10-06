@@ -47,6 +47,20 @@ public sealed class PeopleService : IPeopleService
         return await GetAsync(id, cancellationToken);
     }
 
+    public async Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, CancellationToken cancellationToken = default)
+    {
+        if (await _people.GetAsync(id, cancellationToken) is not { } group
+            || await _people.GetAsync(targetId, cancellationToken) is not { } target)
+            return Result.NotFound();
+        if (group.Name is not null)
+            return Result.Invalid("name", "Only unknown groups can be assigned to a person.");
+        if (target.Name is null)
+            return Result.Invalid("personId", "Choose a named person.");
+
+        await _people.AssignGroupAsync(id, targetId, _clock.UtcNow, cancellationToken);
+        return await GetAsync(targetId, cancellationToken);
+    }
+
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default) =>
         await _people.DeleteAsync(id, cancellationToken) ? Result.Ok() : Result.NotFound();
 

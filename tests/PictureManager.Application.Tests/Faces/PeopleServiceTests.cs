@@ -24,6 +24,36 @@ public class PeopleServiceTests
 
     private PeopleService Create() => new(_people, _clock);
 
+    [Fact]
+    public async Task AssignGroupAsync_GroupToNamedPerson_AssignsAndReturnsTarget()
+    {
+        var result = await Create().AssignGroupAsync(1, 2);
+
+        result.Status.Should().Be(ResultStatus.Success);
+        await _people.Received(1).AssignGroupAsync(1, 2, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AssignGroupAsync_NamedSource_IsInvalid()
+    {
+        (await Create().AssignGroupAsync(2, 2)).Status.Should().Be(ResultStatus.Invalid);
+        await _people.DidNotReceiveWithAnyArgs().AssignGroupAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task AssignGroupAsync_UnnamedTarget_IsInvalid()
+    {
+        _people.GetAsync(3, Arg.Any<CancellationToken>()).Returns(new PersonSummary(3, null, 0, 1, null));
+
+        (await Create().AssignGroupAsync(1, 3)).Status.Should().Be(ResultStatus.Invalid);
+    }
+
+    [Fact]
+    public async Task AssignGroupAsync_MissingPerson_IsNotFound()
+    {
+        (await Create().AssignGroupAsync(1, 99)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("   ")]

@@ -16,6 +16,7 @@ public static class PeopleEndpoints
         user.MapPatch("/people/{id:int}", NameAsync);
         user.MapDelete("/people/{id:int}", DeleteAsync);
         user.MapPost("/people/{id:int}/ignore", IgnoreGroupAsync);
+        user.MapPost("/people/{id:int}/assign", AssignGroupAsync);
         user.MapGet("/faces/{id:int}/thumbnail", GetFaceThumbnailAsync);
 
         user.MapGet("/images/{id:int}/faces", GetImageFacesAsync);
@@ -90,6 +91,10 @@ public static class PeopleEndpoints
         int id, IPeopleService service, CancellationToken cancellationToken) =>
         (await service.IgnoreGroupAsync(id, cancellationToken)).ToOk();
 
+    public static async Task<Results<Ok<PersonSummary>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AssignGroupAsync(
+        int id, AssignGroupRequest request, IPeopleService service, CancellationToken cancellationToken) =>
+        (await service.AssignGroupAsync(id, request.PersonId, cancellationToken)).ToOk();
+
     public static async Task<IResult> GetFaceThumbnailAsync(int id, IFaceCropService crops, CancellationToken cancellationToken)
     {
         var path = await crops.GetOrCreateCropPathAsync(id, cancellationToken);
@@ -98,3 +103,5 @@ public static class PeopleEndpoints
 }
 
 public sealed record PersonNameRequest(string? Name);
+
+public sealed record AssignGroupRequest(int PersonId);

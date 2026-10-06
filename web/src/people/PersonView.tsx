@@ -1,3 +1,4 @@
+import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import HideSourceIcon from '@mui/icons-material/HideSource'
 import { Box, Button, IconButton, Tooltip } from '@mui/material'
@@ -8,6 +9,7 @@ import { parseGridParams } from '../routing/urlState'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { GridHeader } from '../views/GridHeader'
 import { ImageBrowser } from '../views/ImageBrowser'
+import { AssignGroupDialog } from './AssignGroupDialog'
 import { FACE_MODES } from './faceModes'
 import { FaceModeToggle } from './FaceModeToggle'
 import { openedFromStrip } from './openedFromStrip'
@@ -38,6 +40,7 @@ function PersonContent({ personId }: PersonContentProps) {
   const [stripMode, setStripMode] = useStoredChoice('pm.people.stripMode', FACE_MODES, 'faces')
   const [editing, setEditing] = useState(false)
   const [ignoring, setIgnoring] = useState(false)
+  const [assigning, setAssigning] = useState(false)
 
   if (person.isError) return <PersonNotFound />
   // The grid's filter depends on whether the person is named, so wait for that.
@@ -87,6 +90,18 @@ function PersonContent({ personId }: PersonContentProps) {
                   </IconButton>
                 </Tooltip>
                 {isGroup && (
+                  <Tooltip title="Assign to person">
+                    <IconButton
+                      size="small"
+                      aria-label="Assign to person"
+                      onClick={() => setAssigning(true)}
+                      className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                    >
+                      <DriveFileMoveOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {isGroup && (
                   <Tooltip title="Ignore group">
                     <IconButton
                       size="small"
@@ -115,6 +130,7 @@ function PersonContent({ personId }: PersonContentProps) {
           onClose={() => setIgnoring(false)}
         />
       )}
+      {assigning && <AssignGroupDialog group={person.data} label={label} onClose={() => setAssigning(false)} />}
       {editing && (
         <PersonEditDialog key={person.data.id} person={person.data} label={label} onClose={() => setEditing(false)} />
       )}

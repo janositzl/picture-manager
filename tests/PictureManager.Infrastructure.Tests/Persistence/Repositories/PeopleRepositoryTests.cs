@@ -153,6 +153,28 @@ public class PeopleRepositoryTests
     }
 
     [Fact]
+    public async Task AssignGroupAsync_ConfirmsGroupFacesOnTarget_AndDeletesSource()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var source = new Person { CreatedUtc = Now, ModifiedUtc = Now };
+        var target = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(source, target);
+        await db.Context.SaveChangesAsync();
+        var face = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), source.Id, FaceAssignmentState.Suggested);
+
+        await new PeopleRepository(db.CreateContext()).AssignGroupAsync(source.Id, target.Id, Now);
+
+        await using var read = db.CreateContext();
+        (await read.People.AnyAsync(p => p.Id == source.Id)).Should().BeFalse();
+        var moved = await read.Faces.SingleAsync(f => f.Id == face.Id);
+        moved.PersonId.Should().Be(target.Id);
+        moved.AssignmentState.Should().Be(FaceAssignmentState.Confirmed);
+    }
+
+    [Fact]
     public async Task DeleteAsync_UnassignsFacesForRegrouping_AndDeletesPerson()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

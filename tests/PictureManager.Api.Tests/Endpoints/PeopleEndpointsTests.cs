@@ -74,4 +74,17 @@ public class PeopleEndpointsTests
             .Should().BeOfType<Ok<CountResponse>>().Which.Value.Should().Be(new CountResponse(3));
         (await PeopleEndpoints.IgnoreGroupAsync(2, people, CancellationToken.None)).Result.Should().BeOfType<ValidationProblem>();
     }
+
+    [Fact]
+    public async Task AssignGroupAsync_ReturnsTarget_Or400ForNamedSource()
+    {
+        var people = Substitute.For<IPeopleService>();
+        var anna = new PersonSummary(2, "Anna", 9, 0, 200);
+        people.AssignGroupAsync(1, 2, Arg.Any<CancellationToken>()).Returns(Result<PersonSummary>.Ok(anna));
+        people.AssignGroupAsync(2, 2, Arg.Any<CancellationToken>()).Returns(Result.Invalid("name", "Only unknown groups can be assigned to a person."));
+
+        (await PeopleEndpoints.AssignGroupAsync(1, new AssignGroupRequest(2), people, CancellationToken.None)).Result
+            .Should().BeOfType<Ok<PersonSummary>>().Which.Value.Should().Be(anna);
+        (await PeopleEndpoints.AssignGroupAsync(2, new AssignGroupRequest(2), people, CancellationToken.None)).Result.Should().BeOfType<ValidationProblem>();
+    }
 }

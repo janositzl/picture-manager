@@ -152,6 +152,16 @@ export function useAssignFace() {
   })
 }
 
+/** Merges an unnamed group into a named person, confirming its faces; resolves to the target person. */
+export function useAssignGroup() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({ id, personId }: { id: number; personId: number }) =>
+      post<PersonSummary>(`/api/people/${id}/assign`, { personId }),
+    onSuccess: invalidate,
+  })
+}
+
 /** Accept all of a person's suggestions; resolves to how many faces were confirmed. */
 export function useAcceptAllSuggestions() {
   const invalidate = useInvalidatePeopleData()
