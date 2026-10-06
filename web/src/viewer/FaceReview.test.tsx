@@ -155,6 +155,61 @@ describe('face review from the normal viewer', () => {
   })
 })
 
+describe('re-analysing a photo', () => {
+  it('runs the detector again on this photo from the panel icon and reports what it found', async () => {
+    let sent: { id: string; body: unknown } | null = null
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      personImages,
+      faces([confirmed]),
+      http.post('/api/images/:id/faces/reanalyze', async ({ params, request }) => {
+        sent = { id: String(params.id), body: await request.json() }
+        return HttpResponse.json({ faces: 3, suggested: 1 })
+      }),
+    )
+    const { user } = renderApp('/people/1?image=20')
+
+    const section = await screen.findByRole('region', { name: 'People in photo' })
+    await user.click(await within(section).findByRole('button', { name: 'Re-analyse faces' }))
+
+    await waitFor(() => expect(sent).toEqual({ id: '20', body: { preset: 'detailed' } }))
+    expect(await screen.findByText('3 faces found, 1 suggested.')).toBeInTheDocument()
+  })
+
+  it('is offered from the normal viewer too, once face review is switched on', async () => {
+    server.use(faces([]))
+    const { user } = renderApp('/folders/3?image=20')
+
+    await user.click(await screen.findByRole('button', { name: 'Review faces' }))
+
+    const section = await screen.findByRole('region', { name: 'People in photo' })
+    expect(within(section).getByRole('button', { name: 'Re-analyse faces' })).toBeInTheDocument()
+  })
+})
+
+describe('re-analysing one photo', () => {
+  it('runs detection again on the photo from the panel and reports what it found', async () => {
+    let sent: unknown = null
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      personImages,
+      faces([confirmed]),
+      http.post('/api/images/:id/faces/reanalyze', async ({ params, request }) => {
+        sent = { id: params.id, body: await request.json() }
+        return HttpResponse.json({ faces: 3, suggested: 1 })
+      }),
+    )
+    const { user } = renderApp('/people/1?image=20')
+
+    await user.click(await screen.findByRole('button', { name: 'Re-analyse faces' }))
+
+    await waitFor(() => expect(sent).toEqual({ id: '20', body: { preset: 'detailed' } }))
+    expect(await screen.findByText('3 faces found, 1 suggested.')).toBeInTheDocument()
+  })
+})
+
 describe('re-checking faces', () => {
   it('asks the server to re-match the photo and reports how many faces were suggested', async () => {
     let sent = ''

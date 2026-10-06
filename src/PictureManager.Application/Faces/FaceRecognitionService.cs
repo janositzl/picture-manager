@@ -55,7 +55,9 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         _clock = clock;
     }
 
-    public async Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, CancellationToken cancellationToken = default)
+    public async Task<int> QueueAsync(
+        int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, FaceDetectionPreset preset = FaceDetectionPreset.Fast,
+        CancellationToken cancellationToken = default)
     {
         if (await _jobRepository.HasActiveJobAsync(cancellationToken))
             throw new FaceRecognitionAlreadyInProgressException();
@@ -77,7 +79,7 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
 
         // Registered before enqueueing, so a cancel that arrives while the job still waits in the queue works.
         _cancellations.Register(job.Id);
-        _queue.Enqueue(new QueuedFaceRecognition(job.Id, jobFolderId, isRecursive));
+        _queue.Enqueue(new QueuedFaceRecognition(job.Id, jobFolderId, isRecursive, preset));
         return job.Id;
     }
 
@@ -114,7 +116,7 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
                 var processor = scope.ServiceProvider.GetRequiredService<IFaceImageProcessor>();
                 var jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
 
-                var result = await processor.ProcessAsync(imageId, faceModelId, token);
+                var result = await processor.ProcessAsync(imageId, faceModelId, job.Preset, token);
                 await jobs.IncrementFaceProgressAsync(job.JobId, result.FacesFound, token);
             });
 

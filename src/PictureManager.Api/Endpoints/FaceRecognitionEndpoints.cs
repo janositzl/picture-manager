@@ -21,9 +21,12 @@ public static class FaceRecognitionEndpoints
 
     public static async Task<IResult> StartAsync(FaceRecognitionRequest request, IFaceRecognitionService service, CancellationToken cancellationToken)
     {
+        if (!FaceDetectionPresets.TryParse(request.Preset, FaceDetectionPreset.Fast, out var preset))
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["preset"] = new[] { "Must be 'fast' or 'detailed'." } });
+
         try
         {
-            var jobId = await service.QueueAsync(request.RootId, request.FolderId, request.IsRecursive, request.Reanalyze, cancellationToken);
+            var jobId = await service.QueueAsync(request.RootId, request.FolderId, request.IsRecursive, request.Reanalyze, preset, cancellationToken);
             return TypedResults.Ok(new FaceRecognitionStartedResponse(jobId));
         }
         catch (FaceRecognitionAlreadyInProgressException ex)
@@ -73,6 +76,6 @@ public static class FaceRecognitionEndpoints
         TypedResults.Ok(await service.GetFolderCoverageAsync(cancellationToken));
 }
 
-public sealed record FaceRecognitionRequest(int? RootId, int? FolderId, bool IsRecursive = true, bool Reanalyze = false);
+public sealed record FaceRecognitionRequest(int? RootId, int? FolderId, bool IsRecursive = true, bool Reanalyze = false, string? Preset = null);
 public sealed record FaceRecognitionStartedResponse(int FaceRecognitionJobId);
 public sealed record FaceRecognitionProgress(int Id, string Status, int ImagesFound, int ImagesProcessed, int FacesFound, string? ErrorMessage);

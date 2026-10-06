@@ -31,11 +31,15 @@ export function startScan(folderId: number, isRecursive: boolean): Promise<numbe
   }).then((response) => response.scanJobId)
 }
 
+/** How hard the detector looks: fast, or detailed (also finds small and distant faces; slower). */
+export type FacePreset = 'fast' | 'detailed'
+
 /** reanalyze: forget that the photos in scope were analysed, so every one is analysed again. */
 export function startFaceRecognition(
   folderId: number | null,
   isRecursive: boolean,
   reanalyze = false,
+  preset: FacePreset = 'fast',
 ): Promise<number> {
   return apiFetch<{ faceRecognitionJobId: number }>('/api/face-recognitions', {
     method: 'POST',
@@ -44,6 +48,7 @@ export function startFaceRecognition(
       ...(folderId === null ? {} : { folderId }),
       isRecursive,
       ...(reanalyze && { reanalyze }),
+      ...(preset !== 'fast' && { preset }),
     }),
   }).then((response) => response.faceRecognitionJobId)
 }

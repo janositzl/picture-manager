@@ -21,6 +21,7 @@ public static class PeopleEndpoints
 
         user.MapGet("/images/{id:int}/faces", GetImageFacesAsync);
         user.MapPost("/images/{id:int}/faces/recheck", RecheckFacesAsync);
+        user.MapPost("/images/{id:int}/faces/reanalyze", ReanalyzeImageAsync);
         user.MapPost("/faces/{id:int}/accept", AcceptAsync);
         user.MapPost("/faces/{id:int}/reject", RejectAsync);
         user.MapPost("/faces/{id:int}/unknown", MarkUnknownAsync);
@@ -36,6 +37,14 @@ public static class PeopleEndpoints
     public static async Task<Results<Ok<IReadOnlyList<ImageFaceDto>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetImageFacesAsync(
         int id, bool? includeIgnored, bool? confirmedOnly, IFaceReviewService service, CancellationToken cancellationToken) =>
         (await service.GetImageFacesAsync(id, includeIgnored ?? false, confirmedOnly ?? false, cancellationToken)).ToOk();
+
+    public static async Task<Results<Ok<ReanalyzeImageResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ReanalyzeImageAsync(
+        int id, ReanalyzeImageRequest? request, IFaceReviewService service, CancellationToken cancellationToken)
+    {
+        if (!FaceDetectionPresets.TryParse(request?.Preset, FaceDetectionPreset.Detailed, out var preset))
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["preset"] = new[] { "Must be 'fast' or 'detailed'." } });
+        return (await service.ReanalyzeImageAsync(id, preset, cancellationToken)).ToOk();
+    }
 
     public static async Task<Results<Ok<CountResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> RecheckFacesAsync(
         int id, IFaceReviewService service, CancellationToken cancellationToken) =>
@@ -108,5 +117,7 @@ public static class PeopleEndpoints
 }
 
 public sealed record PersonNameRequest(string? Name);
+
+public sealed record ReanalyzeImageRequest(string? Preset);
 
 public sealed record AssignGroupRequest(int PersonId, IReadOnlyList<int>? ImageIds = null);

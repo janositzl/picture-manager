@@ -101,7 +101,31 @@ describe('folder actions', () => {
     expect(body).toBeNull()
     await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))
 
-    await waitFor(() => expect(body).toEqual({ folderId: 3, isRecursive: true, reanalyze: true }))
+    await waitFor(() => expect(body).toEqual({ folderId: 3, isRecursive: true, reanalyze: true, preset: 'detailed' }))
+  })
+
+  it('lets you re-analyse with the fast preset instead, and remembers the choice', async () => {
+    const bodies: unknown[] = []
+    server.use(
+      http.post('/api/face-recognitions', async ({ request }) => {
+        bodies.push(await request.json())
+        return HttpResponse.json({ faceRecognitionJobId: 9 })
+      }),
+      faceRecognitionEvents(9, [
+        { Id: 9, Status: 'Completed', ImagesFound: 0, ImagesProcessed: 0, FacesFound: 0, ErrorMessage: null },
+      ]),
+    )
+    const { user } = renderApp('/folders/3')
+    await openMenu(user, 'Madeira')
+    await user.click(await screen.findByRole('menuitem', { name: 'Re-analyse faces' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Re-analyse faces?' })
+    expect(within(dialog).getByRole('button', { name: 'Detailed' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: 'Fast' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))
+
+    await waitFor(() => expect(bodies).toEqual([{ folderId: 3, isRecursive: true, reanalyze: true }]))
+    expect(localStorage.getItem('pm.faces.reanalysePreset')).toBe('fast')
+    localStorage.removeItem('pm.faces.reanalysePreset')
   })
 
   it('shows scan progress while enumerating, then while enriching', async () => {

@@ -14,6 +14,9 @@ public sealed record AssignFaceRequest(int? PersonId, string? Name);
 
 public sealed record CountResponse(int Count);
 
+/// <summary>Result of re-analysing one photo: how many faces were found, and how many of the unidentified ones got a suggestion.</summary>
+public sealed record ReanalyzeImageResponse(int Faces, int Suggested);
+
 public interface IFaceReviewService
 {
     /// <summary>NotFound when the image doesn't exist or isn't visible. confirmedOnly leaves out everything but Confirmed faces.</summary>
@@ -27,6 +30,12 @@ public interface IFaceReviewService
 
     /// <summary>Confirms the face for a person and returns that person.</summary>
     Task<Result<PersonSummary>> AssignAsync(int faceId, AssignFaceRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs face detection again on this one photo right now (replacing its faces, keeping decisions on faces that still
+    /// overlap), then matches its unidentified faces to existing people.
+    /// </summary>
+    Task<Result<ReanalyzeImageResponse>> ReanalyzeImageAsync(int imageId, FaceDetectionPreset preset, CancellationToken cancellationToken = default);
 
     /// <summary>Tries again to match the photo's Unknown faces to existing people; returns how many got a suggestion.</summary>
     Task<Result<CountResponse>> RecheckFacesAsync(int imageId, CancellationToken cancellationToken = default);

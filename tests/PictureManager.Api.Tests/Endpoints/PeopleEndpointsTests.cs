@@ -100,4 +100,17 @@ public class PeopleEndpointsTests
             .Should().BeOfType<Ok<CountResponse>>().Which.Value.Should().Be(new CountResponse(2));
         (await PeopleEndpoints.RecheckFacesAsync(2, review, CancellationToken.None)).Result.Should().BeOfType<NotFound>();
     }
+
+    [Fact]
+    public async Task ReanalyzeImageAsync_DefaultsToDetailed_AndRejectsUnknownPresets()
+    {
+        var review = Substitute.For<IFaceReviewService>();
+        var response = new ReanalyzeImageResponse(3, 1);
+        review.ReanalyzeImageAsync(1, FaceDetectionPreset.Detailed, Arg.Any<CancellationToken>()).Returns(Result<ReanalyzeImageResponse>.Ok(response));
+
+        (await PeopleEndpoints.ReanalyzeImageAsync(1, null, review, CancellationToken.None)).Result
+            .Should().BeOfType<Ok<ReanalyzeImageResponse>>().Which.Value.Should().Be(response);
+        (await PeopleEndpoints.ReanalyzeImageAsync(1, new ReanalyzeImageRequest("slow"), review, CancellationToken.None)).Result
+            .Should().BeOfType<ValidationProblem>();
+    }
 }

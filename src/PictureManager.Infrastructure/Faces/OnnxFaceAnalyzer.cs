@@ -42,9 +42,11 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
 
     public FaceModelDescriptor Model => GetSessions().Descriptor;
 
-    public async Task<FaceAnalysisResult?> AnalyzeAsync(string imagePath, int? orientation, CancellationToken cancellationToken = default)
+    public async Task<FaceAnalysisResult?> AnalyzeAsync(
+        string imagePath, int? orientation, FaceDetectionPreset preset = FaceDetectionPreset.Fast, CancellationToken cancellationToken = default)
     {
         var sessions = GetSessions();
+        var settings = _options.For(preset);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Decoding is NAS I/O + CPU and runs outside the inference gate, so reads overlap model execution.
@@ -56,8 +58,8 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         await _inference.WaitAsync(cancellationToken);
         try
         {
-            var detections = Detect(sessions.Detector, image)
-                .Where(d => Math.Min(d.X2 - d.X1, d.Y2 - d.Y1) >= _options.MinFaceSizePx)
+            var detections = Detect(sessions.Detector, image, settings.DetectorInputSize)
+                .Where(d => Math.Min(d.X2 - d.X1, d.Y2 - d.Y1) >= settings.MinFaceSizePx)
                 .ToList();
             if (detections.Count == 0)
                 return new FaceAnalysisResult(Array.Empty<DetectedFace>());
@@ -91,10 +93,9 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         }
     }
 
-    private List<RawDetection> Detect(InferenceSession detector, SKBitmap image)
+    private List<RawDetection> Detect(InferenceSession detector, SKBitmap image, int size)
     {
         // Letterbox to the top-left of a 640² canvas, keeping the aspect ratio (as InsightFace does).
-        var size = _options.DetectorInputSize;
         var scale = (float)size / Math.Max(image.Width, image.Height);
         using var input = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(input))

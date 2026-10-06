@@ -19,7 +19,7 @@ public class FaceRecognitionEndpointsTests
     public async Task StartAsync_Queued_ReturnsJobId()
     {
         var service = Substitute.For<IFaceRecognitionService>();
-        service.QueueAsync(null, 20, true, false, Arg.Any<CancellationToken>()).Returns(77);
+        service.QueueAsync(null, 20, true, false, FaceDetectionPreset.Fast, Arg.Any<CancellationToken>()).Returns(77);
 
         var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true), service, CancellationToken.None);
 
@@ -30,18 +30,29 @@ public class FaceRecognitionEndpointsTests
     public async Task StartAsync_Reanalyze_IsPassedToTheService()
     {
         var service = Substitute.For<IFaceRecognitionService>();
-        service.QueueAsync(null, 20, false, true, Arg.Any<CancellationToken>()).Returns(78);
+        service.QueueAsync(null, 20, false, true, FaceDetectionPreset.Detailed, Arg.Any<CancellationToken>()).Returns(78);
 
-        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, false, true), service, CancellationToken.None);
+        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, false, true, "detailed"), service, CancellationToken.None);
 
         result.Should().BeOfType<Ok<FaceRecognitionStartedResponse>>().Which.Value.Should().Be(new FaceRecognitionStartedResponse(78));
+    }
+
+    [Fact]
+    public async Task StartAsync_UnknownPreset_ReturnsValidationProblemOnPreset()
+    {
+        var service = Substitute.For<IFaceRecognitionService>();
+
+        var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true, false, "slow"), service, CancellationToken.None);
+
+        result.Should().BeOfType<ValidationProblem>().Which.ProblemDetails.Errors.Should().ContainKey("preset");
+        await service.DidNotReceiveWithAnyArgs().QueueAsync(default, default, default, default, default, default);
     }
 
     [Fact]
     public async Task StartAsync_AnotherJobActive_ReturnsConflict()
     {
         var service = Substitute.For<IFaceRecognitionService>();
-        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new FaceRecognitionAlreadyInProgressException());
 
         var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, null, true), service, CancellationToken.None);
@@ -53,7 +64,7 @@ public class FaceRecognitionEndpointsTests
     public async Task StartAsync_UnavailableFolder_ReturnsValidationProblemOnFolderId()
     {
         var service = Substitute.For<IFaceRecognitionService>();
-        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        service.QueueAsync(Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(FolderUnavailableException.Missing(20));
 
         var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true), service, CancellationToken.None);

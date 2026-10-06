@@ -170,9 +170,9 @@ export function FolderActionsMenu({
           <ReanalyseFacesConfirm
             folderName={folderName}
             recursive
-            onConfirm={() => {
+            onConfirm={(preset) => {
               setConfirmingReanalyse(false)
-              recognizeFaces(folderId, { reanalyze: true })
+              recognizeFaces(folderId, { reanalyze: true, preset })
             }}
             onClose={() => setConfirmingReanalyse(false)}
           />

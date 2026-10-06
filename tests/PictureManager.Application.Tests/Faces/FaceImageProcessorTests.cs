@@ -54,7 +54,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_FacesFound_SavesThemAndReportsCount()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(new[] { AFace(), AFace() }));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(new[] { AFace(), AFace() }));
 
         var result = await Create().ProcessAsync(7, ModelId);
 
@@ -66,7 +66,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_NoFaces_SavesEmptyResult()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(Array.Empty<DetectedFace>()));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(Array.Empty<DetectedFace>()));
 
         var result = await Create().ProcessAsync(7, ModelId);
 
@@ -80,7 +80,7 @@ public sealed class FaceImageProcessorTests : IDisposable
         var result = await Create().ProcessAsync(7, ModelId);
 
         result.Outcome.Should().Be(FaceImageOutcome.Skipped);
-        await _analyzer.DidNotReceiveWithAnyArgs().AnalyzeAsync(default!, default, default);
+        await _analyzer.DidNotReceiveWithAnyArgs().AnalyzeAsync(default!, default, default, default);
         await _faces.DidNotReceiveWithAnyArgs().SaveFailureAsync(default, default, default!, default, default, default, default, default);
         await _faces.DidNotReceiveWithAnyArgs().SaveResultAsync(default, default, default!, default!, default, default);
     }
@@ -89,7 +89,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_IoError_RecordsRetryableFailure()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("network name no longer available"));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("network name no longer available"));
 
         var result = await Create().ProcessAsync(7, ModelId);
 
@@ -101,7 +101,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_IoErrorAfterFileVanished_SkipsWithoutWritingState()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
         {
             File.Delete(Physical);
             throw new IOException("network name no longer available");
@@ -118,7 +118,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_IoErrorAfterRootUnmounted_SkipsWithoutWritingState()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns<Task<FaceAnalysisResult?>>(_ =>
         {
             _root.Delete(recursive: true);
             throw new IOException("network name no longer available");
@@ -138,7 +138,7 @@ public sealed class FaceImageProcessorTests : IDisposable
         {
             ImageId = 7, FaceModelId = ModelId, ImageFingerprint = "hash", Status = FaceProcessingStatus.Failed, Attempts = 2
         });
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("again"));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("again"));
 
         await Create().ProcessAsync(7, ModelId);
 
@@ -153,7 +153,7 @@ public sealed class FaceImageProcessorTests : IDisposable
         {
             ImageId = 7, FaceModelId = ModelId, ImageFingerprint = "older", Status = FaceProcessingStatus.Failed, Attempts = 2
         });
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("x"));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("x"));
 
         await Create().ProcessAsync(7, ModelId);
 
@@ -164,7 +164,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_Undecodable_IsPermanentImmediately()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns((FaceAnalysisResult?)null);
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns((FaceAnalysisResult?)null);
 
         await Create().ProcessAsync(7, ModelId);
 
@@ -175,7 +175,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_ImageDeletedBeforeSave_IsSkipped()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(new[] { AFace() }));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(new FaceAnalysisResult(new[] { AFace() }));
         _faces.SaveResultAsync(default, default, default!, default!, default, default).ReturnsForAnyArgs(false);
 
         (await Create().ProcessAsync(7, ModelId)).Should().Be(new FaceImageResult(FaceImageOutcome.Skipped, 0));
@@ -185,7 +185,7 @@ public sealed class FaceImageProcessorTests : IDisposable
     public async Task ProcessAsync_ModelUnavailable_Propagates()
     {
         File.WriteAllText(Physical, "x");
-        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<CancellationToken>()).ThrowsAsync(new FaceModelUnavailableException("missing"));
+        _analyzer.AnalyzeAsync(Physical, 1, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).ThrowsAsync(new FaceModelUnavailableException("missing"));
 
         var act = () => Create().ProcessAsync(7, ModelId);
 

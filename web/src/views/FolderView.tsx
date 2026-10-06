@@ -141,9 +141,9 @@ export function FolderView() {
         <ReanalyseFacesConfirm
           folderName={detail.name}
           recursive={false}
-          onConfirm={() => {
+          onConfirm={(preset) => {
             setConfirmingReanalyse(false)
-            recognizeFaces(folderId, { isRecursive: false, reanalyze: true })
+            recognizeFaces(folderId, { isRecursive: false, reanalyze: true, preset })
           }}
           onClose={() => setConfirmingReanalyse(false)}
         />

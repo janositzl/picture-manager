@@ -18,5 +18,5 @@ public interface IFaceAnalyzer
     FaceModelDescriptor Model { get; }
 
     /// <summary>The faces in the image; an empty list if none; null if the file can't be decoded as an image.</summary>
-    Task<FaceAnalysisResult?> AnalyzeAsync(string imagePath, int? orientation, CancellationToken cancellationToken = default);
+    Task<FaceAnalysisResult?> AnalyzeAsync(string imagePath, int? orientation, FaceDetectionPreset preset = FaceDetectionPreset.Fast, CancellationToken cancellationToken = default);
 }

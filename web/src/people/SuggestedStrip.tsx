@@ -153,7 +153,19 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
         </div>
       )}
       {open && (
-        <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 0.5, pt: 0.25 }}>
+        // Tiles wrap into rows; the area grows with its content up to 70vh, then scrolls. Drag the bottom-right corner to resize.
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            overflowY: 'auto',
+            resize: 'vertical',
+            minHeight: TILE + 16,
+            maxHeight: '70vh',
+            p: 0.5,
+          }}
+        >
           {items.map((item) => {
             const faceId = item.faceId ?? null
             const useCrop = mode === 'faces' && faceId !== null

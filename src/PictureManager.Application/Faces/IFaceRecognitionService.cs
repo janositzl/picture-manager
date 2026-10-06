@@ -13,7 +13,9 @@ public interface IFaceRecognitionService
     /// reanalyze = forget that the photos in scope were analysed first, so every one of them is analysed again.
     /// Throws FaceRecognitionAlreadyInProgressException, ScanRootUnavailableException or FolderUnavailableException.
     /// </summary>
-    Task<int> QueueAsync(int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, CancellationToken cancellationToken = default);
+    Task<int> QueueAsync(
+        int? rootId, int? folderId, bool isRecursive, bool reanalyze = false, FaceDetectionPreset preset = FaceDetectionPreset.Fast,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Selects candidates, analyzes them, clusters, and records the outcome (Completed, Failed or Cancelled).

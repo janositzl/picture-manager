@@ -16,14 +16,48 @@ public sealed class FaceReviewService : IFaceReviewService
     private readonly IFaceReviewRepository _review;
     private readonly IPeopleRepository _people;
     private readonly IFaceClusterer _clusterer;
+    private readonly IFaceImageProcessor _processor;
+    private readonly IFaceAnalyzer _analyzer;
+    private readonly IFaceRepository _faces;
     private readonly IClock _clock;
 
-    public FaceReviewService(IFaceReviewRepository review, IPeopleRepository people, IFaceClusterer clusterer, IClock clock)
+    public FaceReviewService(
+        IFaceReviewRepository review, IPeopleRepository people, IFaceClusterer clusterer, IFaceImageProcessor processor,
+        IFaceAnalyzer analyzer, IFaceRepository faces, IClock clock)
     {
         _review = review;
         _people = people;
         _clusterer = clusterer;
+        _processor = processor;
+        _analyzer = analyzer;
+        _faces = faces;
         _clock = clock;
+    }
+
+    public async Task<Result<ReanalyzeImageResponse>> ReanalyzeImageAsync(
+        int imageId, FaceDetectionPreset preset, CancellationToken cancellationToken = default)
+    {
+        if (await _review.GetUnknownFacesAsync(imageId, cancellationToken) is null)
+            return Result.NotFound();
+
+        int modelId;
+        try
+        {
+            modelId = await _faces.GetOrCreateModelIdAsync(_analyzer.Model, _clock.UtcNow, cancellationToken);
+        }
+        catch (FaceModelUnavailableException)
+        {
+            return Result.Invalid("models", "The face recognition models are not available.");
+        }
+
+        var processed = await _processor.ProcessAsync(imageId, modelId, preset, cancellationToken);
+        if (processed.Outcome != FaceImageOutcome.Processed)
+            return Result.Invalid("image", processed.Outcome == FaceImageOutcome.Failed
+                ? "The photo could not be analysed."
+                : "The photo is not available right now.");
+
+        var matched = await RecheckFacesAsync(imageId, cancellationToken);
+        return Result<ReanalyzeImageResponse>.Ok(new ReanalyzeImageResponse(processed.FacesFound, matched.Value?.Count ?? 0));
     }
 
     public async Task<Result<CountResponse>> RecheckFacesAsync(int imageId, CancellationToken cancellationToken = default)

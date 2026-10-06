@@ -20,6 +20,9 @@ public class FaceReviewServiceTests
     private readonly IFaceReviewRepository _review = Substitute.For<IFaceReviewRepository>();
     private readonly IPeopleRepository _people = Substitute.For<IPeopleRepository>();
     private readonly IFaceClusterer _clusterer = Substitute.For<IFaceClusterer>();
+    private readonly IFaceImageProcessor _processor = Substitute.For<IFaceImageProcessor>();
+    private readonly IFaceAnalyzer _analyzer = Substitute.For<IFaceAnalyzer>();
+    private readonly IFaceRepository _faceRepo = Substitute.For<IFaceRepository>();
     private readonly IClock _clock = Substitute.For<IClock>();
 
     public FaceReviewServiceTests()
@@ -30,7 +33,55 @@ public class FaceReviewServiceTests
         _people.GetAsync(7, Arg.Any<CancellationToken>()).Returns(new PersonSummary(7, "Anna", 3, 1, 5));
     }
 
-    private FaceReviewService Create() => new(_review, _people, _clusterer, _clock);
+    private FaceReviewService Create() => new(_review, _people, _clusterer, _processor, _analyzer, _faceRepo, _clock);
+
+    private void StubModel() =>
+        _faceRepo.GetOrCreateModelIdAsync(Arg.Any<FaceModelDescriptor>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(3);
+
+    [Fact]
+    public async Task ReanalyzeImage_AnalysesThePhotoWithThePreset_ThenMatchesItsUnknownFaces()
+    {
+        StubModel();
+        _review.GetUnknownFacesAsync(10, Arg.Any<CancellationToken>()).Returns(new[] { new RecheckFace(1, 3, 0.4f, null) });
+        _processor.ProcessAsync(10, 3, FaceDetectionPreset.Detailed, Arg.Any<CancellationToken>())
+            .Returns(new FaceImageResult(FaceImageOutcome.Processed, 3));
+        _clusterer.MatchAsync(3, Arg.Any<IReadOnlyList<FaceCandidate>>(), Arg.Any<CancellationToken>()).Returns(2);
+
+        var result = await Create().ReanalyzeImageAsync(10, FaceDetectionPreset.Detailed);
+
+        result.Status.Should().Be(ResultStatus.Success);
+        result.Value.Should().Be(new ReanalyzeImageResponse(3, 2));
+    }
+
+    [Fact]
+    public async Task ReanalyzeImage_MissingPhoto_IsNotFound_AndNothingRuns()
+    {
+        _review.GetUnknownFacesAsync(99, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<RecheckFace>?)null);
+
+        (await Create().ReanalyzeImageAsync(99, FaceDetectionPreset.Fast)).Status.Should().Be(ResultStatus.NotFound);
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default, default);
+    }
+
+    [Theory]
+    [InlineData(FaceImageOutcome.Failed)]
+    [InlineData(FaceImageOutcome.Skipped)]
+    public async Task ReanalyzeImage_WhenTheAnalysisDoesNotProcessThePhoto_IsInvalid(FaceImageOutcome outcome)
+    {
+        StubModel();
+        _review.GetUnknownFacesAsync(10, Arg.Any<CancellationToken>()).Returns(Array.Empty<RecheckFace>());
+        _processor.ProcessAsync(10, 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(new FaceImageResult(outcome, 0));
+
+        (await Create().ReanalyzeImageAsync(10, FaceDetectionPreset.Fast)).Status.Should().Be(ResultStatus.Invalid);
+    }
+
+    [Fact]
+    public async Task ReanalyzeImage_ModelsUnavailable_IsInvalid()
+    {
+        _review.GetUnknownFacesAsync(10, Arg.Any<CancellationToken>()).Returns(Array.Empty<RecheckFace>());
+        _analyzer.Model.Returns(_ => throw new FaceModelUnavailableException("missing"));
+
+        (await Create().ReanalyzeImageAsync(10, FaceDetectionPreset.Fast)).Status.Should().Be(ResultStatus.Invalid);
+    }
 
     [Fact]
     public async Task RecheckFaces_MatchesTheImagesUnknownFacesPerModel_AndCountsSuggestions()

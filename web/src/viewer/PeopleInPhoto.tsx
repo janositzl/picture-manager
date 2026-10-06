@@ -1,9 +1,12 @@
+import AutorenewIcon from '@mui/icons-material/Autorenew'
+import BlockIcon from '@mui/icons-material/Block'
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   FormControlLabel,
   Switch,
   Tooltip,
@@ -16,6 +19,7 @@ import {
   useAssignFace,
   useFaceAction,
   useImageFaces,
+  useReanalyzeImage,
   useRecheckFaces,
   type FaceAction,
   type ImageFace,
@@ -114,6 +118,7 @@ export function PeopleInPhoto({ review, item }: Props) {
   const faceAction = useFaceAction()
   const assign = useAssignFace()
   const recheck = useRecheckFaces()
+  const reanalyze = useReanalyzeImage()
   const notify = useNotify()
   const [picker, setPicker] = useState<'assign' | 'change' | null>(null)
   const selected = review.faces.find((f) => f.id === review.selectedId) ?? null
@@ -226,6 +231,36 @@ export function PeopleInPhoto({ review, item }: Props) {
                     {review.faces.length}
                   </span>
                 )}
+                <Tooltip title="Re-analyse this photo's faces (detailed)">
+                  <span className="ml-auto">
+                    <IconButton
+                      size="small"
+                      aria-label="Re-analyse faces"
+                      color="inherit"
+                      disabled={reanalyze.isPending}
+                      onClick={() =>
+                        reanalyze.mutate(
+                          { imageId: item.id },
+                          {
+                            onSuccess: ({ faces, suggested }) =>
+                              notify(
+                                faces === 0
+                                  ? 'No faces found in this photo.'
+                                  : `${faces} ${faces === 1 ? 'face' : 'faces'} found${suggested > 0 ? `, ${suggested} suggested` : ''}.`,
+                              ),
+                            onError: () => notify("Couldn't analyse this photo."),
+                          },
+                        )
+                      }
+                    >
+                      {reanalyze.isPending ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <AutorenewIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </h2>
               {list}
               {review.faces.some((f) => f.state === 'unknown') && (
@@ -340,7 +375,10 @@ export function PeopleInPhoto({ review, item }: Props) {
                     </Tooltip>
                   )}
                   {selected.state === 'confirmed' && (
-                    <Tooltip describeChild title={'Remove the name from this face. It goes back to Unknown.'}>
+                    <Tooltip
+                      describeChild
+                      title={'Remove the name from this face. It goes back to Unknown.'}
+                    >
                       <Button
                         size="small"
                         variant="outlined"
@@ -361,8 +399,15 @@ export function PeopleInPhoto({ review, item }: Props) {
                     >
                       <Button
                         size="small"
-                        color="inherit"
-                        sx={{ ...ghostButtonSx, opacity: 0.75 }}
+                        variant="outlined"
+                        color="error"
+                        //startIcon={<BlockIcon fontSize="small" />}
+                        sx={{
+                          ...ghostButtonSx,
+                          color: 'error.light',
+                          borderColor: 'rgba(244,67,54,0.4)',
+                          '&:hover': { borderColor: 'error.light', bgcolor: 'rgba(244,67,54,0.12)' },
+                        }}
                         onClick={() => run(selected, 'ignore')}
                       >
                         Ignore face

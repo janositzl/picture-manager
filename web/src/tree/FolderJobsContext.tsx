@@ -7,6 +7,7 @@ import {
   startFaceRecognition,
   startScan,
   useJobEvents,
+  type FacePreset,
   type JobKind,
 } from '../api/jobs'
 import { ApiError } from '../api/client'
@@ -36,7 +37,7 @@ type FolderJobs = {
   /** Recursive by default; reanalyze runs the detector again on photos that were already analysed. */
   recognizeFaces: (
     folderId: number | null,
-    options?: { isRecursive?: boolean; reanalyze?: boolean },
+    options?: { isRecursive?: boolean; reanalyze?: boolean; preset?: FacePreset },
   ) => void
   cancelActiveJob: () => void
 }
@@ -120,9 +121,16 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   )
 
   const recognizeFaces = useCallback(
-    (folderId: number | null, { isRecursive = true, reanalyze = false } = {}) =>
+    (
+      folderId: number | null,
+      {
+        isRecursive = true,
+        reanalyze = false,
+        preset = 'fast',
+      }: { isRecursive?: boolean; reanalyze?: boolean; preset?: FacePreset } = {},
+    ) =>
       run('face-recognitions', folderId, () =>
-        startFaceRecognition(folderId, isRecursive, reanalyze),
+        startFaceRecognition(folderId, isRecursive, reanalyze, preset),
       ),
     [run],
   )

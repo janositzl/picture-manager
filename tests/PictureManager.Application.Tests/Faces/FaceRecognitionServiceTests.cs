@@ -42,7 +42,7 @@ public class FaceRecognitionServiceTests : IDisposable
             job.Id = 50;
             return job;
         });
-        _processor.ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>()).Returns(new FaceImageResult(FaceImageOutcome.Processed, 1));
+        _processor.ProcessAsync(Arg.Any<int>(), 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(new FaceImageResult(FaceImageOutcome.Processed, 1));
     }
 
     public void Dispose()
@@ -108,6 +108,24 @@ public class FaceRecognitionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task QueueAsync_PassesThePresetToTheQueuedJob_AndDefaultsToFast()
+    {
+        await Create().QueueAsync(rootId: null, folderId: null, isRecursive: true, preset: FaceDetectionPreset.Detailed);
+
+        _queue.Received(1).Enqueue(new QueuedFaceRecognition(50, null, true, FaceDetectionPreset.Detailed));
+    }
+
+    [Fact]
+    public async Task RunAsync_AnalysesWithTheJobsPreset()
+    {
+        _faces.GetCandidateImageIdsAsync(3, 20, true, Arg.Any<CancellationToken>()).Returns(new List<int> { 1 });
+
+        await Create().RunAsync(new QueuedFaceRecognition(50, 20, true, FaceDetectionPreset.Detailed));
+
+        await _processor.Received(1).ProcessAsync(1, 3, FaceDetectionPreset.Detailed, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task QueueAsync_AnotherJobActive_Throws()
     {
         _jobs.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
@@ -128,7 +146,7 @@ public class FaceRecognitionServiceTests : IDisposable
 
         await _jobs.Received(1).SetEnumerationResultAsync(50, 0, 3, Arg.Any<CancellationToken>());
         await _jobs.Received(1).TryTransitionToEnrichingAsync(50, Arg.Any<CancellationToken>());
-        await _processor.Received(3).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>());
+        await _processor.Received(3).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>());
         await _jobs.Received(3).IncrementFaceProgressAsync(50, 1, Arg.Any<CancellationToken>());
         await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
         await _jobs.Received(1).TryMarkCompletedAsync(50, JobStatus.Enriching, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -139,7 +157,7 @@ public class FaceRecognitionServiceTests : IDisposable
     {
         _faces.GetCandidateImageIdsAsync(3, null, true, Arg.Any<CancellationToken>()).Returns(new List<int> { 1, 2, 3, 4 });
         using var cts = new CancellationTokenSource();
-        _processor.ProcessAsync(1, 3, Arg.Any<CancellationToken>()).Returns(_ =>
+        _processor.ProcessAsync(1, 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>()).Returns(_ =>
         {
             cts.Cancel();
             return new FaceImageResult(FaceImageOutcome.Processed, 0);
@@ -161,7 +179,7 @@ public class FaceRecognitionServiceTests : IDisposable
         var act = () => Create().RunAsync(new QueuedFaceRecognition(50, null, true), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
-        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default);
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default, default);
         await _jobs.Received(1).SetFailureResultAsync(50, 0, 0, null, JobStatus.Cancelled, Arg.Any<DateTime>(), CancellationToken.None);
     }
 
@@ -187,7 +205,7 @@ public class FaceRecognitionServiceTests : IDisposable
 
         var thrown = await act.Should().ThrowAsync<ScanRootsUnavailableException>();
         thrown.Which.RootNames.Should().Equal("nas", "usb");
-        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default);
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default, default);
         await _clusterer.DidNotReceiveWithAnyArgs().ClusterAsync(default, default);
         await _jobs.Received(1).SetFailureResultAsync(
             50, 0, 0, Arg.Is<string?>(m => m!.Contains("'nas'") && m.Contains("'usb'")), JobStatus.Failed, Arg.Any<DateTime>(), CancellationToken.None);
@@ -203,7 +221,7 @@ public class FaceRecognitionServiceTests : IDisposable
         var act = () => Create().RunAsync(new QueuedFaceRecognition(50, 20, true));
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("nas");
-        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default);
+        await _processor.DidNotReceiveWithAnyArgs().ProcessAsync(default, default, default, default);
         await _clusterer.DidNotReceiveWithAnyArgs().ClusterAsync(default, default);
     }
 
@@ -219,7 +237,7 @@ public class FaceRecognitionServiceTests : IDisposable
         var act = () => Create().RunAsync(new QueuedFaceRecognition(50, null, true));
 
         (await act.Should().ThrowAsync<ScanRootsUnavailableException>()).Which.RootNames.Should().Equal("usb");
-        await _processor.Received(2).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<CancellationToken>());
+        await _processor.Received(2).ProcessAsync(Arg.Any<int>(), 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>());
         await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
         await _jobs.Received(1).SetFailureResultAsync(
             50, 0, 2, Arg.Is<string?>(m => m!.Contains("'usb'") && !m.Contains("'nas'")), JobStatus.Failed, Arg.Any<DateTime>(), CancellationToken.None);
@@ -235,7 +253,7 @@ public class FaceRecognitionServiceTests : IDisposable
 
         await Create().RunAsync(new QueuedFaceRecognition(50, 20, true));
 
-        await _processor.Received(1).ProcessAsync(1, 3, Arg.Any<CancellationToken>());
+        await _processor.Received(1).ProcessAsync(1, 3, Arg.Any<FaceDetectionPreset>(), Arg.Any<CancellationToken>());
         await _clusterer.Received(1).ClusterAsync(3, Arg.Any<CancellationToken>());
         await _jobs.Received(1).TryMarkCompletedAsync(50, JobStatus.Enriching, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _jobs.DidNotReceiveWithAnyArgs().SetFailureResultAsync(default, default, default, default, default, default, default);

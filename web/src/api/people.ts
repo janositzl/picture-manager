@@ -107,7 +107,8 @@ export function useImageFaces(imageId: number | null, options: ImageFacesOptions
   if (confirmedOnly) params.set('confirmedOnly', 'true')
   return useQuery({
     queryKey: faceKeys.forImage(imageId ?? 0, params.toString()),
-    queryFn: ({ signal }) => apiFetch<ImageFace[]>(`/api/images/${imageId}/faces?${params}`, { signal }),
+    queryFn: ({ signal }) =>
+      apiFetch<ImageFace[]>(`/api/images/${imageId}/faces?${params}`, { signal }),
     enabled: enabled && imageId !== null,
   })
 }
@@ -156,9 +157,42 @@ export function useAssignFace() {
 export function useAssignGroup() {
   const invalidate = useInvalidatePeopleData()
   return useMutation({
-    mutationFn: ({ id, personId, imageIds }: { id: number; personId: number; imageIds?: number[] }) =>
-      post<PersonSummary>(`/api/people/${id}/assign`, imageIds === undefined ? { personId } : { personId, imageIds }),
+    mutationFn: ({
+      id,
+      personId,
+      imageIds,
+    }: {
+      id: number
+      personId: number
+      imageIds?: number[]
+    }) =>
+      post<PersonSummary>(
+        `/api/people/${id}/assign`,
+        imageIds === undefined ? { personId } : { personId, imageIds },
+      ),
     onSuccess: invalidate,
+  })
+}
+
+/** Runs face detection again on one photo right now; resolves to how many faces it has and how many got a suggestion. */
+export function useReanalyzeImage() {
+  const invalidate = useInvalidatePeopleData()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      imageId,
+      preset = 'detailed',
+    }: {
+      imageId: number
+      preset?: 'fast' | 'detailed'
+    }) =>
+      post<{ faces: number; suggested: number }>(`/api/images/${imageId}/faces/reanalyze`, {
+        preset,
+      }),
+    onSuccess: () => {
+      invalidate()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.faceCoverage() })
+    },
   })
 }
 
@@ -166,7 +200,8 @@ export function useAssignGroup() {
 export function useRecheckFaces() {
   const invalidate = useInvalidatePeopleData()
   return useMutation({
-    mutationFn: (imageId: number) => post<{ count: number }>(`/api/images/${imageId}/faces/recheck`),
+    mutationFn: (imageId: number) =>
+      post<{ count: number }>(`/api/images/${imageId}/faces/recheck`),
     onSuccess: invalidate,
   })
 }

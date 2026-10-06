@@ -33,7 +33,8 @@ public sealed class FaceImageProcessor : IFaceImageProcessor
         _logger = logger;
     }
 
-    public async Task<FaceImageResult> ProcessAsync(int imageId, int faceModelId, CancellationToken cancellationToken = default)
+    public async Task<FaceImageResult> ProcessAsync(
+        int imageId, int faceModelId, FaceDetectionPreset preset = FaceDetectionPreset.Fast, CancellationToken cancellationToken = default)
     {
         var image = await _images.GetByIdWithFolderAsync(imageId, cancellationToken);
         if (image?.Folder?.Root is null)
@@ -50,7 +51,7 @@ public sealed class FaceImageProcessor : IFaceImageProcessor
         FaceAnalysisResult? analysis;
         try
         {
-            analysis = await _analyzer.AnalyzeAsync(path, image.Orientation, cancellationToken);
+            analysis = await _analyzer.AnalyzeAsync(path, image.Orientation, preset, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not FaceModelUnavailableException)
         {
