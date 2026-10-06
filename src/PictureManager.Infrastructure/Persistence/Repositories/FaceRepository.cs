@@ -49,7 +49,7 @@ public sealed class FaceRepository : IFaceRepository
 
     public async Task<IReadOnlyList<int>> GetCandidateImageIdsAsync(int faceModelId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Images.AsNoTracking().WhereVisible().Where(i => i.IndexState == IndexState.Indexed);
+        var query = FaceScopeImages();
 
         if (folderId is int id)
         {
@@ -75,6 +75,53 @@ public sealed class FaceRepository : IFaceRepository
             && s.Status != FaceProcessingStatus.Failed));
 
         return await query.OrderBy(i => i.Id).Select(i => i.Id).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The images face recognition works on: visible, Indexed, and not in or beneath an excluded folder. Shared by
+    /// the job's candidates and the folder coverage, so the two always agree.
+    /// </summary>
+    private IQueryable<Image> FaceScopeImages() =>
+        _dbContext.Images.AsNoTracking().WhereVisible()
+            .Where(i => i.IndexState == IndexState.Indexed)
+            .Where(i => !_dbContext.Folders.Any(x => x.IsExcluded && x.RootId == i.Folder!.RootId
+                && (x.Id == i.FolderId || x.RelativePath == "" || i.Folder.RelativePath.StartsWith(x.RelativePath + "/"))));
+
+    public async Task<IReadOnlyList<FolderFaceCounts>> GetFolderFaceCountsAsync(int faceModelId, CancellationToken cancellationToken = default)
+    {
+        var folders = await _dbContext.Folders.AsNoTracking().WhereVisible()
+            .Select(f => new { f.Id, f.ParentId })
+            .ToListAsync(cancellationToken);
+
+        // The state is one row per image (keyed by ImageId). Current = this model and this exact content.
+        var counts = await (
+                from i in FaceScopeImages()
+                join s in _dbContext.FaceProcessingStates on i.Id equals s.ImageId into states
+                from s in states.DefaultIfEmpty()
+                let isCurrent = s != null && s.FaceModelId == faceModelId && s.ImageFingerprint == i.ContentHash
+                select new
+                {
+                    i.FolderId,
+                    Done = isCurrent && s!.Status == FaceProcessingStatus.Completed,
+                    Failed = isCurrent && s!.Status == FaceProcessingStatus.PermanentlyFailed,
+                    Stale = s != null && !isCurrent && s.Status != FaceProcessingStatus.Failed
+                })
+            .GroupBy(r => r.FolderId)
+            .Select(g => new
+            {
+                FolderId = g.Key,
+                Total = g.Count(),
+                Done = g.Sum(r => r.Done ? 1 : 0),
+                Failed = g.Sum(r => r.Failed ? 1 : 0),
+                Stale = g.Sum(r => r.Stale ? 1 : 0)
+            })
+            .ToDictionaryAsync(c => c.FolderId, cancellationToken);
+
+        return folders
+            .Select(f => counts.TryGetValue(f.Id, out var c)
+                ? new FolderFaceCounts(f.Id, f.ParentId, c.Total, c.Done, c.Failed, c.Stale)
+                : new FolderFaceCounts(f.Id, f.ParentId, 0, 0, 0, 0))
+            .ToList();
     }
 
     public Task<FaceProcessingState?> GetStateAsync(int imageId, CancellationToken cancellationToken = default) =>

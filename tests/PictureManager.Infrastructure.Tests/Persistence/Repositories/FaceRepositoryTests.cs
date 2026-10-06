@@ -72,6 +72,88 @@ public class FaceRepositoryTests
     }
 
     [Fact]
+    public async Task GetCandidateImageIdsAsync_SkipsImagesInOrBeneathAnExcludedFolder()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var trips = await FaceTestData.AddFolderAsync(db.Context, top, "Trips");
+        var privateFolder = await FaceTestData.AddFolderAsync(db.Context, trips, "Private");
+        var nested = await FaceTestData.AddFolderAsync(db.Context, privateFolder, "Nested");      // not flagged itself
+        var privateBis = await FaceTestData.AddFolderAsync(db.Context, trips, "Private2");        // prefix trap: stays in scope
+        var model = await FaceTestData.AddModelAsync(db.Context);
+
+        var inTrips = await FaceTestData.AddImageAsync(db.Context, trips, "a");
+        await FaceTestData.AddImageAsync(db.Context, privateFolder, "b");     // indexed before the exclusion
+        await FaceTestData.AddImageAsync(db.Context, nested, "c");
+        var inPrivateBis = await FaceTestData.AddImageAsync(db.Context, privateBis, "d");
+        privateFolder.IsExcluded = true;
+        await db.Context.SaveChangesAsync();
+        var repository = new FaceRepository(db.CreateContext());
+
+        var expected = new[] { inTrips.Id, inPrivateBis.Id };
+        (await repository.GetCandidateImageIdsAsync(model, trips.Id, isRecursive: true)).Should().BeEquivalentTo(expected);
+        (await repository.GetCandidateImageIdsAsync(model, top.Id, isRecursive: true)).Should().BeEquivalentTo(expected);
+        (await repository.GetCandidateImageIdsAsync(model, null, isRecursive: true)).Should().BeEquivalentTo(expected);
+        (await repository.GetCandidateImageIdsAsync(model, privateFolder.Id, isRecursive: true)).Should().BeEmpty();
+        (await repository.GetCandidateImageIdsAsync(model, nested.Id, isRecursive: false)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetFolderFaceCountsAsync_CountsOwnImages_WithTheCandidateRules()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var trips = await FaceTestData.AddFolderAsync(db.Context, top, "Trips");
+        var madeira = await FaceTestData.AddFolderAsync(db.Context, trips, "Madeira");
+        var gone = await FaceTestData.AddFolderAsync(db.Context, top, "Gone");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var otherModel = await FaceTestData.AddModelAsync(db.Context, "model-2");
+
+        await FaceTestData.AddImageAsync(db.Context, trips, "new");                                  // never processed
+        await FaceTestData.AddImageAsync(db.Context, trips, "notIndexed", IndexState.Pending);       // not counted
+        var missing = await FaceTestData.AddImageAsync(db.Context, trips, "missing");                // not counted
+        missing.MissingSinceUtc = Now;
+        var done = await FaceTestData.AddImageAsync(db.Context, trips, "done", hash: "h1");          // done
+        var changed = await FaceTestData.AddImageAsync(db.Context, trips, "changed", hash: "new");   // stale (old fingerprint)
+        var retry = await FaceTestData.AddImageAsync(db.Context, trips, "retry", hash: "h2");        // never processed (retryable)
+        var givenUp = await FaceTestData.AddImageAsync(db.Context, trips, "gaveup", hash: "h3");     // failed
+        var otherDone = await FaceTestData.AddImageAsync(db.Context, madeira, "other", hash: "h4");  // stale (other model)
+        var madeiraDone = await FaceTestData.AddImageAsync(db.Context, madeira, "m", hash: "h5");    // done
+        await FaceTestData.AddImageAsync(db.Context, gone, "g");                                     // folder missing: not counted
+        gone.MissingSinceUtc = Now;
+        var excluded = await FaceTestData.AddFolderAsync(db.Context, top, "Private");
+        var underExcluded = await FaceTestData.AddFolderAsync(db.Context, excluded, "Nested");
+        await FaceTestData.AddImageAsync(db.Context, excluded, "x");                                 // excluded: not counted
+        await FaceTestData.AddImageAsync(db.Context, underExcluded, "y");                            // beneath excluded: not counted
+        excluded.IsExcluded = true;
+        db.Context.FaceProcessingStates.AddRange(
+            new FaceProcessingState { ImageId = done.Id, FaceModelId = model, ImageFingerprint = "h1", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = changed.Id, FaceModelId = model, ImageFingerprint = "old", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = retry.Id, FaceModelId = model, ImageFingerprint = "h2", Status = FaceProcessingStatus.Failed, Attempts = 1, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = givenUp.Id, FaceModelId = model, ImageFingerprint = "h3", Status = FaceProcessingStatus.PermanentlyFailed, Attempts = 3, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = otherDone.Id, FaceModelId = otherModel, ImageFingerprint = "h4", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now },
+            new FaceProcessingState { ImageId = madeiraDone.Id, FaceModelId = model, ImageFingerprint = "h5", Status = FaceProcessingStatus.Completed, ProcessedUtc = Now });
+        await db.Context.SaveChangesAsync();
+        var repository = new FaceRepository(db.CreateContext());
+
+        var counts = await repository.GetFolderFaceCountsAsync(model);
+
+        counts.Should().BeEquivalentTo(new[]
+        {
+            new FolderFaceCounts(top.Id, null, 0, 0, 0, 0),
+            new FolderFaceCounts(trips.Id, top.Id, Total: 5, Done: 1, Failed: 1, Stale: 1),
+            new FolderFaceCounts(madeira.Id, trips.Id, Total: 2, Done: 1, Failed: 0, Stale: 1),
+            new FolderFaceCounts(gone.Id, top.Id, 0, 0, 0, 0),
+            new FolderFaceCounts(excluded.Id, top.Id, 0, 0, 0, 0),
+            new FolderFaceCounts(underExcluded.Id, excluded.Id, 0, 0, 0, 0),
+        });
+
+        // Invariant with the job: a folder's candidates are exactly its images that are neither Done nor Failed.
+        var tripsCandidates = await repository.GetCandidateImageIdsAsync(model, trips.Id, isRecursive: false);
+        tripsCandidates.Should().HaveCount(5 - 1 - 1);
+    }
+
+    [Fact]
     public async Task SaveResultAsync_ReplacesFacesAndRecordsCompletedState()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

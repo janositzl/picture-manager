@@ -26,10 +26,18 @@ public interface IFaceRepository
 
     /// <summary>
     /// Ids (ascending) of visible Indexed images in scope that still need analysis by this model: no state, a
-    /// state for another model or an older ContentHash, or a retryable Failed state. folderId null = everything;
-    /// an unknown folderId = nothing.
+    /// state for another model or an older ContentHash, or a retryable Failed state. Images in an excluded folder
+    /// or beneath one are never in scope (they may still be indexed from before the exclusion). folderId null =
+    /// everything; an unknown folderId = nothing.
     /// </summary>
     Task<IReadOnlyList<int>> GetCandidateImageIdsAsync(int faceModelId, int? folderId, bool isRecursive, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// One row per visible folder with its own (not its subfolders') in-scope images: Total, Done = Completed by
+    /// this model for the current ContentHash, Failed = PermanentlyFailed likewise, Stale = Completed or
+    /// PermanentlyFailed for another model or older content. Same image set as GetCandidateImageIdsAsync.
+    /// </summary>
+    Task<IReadOnlyList<FolderFaceCounts>> GetFolderFaceCountsAsync(int faceModelId, CancellationToken cancellationToken = default);
 
     Task<FaceProcessingState?> GetStateAsync(int imageId, CancellationToken cancellationToken = default);
 
