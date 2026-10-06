@@ -88,4 +88,16 @@ public class PeopleEndpointsTests
             .Should().BeOfType<Ok<PersonSummary>>().Which.Value.Should().Be(anna);
         (await PeopleEndpoints.AssignGroupAsync(2, new AssignGroupRequest(2), people, CancellationToken.None)).Result.Should().BeOfType<ValidationProblem>();
     }
+
+    [Fact]
+    public async Task RecheckFacesAsync_ReturnsCount_OrNotFound()
+    {
+        var review = Substitute.For<IFaceReviewService>();
+        review.RecheckFacesAsync(1, Arg.Any<CancellationToken>()).Returns(Result<CountResponse>.Ok(new CountResponse(2)));
+        review.RecheckFacesAsync(2, Arg.Any<CancellationToken>()).Returns(Result.NotFound());
+
+        (await PeopleEndpoints.RecheckFacesAsync(1, review, CancellationToken.None)).Result
+            .Should().BeOfType<Ok<CountResponse>>().Which.Value.Should().Be(new CountResponse(2));
+        (await PeopleEndpoints.RecheckFacesAsync(2, review, CancellationToken.None)).Result.Should().BeOfType<NotFound>();
+    }
 }

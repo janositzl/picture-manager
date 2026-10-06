@@ -16,6 +16,7 @@ import {
   useAssignFace,
   useFaceAction,
   useImageFaces,
+  useRecheckFaces,
   type FaceAction,
   type ImageFace,
 } from '../api/people'
@@ -62,7 +63,7 @@ export function ConfirmedPeople({ imageId }: { imageId: number }) {
 
 type Props = {
   review: FaceReview
-  item: Pick<ImageListItem, 'fileName' | 'extension' | 'folderPath'>
+  item: Pick<ImageListItem, 'id' | 'fileName' | 'extension' | 'folderPath'>
 }
 
 const DOT: Record<ImageFace['state'], string> = {
@@ -112,6 +113,7 @@ const ghostButtonSx = { textTransform: 'none', fontWeight: 500, borderRadius: '1
 export function PeopleInPhoto({ review, item }: Props) {
   const faceAction = useFaceAction()
   const assign = useAssignFace()
+  const recheck = useRecheckFaces()
   const notify = useNotify()
   const [picker, setPicker] = useState<'assign' | 'change' | null>(null)
   const selected = review.faces.find((f) => f.id === review.selectedId) ?? null
@@ -226,6 +228,35 @@ export function PeopleInPhoto({ review, item }: Props) {
                 )}
               </h2>
               {list}
+              {review.faces.some((f) => f.state === 'unknown') && (
+                <Tooltip
+                  describeChild
+                  title="Try again to match the unidentified faces in this photo to people you have confirmed since."
+                >
+                  <span className="self-start">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="inherit"
+                      disabled={recheck.isPending}
+                      sx={ghostButtonSx}
+                      onClick={() =>
+                        recheck.mutate(item.id, {
+                          onSuccess: ({ count }) =>
+                            notify(
+                              count === 0
+                                ? 'No new matches.'
+                                : `${count} ${count === 1 ? 'face' : 'faces'} now suggested.`,
+                            ),
+                          onError: () => notify("Couldn't re-check the faces."),
+                        })
+                      }
+                    >
+                      Re-check faces
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
             </div>
             {selected && (
               <div className="flex flex-col gap-3 rounded-2xl border border-solid border-white/10 bg-white/5 p-3">

@@ -162,6 +162,15 @@ export function useAssignGroup() {
   })
 }
 
+/** Asks the matcher again about a photo's Unknown faces; resolves to how many now have a suggestion. */
+export function useRecheckFaces() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: (imageId: number) => post<{ count: number }>(`/api/images/${imageId}/faces/recheck`),
+    onSuccess: invalidate,
+  })
+}
+
 /** Accept all of a person's suggestions; resolves to how many faces were confirmed. */
 export function useAcceptAllSuggestions() {
   const invalidate = useInvalidatePeopleData()

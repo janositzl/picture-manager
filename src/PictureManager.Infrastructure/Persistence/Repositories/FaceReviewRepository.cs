@@ -32,6 +32,18 @@ public sealed class FaceReviewRepository : IFaceReviewRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RecheckFace>?> GetUnknownFacesAsync(int imageId, CancellationToken cancellationToken = default)
+    {
+        if (!await _dbContext.Images.AsNoTracking().WhereVisible().AnyAsync(i => i.Id == imageId, cancellationToken))
+            return null;
+
+        return await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.ImageId == imageId && f.AssignmentState == FaceAssignmentState.Unknown)
+            .OrderBy(f => f.Id)
+            .Select(f => new RecheckFace(f.Id, f.FaceModelId, f.QualityScore, f.RejectedPersonId))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> FaceExistsAsync(int faceId, CancellationToken cancellationToken = default) =>
         _dbContext.Faces.AnyAsync(f => f.Id == faceId, cancellationToken);
 

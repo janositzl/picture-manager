@@ -19,6 +19,7 @@ public class FaceReviewServiceTests
 
     private readonly IFaceReviewRepository _review = Substitute.For<IFaceReviewRepository>();
     private readonly IPeopleRepository _people = Substitute.For<IPeopleRepository>();
+    private readonly IFaceClusterer _clusterer = Substitute.For<IFaceClusterer>();
     private readonly IClock _clock = Substitute.For<IClock>();
 
     public FaceReviewServiceTests()
@@ -29,7 +30,28 @@ public class FaceReviewServiceTests
         _people.GetAsync(7, Arg.Any<CancellationToken>()).Returns(new PersonSummary(7, "Anna", 3, 1, 5));
     }
 
-    private FaceReviewService Create() => new(_review, _people, _clock);
+    private FaceReviewService Create() => new(_review, _people, _clusterer, _clock);
+
+    [Fact]
+    public async Task RecheckFaces_MatchesTheImagesUnknownFacesPerModel_AndCountsSuggestions()
+    {
+        _review.GetUnknownFacesAsync(10, Arg.Any<CancellationToken>())
+            .Returns(new[] { new RecheckFace(1, 3, 0.4f, null), new RecheckFace(2, 3, 0.5f, 9) });
+        _clusterer.MatchAsync(3, Arg.Is<IReadOnlyList<FaceCandidate>>(f => f.Count == 2), Arg.Any<CancellationToken>()).Returns(1);
+
+        var result = await Create().RecheckFacesAsync(10);
+
+        result.Status.Should().Be(ResultStatus.Success);
+        result.Value!.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RecheckFaces_MissingImage_IsNotFound()
+    {
+        _review.GetUnknownFacesAsync(99, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<RecheckFace>?)null);
+        (await Create().RecheckFacesAsync(99)).Status.Should().Be(ResultStatus.NotFound);
+        await _clusterer.DidNotReceiveWithAnyArgs().MatchAsync(default, default!, default);
+    }
 
     [Fact]
     public async Task Accept_FaceInAnotherState_IsStillOk_ButUnknownFaceIsNotFound()

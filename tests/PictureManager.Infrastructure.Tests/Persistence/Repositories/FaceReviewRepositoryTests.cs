@@ -39,6 +39,23 @@ public class FaceReviewRepositoryTests
     }
 
     [Fact]
+    public async Task GetUnknownFaces_ReturnsOnlyUnknownFacesOfThatImage_AndNullForAMissingImage()
+    {
+        var s = await SeedAsync();
+        await using var _ = s.Db;
+        var unknown = await AddAsync(s, 0, null, FaceAssignmentState.Unknown);
+        await AddAsync(s, 1, s.Anna.Id, FaceAssignmentState.Suggested);
+        await AddAsync(s, 2, null, FaceAssignmentState.Ignored);
+        var repository = new FaceReviewRepository(s.Db.CreateContext());
+
+        var faces = await repository.GetUnknownFacesAsync(s.ImageId);
+
+        faces!.Select(f => f.Id).Should().Equal(unknown.Id);
+        faces![0].FaceModelId.Should().Be(s.ModelId);
+        (await repository.GetUnknownFacesAsync(999_999)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task Accept_ConfirmsOnlyASuggestedFace()
     {
         var s = await SeedAsync();

@@ -10,6 +10,8 @@ namespace PictureManager.Application.Repositories;
 public sealed record ImageFace(
     int Id, float X, float Y, float Width, float Height, FaceAssignmentState State, int? PersonId, string? PersonName);
 
+public sealed record RecheckFace(int Id, int FaceModelId, float Quality, int? RejectedPersonId);
+
 /// <summary>
 /// The user's decisions about detected faces. Every method touches only faces in the state it is meant for, so a
 /// repeated or stale request changes nothing; the int results are the number of faces changed.
@@ -18,6 +20,9 @@ public interface IFaceReviewRepository
 {
     /// <summary>Faces of a visible image, left to right; null when the image doesn't exist or isn't visible. Ignored faces only on request.</summary>
     Task<IReadOnlyList<ImageFace>?> GetImageFacesAsync(int imageId, bool includeIgnored, CancellationToken cancellationToken = default);
+
+    /// <summary>Unknown faces of a visible image with their model, for re-matching; null when the image does not exist or is not visible.</summary>
+    Task<IReadOnlyList<RecheckFace>?> GetUnknownFacesAsync(int imageId, CancellationToken cancellationToken = default);
 
     Task<bool> FaceExistsAsync(int faceId, CancellationToken cancellationToken = default);
     Task<bool> PersonExistsAsync(int personId, CancellationToken cancellationToken = default);

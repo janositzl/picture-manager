@@ -15,13 +15,27 @@ public sealed class FaceReviewService : IFaceReviewService
 
     private readonly IFaceReviewRepository _review;
     private readonly IPeopleRepository _people;
+    private readonly IFaceClusterer _clusterer;
     private readonly IClock _clock;
 
-    public FaceReviewService(IFaceReviewRepository review, IPeopleRepository people, IClock clock)
+    public FaceReviewService(IFaceReviewRepository review, IPeopleRepository people, IFaceClusterer clusterer, IClock clock)
     {
         _review = review;
         _people = people;
+        _clusterer = clusterer;
         _clock = clock;
+    }
+
+    public async Task<Result<CountResponse>> RecheckFacesAsync(int imageId, CancellationToken cancellationToken = default)
+    {
+        if (await _review.GetUnknownFacesAsync(imageId, cancellationToken) is not { } faces)
+            return Result.NotFound();
+
+        var matched = 0;
+        foreach (var byModel in faces.GroupBy(f => f.FaceModelId))
+            matched += await _clusterer.MatchAsync(
+                byModel.Key, byModel.Select(f => new FaceCandidate(f.Id, f.Quality, f.RejectedPersonId)).ToList(), cancellationToken);
+        return Result<CountResponse>.Ok(new CountResponse(matched));
     }
 
     public async Task<Result<IReadOnlyList<ImageFaceDto>>> GetImageFacesAsync(

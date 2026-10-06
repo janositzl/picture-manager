@@ -28,6 +28,9 @@ public interface IFaceReviewService
     /// <summary>Confirms the face for a person and returns that person.</summary>
     Task<Result<PersonSummary>> AssignAsync(int faceId, AssignFaceRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>Tries again to match the photo's Unknown faces to existing people; returns how many got a suggestion.</summary>
+    Task<Result<CountResponse>> RecheckFacesAsync(int imageId, CancellationToken cancellationToken = default);
+
     Task<Result<CountResponse>> AcceptAllAsync(int personId, CancellationToken cancellationToken = default);
     Task<Result> AcceptImageAsync(int personId, int imageId, CancellationToken cancellationToken = default);
     Task<Result> RejectImageAsync(int personId, int imageId, CancellationToken cancellationToken = default);

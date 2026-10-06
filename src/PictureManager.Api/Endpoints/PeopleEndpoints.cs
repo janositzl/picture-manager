@@ -20,6 +20,7 @@ public static class PeopleEndpoints
         user.MapGet("/faces/{id:int}/thumbnail", GetFaceThumbnailAsync);
 
         user.MapGet("/images/{id:int}/faces", GetImageFacesAsync);
+        user.MapPost("/images/{id:int}/faces/recheck", RecheckFacesAsync);
         user.MapPost("/faces/{id:int}/accept", AcceptAsync);
         user.MapPost("/faces/{id:int}/reject", RejectAsync);
         user.MapPost("/faces/{id:int}/unknown", MarkUnknownAsync);
@@ -35,6 +36,10 @@ public static class PeopleEndpoints
     public static async Task<Results<Ok<IReadOnlyList<ImageFaceDto>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetImageFacesAsync(
         int id, bool? includeIgnored, bool? confirmedOnly, IFaceReviewService service, CancellationToken cancellationToken) =>
         (await service.GetImageFacesAsync(id, includeIgnored ?? false, confirmedOnly ?? false, cancellationToken)).ToOk();
+
+    public static async Task<Results<Ok<CountResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> RecheckFacesAsync(
+        int id, IFaceReviewService service, CancellationToken cancellationToken) =>
+        (await service.RecheckFacesAsync(id, cancellationToken)).ToOk();
 
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AcceptAsync(
         int id, IFaceReviewService service, CancellationToken cancellationToken) =>

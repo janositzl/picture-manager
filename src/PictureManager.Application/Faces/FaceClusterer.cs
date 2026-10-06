@@ -29,11 +29,10 @@ public sealed class FaceClusterer : IFaceClusterer
         _clock = clock;
     }
 
-    public async Task ClusterAsync(int faceModelId, CancellationToken cancellationToken = default)
+    public async Task<int> MatchAsync(int faceModelId, IReadOnlyList<FaceCandidate> faces, CancellationToken cancellationToken = default)
     {
-        // (a) Join existing people (named or unnamed groups) when a clear majority of near neighbours agree.
-        var seeds = await _faces.GetUnclusteredFacesAsync(faceModelId, minQuality: 0f, cancellationToken);
-        foreach (var face in seeds)
+        var matched = 0;
+        foreach (var face in faces)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var neighbors = await _faces.GetNearestAsync(
@@ -42,8 +41,17 @@ public sealed class FaceClusterer : IFaceClusterer
             {
                 var distance = neighbors.Where(n => n.PersonId == personId && n.Distance <= _options.AutoMatchDistance).Average(n => n.Distance);
                 await _faces.AssignAsync(new[] { face.Id }, personId, distance, cancellationToken);
+                matched++;
             }
         }
+        return matched;
+    }
+
+    public async Task ClusterAsync(int faceModelId, CancellationToken cancellationToken = default)
+    {
+        // (a) Join existing people (named or unnamed groups) when a clear majority of near neighbours agree.
+        var seeds = await _faces.GetUnclusteredFacesAsync(faceModelId, minQuality: 0f, cancellationToken);
+        await MatchAsync(faceModelId, seeds, cancellationToken);
 
         // (b) Group what's left (good-quality faces only) into new unnamed people. DBSCAN starts from the new faces
         // but may expand into any good-quality Unknown face of the model (older noise included).
