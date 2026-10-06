@@ -175,6 +175,41 @@ public class PeopleRepositoryTests
     }
 
     [Fact]
+    public async Task AssignGroupAsync_WithImages_MovesOnlyThose_AndKeepsGroupUntilEmpty()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var imageA = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var imageB = await FaceTestData.AddImageAsync(db.Context, top, "b");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var source = new Person { CreatedUtc = Now, ModifiedUtc = Now };
+        var target = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(source, target);
+        await db.Context.SaveChangesAsync();
+        var faceA = await FaceTestData.AddFaceAsync(db.Context, imageA.Id, model, FaceTestData.Embedding(0), source.Id, FaceAssignmentState.Suggested);
+        var faceB = await FaceTestData.AddFaceAsync(db.Context, imageB.Id, model, FaceTestData.Embedding(1), source.Id, FaceAssignmentState.Suggested);
+
+        await new PeopleRepository(db.CreateContext()).AssignGroupAsync(source.Id, target.Id, Now, new[] { imageA.Id });
+
+        await using (var read = db.CreateContext())
+        {
+            (await read.People.AnyAsync(p => p.Id == source.Id)).Should().BeTrue();
+            var movedA = await read.Faces.SingleAsync(f => f.Id == faceA.Id);
+            movedA.PersonId.Should().Be(target.Id);
+            movedA.AssignmentState.Should().Be(FaceAssignmentState.Confirmed);
+            var stayedB = await read.Faces.SingleAsync(f => f.Id == faceB.Id);
+            stayedB.PersonId.Should().Be(source.Id);
+            stayedB.AssignmentState.Should().Be(FaceAssignmentState.Suggested);
+        }
+
+        await new PeopleRepository(db.CreateContext()).AssignGroupAsync(source.Id, target.Id, Now, new[] { imageB.Id });
+
+        await using var after = db.CreateContext();
+        (await after.People.AnyAsync(p => p.Id == source.Id)).Should().BeFalse();
+        (await after.Faces.SingleAsync(f => f.Id == faceB.Id)).PersonId.Should().Be(target.Id);
+    }
+
+    [Fact]
     public async Task DeleteAsync_UnassignsFacesForRegrouping_AndDeletesPerson()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

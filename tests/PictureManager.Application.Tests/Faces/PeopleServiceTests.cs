@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -30,14 +31,29 @@ public class PeopleServiceTests
         var result = await Create().AssignGroupAsync(1, 2);
 
         result.Status.Should().Be(ResultStatus.Success);
-        await _people.Received(1).AssignGroupAsync(1, 2, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _people.Received(1).AssignGroupAsync(1, 2, Arg.Any<DateTime>(), null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AssignGroupAsync_WithImages_PassesThemOn()
+    {
+        var result = await Create().AssignGroupAsync(1, 2, new[] { 7, 8 });
+
+        result.Status.Should().Be(ResultStatus.Success);
+        await _people.Received(1).AssignGroupAsync(1, 2, Arg.Any<DateTime>(), Arg.Is<IReadOnlyCollection<int>?>(ids => ids!.Count == 2), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AssignGroupAsync_EmptyImageList_IsInvalid()
+    {
+        (await Create().AssignGroupAsync(1, 2, Array.Empty<int>())).Status.Should().Be(ResultStatus.Invalid);
     }
 
     [Fact]
     public async Task AssignGroupAsync_NamedSource_IsInvalid()
     {
         (await Create().AssignGroupAsync(2, 2)).Status.Should().Be(ResultStatus.Invalid);
-        await _people.DidNotReceiveWithAnyArgs().AssignGroupAsync(default, default, default, default);
+        await _people.DidNotReceiveWithAnyArgs().AssignGroupAsync(default, default, default, default, default);
     }
 
     [Fact]

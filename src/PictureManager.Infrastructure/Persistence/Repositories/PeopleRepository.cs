@@ -85,21 +85,25 @@ public sealed class PeopleRepository : IPeopleRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task AssignGroupAsync(int sourceId, int targetId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    public async Task AssignGroupAsync(int sourceId, int targetId, DateTime nowUtc, IReadOnlyCollection<int>? imageIds = null, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Faces
-            .Where(f => f.PersonId == sourceId && f.AssignmentState == FaceAssignmentState.Suggested)
+            .Where(f => f.PersonId == sourceId && f.AssignmentState == FaceAssignmentState.Suggested
+                        && (imageIds == null || imageIds.Contains(f.ImageId)))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(f => f.PersonId, targetId)
                 .SetProperty(f => f.AssignmentState, FaceAssignmentState.Confirmed)
                 .SetProperty(f => f.MatchDistance, (float?)null)
                 .SetProperty(f => f.RejectedPersonId, f => f.RejectedPersonId == targetId ? null : f.RejectedPersonId), cancellationToken);
-        await _dbContext.Faces.Where(f => f.RejectedPersonId == sourceId)
-            .ExecuteUpdateAsync(s => s.SetProperty(f => f.RejectedPersonId, (int?)targetId), cancellationToken);
         await _dbContext.People.Where(p => p.Id == targetId)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.ModifiedUtc, nowUtc), cancellationToken);
-        await _dbContext.People.Where(p => p.Id == sourceId).ExecuteDeleteAsync(cancellationToken);
+        if (imageIds == null || !await _dbContext.Faces.AnyAsync(f => f.PersonId == sourceId, cancellationToken))
+        {
+            await _dbContext.Faces.Where(f => f.RejectedPersonId == sourceId)
+                .ExecuteUpdateAsync(s => s.SetProperty(f => f.RejectedPersonId, (int?)targetId), cancellationToken);
+            await _dbContext.People.Where(p => p.Id == sourceId).ExecuteDeleteAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
     }
 

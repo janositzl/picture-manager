@@ -152,12 +152,12 @@ export function useAssignFace() {
   })
 }
 
-/** Merges an unnamed group into a named person, confirming its faces; resolves to the target person. */
+/** Merges an unnamed group (or just its faces on imageIds) into a named person, confirming them; resolves to the target person. */
 export function useAssignGroup() {
   const invalidate = useInvalidatePeopleData()
   return useMutation({
-    mutationFn: ({ id, personId }: { id: number; personId: number }) =>
-      post<PersonSummary>(`/api/people/${id}/assign`, { personId }),
+    mutationFn: ({ id, personId, imageIds }: { id: number; personId: number; imageIds?: number[] }) =>
+      post<PersonSummary>(`/api/people/${id}/assign`, imageIds === undefined ? { personId } : { personId, imageIds }),
     onSuccess: invalidate,
   })
 }

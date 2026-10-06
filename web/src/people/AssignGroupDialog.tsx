@@ -8,10 +8,18 @@ import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { countText } from './countText'
 import { PersonAvatar } from './PersonAvatar'
 
-type Props = { group: PersonSummary; label: string; onClose: () => void }
+type Props = {
+  group: PersonSummary
+  label: string
+  /** Only these photos' faces are assigned (a partial assignment); omitted = the whole group. */
+  imageIds?: number[]
+  /** Called after a partial assignment that leaves the group in place. */
+  onAssigned?: () => void
+  onClose: () => void
+}
 
 /** Pick a named person to merge an unknown group into; its faces land in that person's confirmed photos. */
-export function AssignGroupDialog({ group, label, onClose }: Props) {
+export function AssignGroupDialog({ group, label, imageIds, onAssigned, onClose }: Props) {
   const people = usePeople()
   const assignGroup = useAssignGroup()
   const navigate = useNavigate()
@@ -22,17 +30,26 @@ export function AssignGroupDialog({ group, label, onClose }: Props) {
   const visible = (people.data ?? [])
     .filter((p) => p.name !== null && p.name.toLowerCase().includes(needle))
     .sort((a, b) => a.name!.localeCompare(b.name!, undefined, { sensitivity: 'base' }))
-  const photos = group.suggestedImageCount
+  const total = group.suggestedImageCount
+  const photos = imageIds?.length ?? total
+  // Selecting every photo is the same as assigning the group: it ends up empty and is gone.
+  const whole = imageIds === undefined || imageIds.length >= total
 
   const confirm = () => {
     if (target === null) return
     assignGroup.mutate(
-      { id: group.id, personId: target.id },
+      { id: group.id, personId: target.id, imageIds: whole ? undefined : imageIds },
       {
         onSuccess: (survivor) => {
-          notify(`Assigned ${label} to ${survivor.name}.`)
-          onClose()
-          navigate(`/people/${survivor.id}`, { replace: true })
+          if (whole) {
+            notify(`Assigned ${label} to ${survivor.name}.`)
+            onClose()
+            navigate(`/people/${survivor.id}`, { replace: true })
+          } else {
+            notify(`Assigned ${photos} ${photos === 1 ? 'photo' : 'photos'} to ${survivor.name}.`)
+            onAssigned?.()
+            onClose()
+          }
         },
         onError: () => {
           setTarget(null)
@@ -80,7 +97,7 @@ export function AssignGroupDialog({ group, label, onClose }: Props) {
       {target !== null && (
         <ConfirmDialog
           title="Assign to person?"
-          message={`Assign ${label} (${photos} ${photos === 1 ? 'photo' : 'photos'}) to '${target.name}' as confirmed? This can't be undone.`}
+          message={`Assign ${whole ? label : `${photos} of ${total} photos`}${whole ? ` (${photos} ${photos === 1 ? 'photo' : 'photos'})` : ''} to '${target.name}' as confirmed? This can't be undone.`}
           confirmLabel="Assign"
           busy={assignGroup.isPending}
           onConfirm={confirm}

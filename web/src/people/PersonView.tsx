@@ -40,7 +40,7 @@ function PersonContent({ personId }: PersonContentProps) {
   const [stripMode, setStripMode] = useStoredChoice('pm.people.stripMode', FACE_MODES, 'faces')
   const [editing, setEditing] = useState(false)
   const [ignoring, setIgnoring] = useState(false)
-  const [assigning, setAssigning] = useState(false)
+  const [assigning, setAssigning] = useState<{ imageIds?: number[]; clear?: () => void } | null>(null)
 
   if (person.isError) return <PersonNotFound />
   // The grid's filter depends on whether the person is named, so wait for that.
@@ -58,6 +58,7 @@ function PersonContent({ personId }: PersonContentProps) {
         filter={{ kind: 'person', personId, state: gridState, sort, order }}
         showFaceCrops={gridMode === 'faces'}
         faceReview={{ personId }}
+        onAssignSelected={isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined}
         viewerEnabled={!openedFromStrip(location.state)}
         banner={
           !isGroup && (
@@ -94,7 +95,7 @@ function PersonContent({ personId }: PersonContentProps) {
                     <IconButton
                       size="small"
                       aria-label="Assign to person"
-                      onClick={() => setAssigning(true)}
+                      onClick={() => setAssigning({})}
                       className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
                     >
                       <DriveFileMoveOutlinedIcon fontSize="small" />
@@ -130,7 +131,15 @@ function PersonContent({ personId }: PersonContentProps) {
           onClose={() => setIgnoring(false)}
         />
       )}
-      {assigning && <AssignGroupDialog group={person.data} label={label} onClose={() => setAssigning(false)} />}
+      {assigning && (
+        <AssignGroupDialog
+          group={person.data}
+          label={label}
+          imageIds={assigning.imageIds}
+          onAssigned={assigning.clear}
+          onClose={() => setAssigning(null)}
+        />
+      )}
       {editing && (
         <PersonEditDialog key={person.data.id} person={person.data} label={label} onClose={() => setEditing(false)} />
       )}

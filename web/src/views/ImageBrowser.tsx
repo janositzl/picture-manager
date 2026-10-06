@@ -28,6 +28,8 @@ type Props = {
   showFaceCrops?: boolean
   /** Opens the viewer in face-review mode for this person. */
   faceReview?: { personId: number }
+  /** Unknown-group views: offers assigning the selected photos; clearSelection ends the selection. */
+  onAssignSelected?: (imageIds: number[], clearSelection: () => void) => void
   /** False when something else (e.g. a suggestions strip) owns the viewer for ?image=. */
   viewerEnabled?: boolean
 }
@@ -42,6 +44,7 @@ export function ImageBrowser({
   emptyState,
   showFaceCrops = false,
   faceReview,
+  onAssignSelected,
   viewerEnabled = true,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -108,6 +111,10 @@ export function ImageBrowser({
           count={selection.count}
           onAddToAlbum={() =>
             setPickerTarget({ imageIds: ids.filter((id) => selection.selected.has(id)) })
+          }
+          onAssign={
+            onAssignSelected &&
+            (() => onAssignSelected(ids.filter((id) => selection.selected.has(id)), selection.clear))
           }
           onClear={selection.clear}
         />

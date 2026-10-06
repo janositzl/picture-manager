@@ -4,12 +4,14 @@ import { Box, Button, IconButton, Typography } from '@mui/material'
 type Props = {
   count: number
   onAddToAlbum: () => void
+  /** Unknown-group views: assign just the selected photos to a person. */
+  onAssign?: () => void
   onClear: () => void
   onRemove?: () => void
 }
 
 /** Replaces a grid's header while photos are selected. */
-export function SelectionBar({ count, onAddToAlbum, onClear, onRemove }: Props) {
+export function SelectionBar({ count, onAddToAlbum, onAssign, onClear, onRemove }: Props) {
   return (
     <Box
       role="toolbar"
@@ -45,6 +47,16 @@ export function SelectionBar({ count, onAddToAlbum, onClear, onRemove }: Props) 
       >
         Add to album…
       </Button>
+      {onAssign && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onAssign}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+        >
+          Assign to person…
+        </Button>
+      )}
       {onRemove && (
         <Button
           color="error"

@@ -8,6 +8,7 @@ using NSubstitute;
 using PictureManager.Api.Endpoints;
 using PictureManager.Application.Common;
 using PictureManager.Application.Faces;
+using PictureManager.Application.Repositories;
 using Xunit;
 
 namespace PictureManager.Api.Tests.Endpoints;
@@ -80,8 +81,8 @@ public class PeopleEndpointsTests
     {
         var people = Substitute.For<IPeopleService>();
         var anna = new PersonSummary(2, "Anna", 9, 0, 200);
-        people.AssignGroupAsync(1, 2, Arg.Any<CancellationToken>()).Returns(Result<PersonSummary>.Ok(anna));
-        people.AssignGroupAsync(2, 2, Arg.Any<CancellationToken>()).Returns(Result.Invalid("name", "Only unknown groups can be assigned to a person."));
+        people.AssignGroupAsync(1, 2, null, Arg.Any<CancellationToken>()).Returns(Result<PersonSummary>.Ok(anna));
+        people.AssignGroupAsync(2, 2, null, Arg.Any<CancellationToken>()).Returns(Result.Invalid("name", "Only unknown groups can be assigned to a person."));
 
         (await PeopleEndpoints.AssignGroupAsync(1, new AssignGroupRequest(2), people, CancellationToken.None)).Result
             .Should().BeOfType<Ok<PersonSummary>>().Which.Value.Should().Be(anna);

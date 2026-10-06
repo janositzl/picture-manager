@@ -93,7 +93,7 @@ public static class PeopleEndpoints
 
     public static async Task<Results<Ok<PersonSummary>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AssignGroupAsync(
         int id, AssignGroupRequest request, IPeopleService service, CancellationToken cancellationToken) =>
-        (await service.AssignGroupAsync(id, request.PersonId, cancellationToken)).ToOk();
+        (await service.AssignGroupAsync(id, request.PersonId, request.ImageIds, cancellationToken)).ToOk();
 
     public static async Task<IResult> GetFaceThumbnailAsync(int id, IFaceCropService crops, CancellationToken cancellationToken)
     {
@@ -104,4 +104,4 @@ public static class PeopleEndpoints
 
 public sealed record PersonNameRequest(string? Name);
 
-public sealed record AssignGroupRequest(int PersonId);
+public sealed record AssignGroupRequest(int PersonId, IReadOnlyList<int>? ImageIds = null);

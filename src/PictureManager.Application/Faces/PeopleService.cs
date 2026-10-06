@@ -47,8 +47,10 @@ public sealed class PeopleService : IPeopleService
         return await GetAsync(id, cancellationToken);
     }
 
-    public async Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, CancellationToken cancellationToken = default)
+    public async Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, IReadOnlyCollection<int>? imageIds = null, CancellationToken cancellationToken = default)
     {
+        if (imageIds is { Count: 0 })
+            return Result.Invalid("imageIds", "Select at least one photo.");
         if (await _people.GetAsync(id, cancellationToken) is not { } group
             || await _people.GetAsync(targetId, cancellationToken) is not { } target)
             return Result.NotFound();
@@ -57,7 +59,7 @@ public sealed class PeopleService : IPeopleService
         if (target.Name is null)
             return Result.Invalid("personId", "Choose a named person.");
 
-        await _people.AssignGroupAsync(id, targetId, _clock.UtcNow, cancellationToken);
+        await _people.AssignGroupAsync(id, targetId, _clock.UtcNow, imageIds, cancellationToken);
         return await GetAsync(targetId, cancellationToken);
     }
 

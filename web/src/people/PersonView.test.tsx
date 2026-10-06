@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { peopleKeys } from '../api/people'
 import { peopleFixture, peopleList, person, type PersonDto } from '../test/peopleHandlers'
+import { image } from '../test/fixtures'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
@@ -195,6 +196,34 @@ describe('PersonView', () => {
 
     await waitFor(() => expect(body).toEqual({ personId: peopleFixture[0].id }))
     expect(await screen.findByRole('heading', { name: 'Anna' })).toBeInTheDocument()
+  })
+
+  it('assigns only the selected photos of an unknown group, staying on the group', async () => {
+    let body: unknown = null
+    server.use(
+      peopleList(),
+      person(peopleFixture[1]),
+      person(peopleFixture[0]),
+      http.get('/api/images', () =>
+        HttpResponse.json({ items: [image(101, 2), image(102, 2)], nextCursor: null }),
+      ),
+      http.post('/api/people/2/assign', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json(peopleFixture[0])
+      }),
+    )
+    renderApp('/people/2')
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Select IMG_0101/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Assign to person…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Assign to person' })
+    fireEvent.click(await within(picker).findByRole('button', { name: /Anna/ }))
+    const confirm = await screen.findByRole('dialog', { name: 'Assign to person?' })
+    expect(confirm).toHaveTextContent('Assign 1 of 5 photos')
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Assign' }))
+
+    await waitFor(() => expect(body).toEqual({ personId: peopleFixture[0].id, imageIds: [101] }))
+    await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Selection' })).not.toBeInTheDocument())
   })
 
   it('offers no assign for a named person', async () => {

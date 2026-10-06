@@ -17,8 +17,11 @@ public interface IPeopleService
     /// </summary>
     Task<Result<PersonSummary>> NameAsync(int id, string? name, CancellationToken cancellationToken = default);
 
-    /// <summary>Merges an unnamed group into a named person, confirming the group's faces. Returns the target.</summary>
-    Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Merges an unnamed group into a named person, confirming the group's faces; with imageIds only those on the
+    /// given photos (the group stays while it has faces left). Returns the target.
+    /// </summary>
+    Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, IReadOnlyCollection<int>? imageIds = null, CancellationToken cancellationToken = default);
 
     /// <summary>Forgets a person or group: their faces become unassigned and may regroup on the next recognition run.</summary>
     Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default);
