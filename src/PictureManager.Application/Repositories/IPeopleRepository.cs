@@ -25,5 +25,11 @@ public interface IPeopleRepository
     /// <summary>Moves every Suggested/Confirmed face of source to target, keeping its state, then deletes source.</summary>
     Task MergeAsync(int sourceId, int targetId, DateTime nowUtc, CancellationToken cancellationToken = default);
 
+    /// <summary>Forgets the person: their faces go back to Unknown (and unclustered, so they can regroup), then the person is deleted. False if missing.</summary>
+    Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Ignores every face of the group (never suggested or grouped again), then deletes the group. Returns the face count, or null if missing.</summary>
+    Task<int?> IgnoreGroupAsync(int id, CancellationToken cancellationToken = default);
+
     Task<FaceCropSource?> GetFaceCropSourceAsync(int faceId, CancellationToken cancellationToken = default);
 }

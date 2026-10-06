@@ -85,6 +85,39 @@ public sealed class PeopleRepository : IPeopleRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Faces.Where(f => f.PersonId == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(f => f.PersonId, (int?)null)
+                .SetProperty(f => f.AssignmentState, FaceAssignmentState.Unknown)
+                .SetProperty(f => f.MatchDistance, (float?)null)
+                .SetProperty(f => f.ClusteredUtc, (DateTime?)null), cancellationToken);
+        await _dbContext.Faces.Where(f => f.RejectedPersonId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.RejectedPersonId, (int?)null), cancellationToken);
+        var deleted = await _dbContext.People.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return deleted > 0;
+    }
+
+    public async Task<int?> IgnoreGroupAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var ignored = await _dbContext.Faces
+            .Where(f => f.PersonId == id && f.AssignmentState != FaceAssignmentState.Ignored)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(f => f.AssignmentState, FaceAssignmentState.Ignored)
+                .SetProperty(f => f.PersonId, (int?)null)
+                .SetProperty(f => f.RejectedPersonId, (int?)null)
+                .SetProperty(f => f.MatchDistance, (float?)null), cancellationToken);
+        await _dbContext.Faces.Where(f => f.RejectedPersonId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.RejectedPersonId, (int?)null), cancellationToken);
+        var deleted = await _dbContext.People.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return deleted > 0 ? ignored : null;
+    }
+
     public Task<FaceCropSource?> GetFaceCropSourceAsync(int faceId, CancellationToken cancellationToken = default) =>
         _dbContext.Faces.AsNoTracking()
             .Where(f => f.Id == faceId)

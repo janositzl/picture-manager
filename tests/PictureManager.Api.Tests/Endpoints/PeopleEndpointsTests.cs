@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NSubstitute;
 using PictureManager.Api.Endpoints;
+using PictureManager.Application.Common;
 using PictureManager.Application.Faces;
 using Xunit;
 
@@ -42,5 +43,35 @@ public class PeopleEndpointsTests
         _crops.GetOrCreateCropPathAsync(6, Arg.Any<CancellationToken>()).Returns((string?)null);
 
         (await PeopleEndpoints.GetFaceThumbnailAsync(6, _crops, CancellationToken.None)).Should().BeOfType<NotFound>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ExistingPerson_ReturnsNoContent()
+    {
+        var people = Substitute.For<IPeopleService>();
+        people.DeleteAsync(1, Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        (await PeopleEndpoints.DeleteAsync(1, people, CancellationToken.None)).Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_MissingPerson_ReturnsNotFound()
+    {
+        var people = Substitute.For<IPeopleService>();
+        people.DeleteAsync(2, Arg.Any<CancellationToken>()).Returns(Result.NotFound());
+
+        (await PeopleEndpoints.DeleteAsync(2, people, CancellationToken.None)).Result.Should().BeOfType<NotFound>();
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_ReturnsCount_Or400ForNamedPeople()
+    {
+        var people = Substitute.For<IPeopleService>();
+        people.IgnoreGroupAsync(1, Arg.Any<CancellationToken>()).Returns(Result<CountResponse>.Ok(new CountResponse(3)));
+        people.IgnoreGroupAsync(2, Arg.Any<CancellationToken>()).Returns(Result.Invalid("name", "Only unknown groups can be ignored."));
+
+        (await PeopleEndpoints.IgnoreGroupAsync(1, people, CancellationToken.None)).Result
+            .Should().BeOfType<Ok<CountResponse>>().Which.Value.Should().Be(new CountResponse(3));
+        (await PeopleEndpoints.IgnoreGroupAsync(2, people, CancellationToken.None)).Result.Should().BeOfType<ValidationProblem>();
     }
 }

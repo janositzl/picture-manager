@@ -1,4 +1,7 @@
 import { Box, Button, InputAdornment, TextField, Tooltip, Typography } from '@mui/material'
+import FaceRetouchingNaturalIcon from '@mui/icons-material/FaceRetouchingNatural'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined'
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -11,11 +14,18 @@ import { useFolderJobs } from '../tree/FolderJobsContext'
 
 type RowProps = { person: PersonSummary; label: string }
 
-function Avatar({ faceId }: { faceId: number | null }) {
+function Avatar({ faceId, unknown }: { faceId: number | null; unknown: boolean }) {
   return faceId !== null ? (
-    <img src={faceThumbnailUrl(faceId)} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" loading="lazy" />
+    <img
+      src={faceThumbnailUrl(faceId)}
+      alt=""
+      className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-zinc-900"
+      loading="lazy"
+    />
   ) : (
-    <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 ring-2 ring-white dark:bg-zinc-800 dark:text-zinc-500 dark:ring-zinc-900">
+      {unknown ? <HelpOutlineIcon fontSize="small" /> : <PersonOutlineIcon fontSize="small" />}
+    </div>
   )
 }
 
@@ -25,22 +35,38 @@ function PersonRow({ person, label }: RowProps) {
     person.name === null
       ? `${person.suggestedImageCount} suggested`
       : `${confirmed} confirmed · ${person.suggestedImageCount} suggested`
+  const hasSuggestions = person.suggestedImageCount > 0
   return (
     <Tooltip title={tooltip} placement="right" enterDelay={600}>
       <NavLink
         to={`/people/${person.id}`}
         aria-label={`${label}, ${tooltip}`}
+        style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'inherit' }}
         className={({ isActive }) =>
-          `flex items-center gap-2 rounded-lg px-2 py-1.5 no-underline transition-colors duration-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-            isActive ? 'bg-zinc-100 dark:bg-zinc-800' : ''
+          `w-full rounded-xl px-2.5 py-2 no-underline transition-all duration-200 ease-in-out ${
+            isActive
+              ? 'bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700'
+              : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'
           }`
         }
       >
-        <Avatar faceId={person.coverFaceId} />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {person.name === null ? `❓ ${label}` : label}
+        <Avatar faceId={person.coverFaceId} unknown={person.name === null} />
+        <span
+          style={{ textDecoration: 'none' }}
+          className="min-w-0 flex-1 truncate text-sm font-medium leading-5 tracking-tight text-zinc-900 dark:text-zinc-100"
+        >
+          {label}
         </span>
-        <span className="text-xs text-zinc-500">{countText(person)}</span>
+        <span
+          style={{ textDecoration: 'none' }}
+          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
+            hasSuggestions
+              ? 'bg-[#ecebfb] text-[#4b46c4] dark:bg-indigo-500/15 dark:text-indigo-300'
+              : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+          }`}
+        >
+          {countText(person)}
+        </span>
       </NavLink>
     </Tooltip>
   )
@@ -51,14 +77,19 @@ type SectionProps = { title: string; rows: RowProps[] }
 function Section({ title, rows }: SectionProps) {
   if (rows.length === 0) return null
   return (
-    <Box component="section" sx={{ mb: 2 }}>
-      <Typography variant="overline" component="h2" color="text.secondary" sx={{ px: 1 }}>
-        {title}
-      </Typography>
-      {rows.map((row) => (
-        <PersonRow key={row.person.id} {...row} />
-      ))}
-    </Box>
+    <section className="flex w-full flex-col">
+      <div className="mb-1.5 flex items-center gap-2 px-2.5">
+        <h2 className="m-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</h2>
+        <span className="rounded-full bg-zinc-200/70 px-1.5 text-[11px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+          {rows.length}
+        </span>
+      </div>
+      <div className="flex w-full flex-col gap-0.5">
+        {rows.map((row) => (
+          <PersonRow key={row.person.id} {...row} />
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -75,22 +106,36 @@ function PeopleList() {
     .filter((row) => row.label.toLowerCase().includes(needle))
   const named = rows.filter((row) => row.person.name !== null)
   const unknown = rows.filter((row) => row.person.name === null).sort((a, b) => a.person.id - b.person.id)
+  const namedTotal = all.filter((person) => person.name !== null).length
 
   return (
-    <Box
-      component="aside"
+    <aside
       aria-label="People"
-      sx={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: 1, borderColor: 'divider' }}
+      className="flex w-80 shrink-0 flex-col border-0 border-r border-solid border-zinc-200 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-950/40"
     >
-      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        <Typography variant="h5" component="h1" sx={HEADING_SX}>
-          People
-        </Typography>
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-0.5">
+          <Typography variant="h5" component="h1" sx={HEADING_SX}>
+            People
+          </Typography>
+          {people.data && people.data.length > 0 && (
+            <p className="m-0 text-sm text-zinc-500">
+              {namedTotal} named · {all.length - namedTotal} unknown
+            </p>
+          )}
+        </div>
         <TextField
           size="small"
-          placeholder="Search…"
+          placeholder="Search people…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '12px',
+              bgcolor: 'background.paper',
+              transition: 'all 200ms ease-in-out',
+            },
+          }}
           slotProps={{
             htmlInput: { 'aria-label': 'Search people' },
             input: {
@@ -102,11 +147,18 @@ function PeopleList() {
             },
           }}
         />
-        <Button variant="outlined" size="small" disabled={activeJob !== null} onClick={() => recognizeFaces(null)}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<FaceRetouchingNaturalIcon fontSize="small" />}
+          disabled={activeJob !== null}
+          onClick={() => recognizeFaces(null)}
+          sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 500, py: 1 }}
+        >
           Recognize faces in all libraries
         </Button>
-      </Box>
-      <Box sx={{ flex: 1, overflowY: 'auto', px: 1, pb: 2 }}>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-6">
         {people.isError && (
           <QueryErrorAlert message="Couldn't load people." onRetry={() => void people.refetch()} />
         )}
@@ -119,12 +171,10 @@ function PeopleList() {
         <Section title="Named" rows={named} />
         <Section title="Unknown" rows={unknown} />
         {people.data && people.data.length > 0 && rows.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ px: 1 }}>
-            No one matches.
-          </Typography>
+          <p className="m-0 px-2.5 text-sm text-zinc-500">No one matches.</p>
         )}
-      </Box>
-    </Box>
+      </div>
+    </aside>
   )
 }
 

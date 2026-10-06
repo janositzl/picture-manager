@@ -80,4 +80,44 @@ public class PeopleServiceTests
     {
         (await Create().NameAsync(1, new string('x', 201))).Status.Should().Be(ResultStatus.Invalid);
     }
+
+    [Fact]
+    public async Task DeleteAsync_ExistingPerson_IsOk()
+    {
+        _people.DeleteAsync(2, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await Create().DeleteAsync(2)).Status.Should().Be(ResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_MissingPerson_IsNotFound()
+    {
+        _people.DeleteAsync(99, Arg.Any<CancellationToken>()).Returns(false);
+
+        (await Create().DeleteAsync(99)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_UnnamedGroup_ReturnsFaceCount()
+    {
+        _people.IgnoreGroupAsync(1, Arg.Any<CancellationToken>()).Returns(4);
+
+        var result = await Create().IgnoreGroupAsync(1);
+
+        result.Status.Should().Be(ResultStatus.Success);
+        result.Value.Should().Be(new CountResponse(4));
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_NamedPerson_IsInvalid()
+    {
+        (await Create().IgnoreGroupAsync(2)).Status.Should().Be(ResultStatus.Invalid);
+        await _people.DidNotReceiveWithAnyArgs().IgnoreGroupAsync(default, default);
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_MissingGroup_IsNotFound()
+    {
+        (await Create().IgnoreGroupAsync(99)).Status.Should().Be(ResultStatus.NotFound);
+    }
 }

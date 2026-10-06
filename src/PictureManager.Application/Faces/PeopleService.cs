@@ -46,4 +46,19 @@ public sealed class PeopleService : IPeopleService
         await _people.SetNameAsync(id, trimmed, _clock.UtcNow, cancellationToken);
         return await GetAsync(id, cancellationToken);
     }
+
+    public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default) =>
+        await _people.DeleteAsync(id, cancellationToken) ? Result.Ok() : Result.NotFound();
+
+    public async Task<Result<CountResponse>> IgnoreGroupAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (await _people.GetAsync(id, cancellationToken) is not { } person)
+            return Result.NotFound();
+        if (person.Name is not null)
+            return Result.Invalid("name", "Only unknown groups can be ignored.");
+
+        return await _people.IgnoreGroupAsync(id, cancellationToken) is int count
+            ? Result<CountResponse>.Ok(new CountResponse(count))
+            : Result.NotFound();
+    }
 }

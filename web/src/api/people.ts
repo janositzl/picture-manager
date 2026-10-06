@@ -79,6 +79,24 @@ export function useNamePerson() {
   })
 }
 
+/** Forgets a person: their faces become unassigned and may regroup on the next recognition run. */
+export function useDeletePerson() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: (id: number) => apiFetch<void>(`/api/people/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Ignores an unnamed group for good; resolves to how many faces were ignored. */
+export function useIgnoreGroup() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: (id: number) => post<{ count: number }>(`/api/people/${id}/ignore`),
+    onSuccess: invalidate,
+  })
+}
+
 type ImageFacesOptions = { includeIgnored?: boolean; confirmedOnly?: boolean; enabled?: boolean }
 
 /** The detected faces of one photo. confirmedOnly = what the normal viewer may show. */

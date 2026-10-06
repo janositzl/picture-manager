@@ -16,4 +16,10 @@ public interface IPeopleService
     /// this one is merged into them and the surviving person is returned.
     /// </summary>
     Task<Result<PersonSummary>> NameAsync(int id, string? name, CancellationToken cancellationToken = default);
+
+    /// <summary>Forgets a person or group: their faces become unassigned and may regroup on the next recognition run.</summary>
+    Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Ignores an unnamed group for good (its faces become Ignored). Named people can't be ignored.</summary>
+    Task<Result<CountResponse>> IgnoreGroupAsync(int id, CancellationToken cancellationToken = default);
 }

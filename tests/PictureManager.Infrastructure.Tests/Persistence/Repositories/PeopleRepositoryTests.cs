@@ -153,6 +153,77 @@ public class PeopleRepositoryTests
     }
 
     [Fact]
+    public async Task DeleteAsync_UnassignsFacesForRegrouping_AndDeletesPerson()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        var confirmed = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Confirmed);
+        var suggested = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Suggested);
+        var rejected = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2), null, FaceAssignmentState.Unknown);
+        rejected.RejectedPersonId = anna.Id;
+        await db.Context.SaveChangesAsync();
+
+        (await new PeopleRepository(db.CreateContext()).DeleteAsync(anna.Id)).Should().BeTrue();
+
+        await using var read = db.CreateContext();
+        (await read.People.AnyAsync(p => p.Id == anna.Id)).Should().BeFalse();
+        foreach (var id in new[] { confirmed.Id, suggested.Id })
+        {
+            var face = await read.Faces.SingleAsync(f => f.Id == id);
+            face.PersonId.Should().BeNull();
+            face.AssignmentState.Should().Be(FaceAssignmentState.Unknown);
+            face.ClusteredUtc.Should().BeNull();
+        }
+        (await read.Faces.SingleAsync(f => f.Id == rejected.Id)).RejectedPersonId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_MissingPerson_ReturnsFalse()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+
+        (await new PeopleRepository(db.CreateContext()).DeleteAsync(999)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_IgnoresFacesAndDeletesGroup()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var group = new Person { CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(group);
+        await db.Context.SaveChangesAsync();
+        var one = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), group.Id, FaceAssignmentState.Suggested);
+        var two = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), group.Id, FaceAssignmentState.Suggested);
+
+        (await new PeopleRepository(db.CreateContext()).IgnoreGroupAsync(group.Id)).Should().Be(2);
+
+        await using var read = db.CreateContext();
+        (await read.People.AnyAsync(p => p.Id == group.Id)).Should().BeFalse();
+        foreach (var id in new[] { one.Id, two.Id })
+        {
+            var face = await read.Faces.SingleAsync(f => f.Id == id);
+            face.AssignmentState.Should().Be(FaceAssignmentState.Ignored);
+            face.PersonId.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public async Task IgnoreGroupAsync_MissingGroup_ReturnsNull()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+
+        (await new PeopleRepository(db.CreateContext()).IgnoreGroupAsync(999)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task ImageList_PersonFilter_ReturnsOnlyThatPersonsPhotos()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

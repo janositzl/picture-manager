@@ -57,7 +57,7 @@ describe('PeoplePage', () => {
 
     await user.click(await screen.findByRole('link', { name: /Anna/ }))
 
-    expect(await screen.findByText('10 confirmed · 3 suggested')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Anna' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Anna/ })).toBeInTheDocument()
   })
 })

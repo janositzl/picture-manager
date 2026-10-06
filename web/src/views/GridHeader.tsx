@@ -17,9 +17,11 @@ type Props = {
   sort: Sort
   order: Order
   actions?: ReactNode
+  /** Rendered right after the title (e.g. an edit button). */
+  titleAdornment?: ReactNode
 }
 
-export function GridHeader({ title, path, count, sort, order, actions }: Props) {
+export function GridHeader({ title, path, count, sort, order, actions, titleAdornment }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
 
   return (
@@ -65,6 +67,7 @@ export function GridHeader({ title, path, count, sort, order, actions }: Props) 
           >
             {title}
           </Typography>
+          {titleAdornment}
           {count !== undefined && (
             <Box
               sx={{
