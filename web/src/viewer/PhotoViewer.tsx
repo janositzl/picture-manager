@@ -35,18 +35,21 @@ import { ConfirmedPeople, PeopleInPhoto } from './PeopleInPhoto'
 import { useFaceReview } from './useFaceReview'
 
 const INFO_PANEL_KEY = 'pm.viewer.infoOpen'
+/** Face review has its own People panel, so there Info starts closed and is remembered separately. */
+const REVIEW_INFO_PANEL_KEY = 'pm.viewer.infoOpen.review'
 
-function readInfoOpen(): boolean {
+function readInfoOpen(key: string, fallback: boolean): boolean {
   try {
-    return localStorage.getItem(INFO_PANEL_KEY) !== 'false'
+    const stored = localStorage.getItem(key)
+    return stored === null ? fallback : stored !== 'false'
   } catch {
-    return true
+    return fallback
   }
 }
 
-function writeInfoOpen(open: boolean): void {
+function writeInfoOpen(key: string, open: boolean): void {
   try {
-    localStorage.setItem(INFO_PANEL_KEY, String(open))
+    localStorage.setItem(key, String(open))
   } catch {
     // Storage unavailable (private mode, blocked): the panel just won't remember.
   }
@@ -82,7 +85,8 @@ export function PhotoViewer({
   const imageId = parseGridParams(searchParams).image
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
-  const [infoOpen, setInfoOpen] = useState(readInfoOpen)
+  const infoKey = faceReview !== undefined ? REVIEW_INFO_PANEL_KEY : INFO_PANEL_KEY
+  const [infoOpen, setInfoOpen] = useState(() => readInfoOpen(infoKey, faceReview === undefined))
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null)
   const pendingNext = useRef(false)
@@ -196,7 +200,7 @@ export function PhotoViewer({
   const toggleInfo = () => {
     const nextOpen = !infoOpen
     setInfoOpen(nextOpen)
-    writeInfoOpen(nextOpen)
+    writeInfoOpen(infoKey, nextOpen)
   }
 
   const onNextLoaded = useEffectEvent((id: number) => {
@@ -447,20 +451,19 @@ export function PhotoViewer({
               </Tooltip>
             </Box>
           </Box>
-          {(infoOpen || faceReview !== undefined) && !notFound && (
+          {infoOpen && !notFound && (
             <InfoPanel
               detail={detail.data}
               isLoading={detail.isPending}
               isError={detail.isError}
               onRetry={() => void detail.refetch()}
               peopleSlot={
-                current === undefined ? null : faceReview !== undefined ? (
-                  <PeopleInPhoto review={review} />
-                ) : (
-                  <ConfirmedPeople imageId={current.id} />
-                )
+                current === undefined || faceReview !== undefined ? null : <ConfirmedPeople imageId={current.id} />
               }
             />
+          )}
+          {faceReview !== undefined && current !== undefined && !notFound && (
+            <PeopleInPhoto review={review} item={current} />
           )}
         </Box>
       </Dialog>

@@ -39,12 +39,23 @@ describe('viewer faces', () => {
     renderApp('/people/1?image=20')
 
     const section = await screen.findByRole('region', { name: 'People in photo' })
-    expect(await within(section).findByRole('button', { name: /✓ Anna/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /Suggested: Anna/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /❓ Unknown/ })).toBeInTheDocument()
+    expect(await within(section).findByRole('button', { name: 'Anna' })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Suggested: Anna' })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Unknown' })).toBeInTheDocument()
     // Starts on the opened person's face, which is confirmed.
-    expect(within(section).getByText('Selected face: Anna')).toBeInTheDocument()
+    expect(within(section).getByText('Confirmed')).toBeInTheDocument()
     expect(within(section).getByRole('button', { name: 'Mark as unknown' })).toBeInTheDocument()
+  })
+
+  it('is its own panel: the photo name and path, with the other details left to the Info panel', async () => {
+    server.use(peopleList(), person(peopleFixture[0]), personImages, faces([confirmed]))
+    renderApp('/people/1?image=20')
+
+    const panel = await screen.findByRole('complementary', { name: 'Face review' })
+    expect(within(panel).getByText('IMG_0001.jpg')).toBeInTheDocument()
+    expect(within(panel).queryByText('Date taken')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('Dimensions')).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: 'Photo info' })).not.toBeInTheDocument()
   })
 
   it('accepting a suggested face sends the decision for that face only', async () => {
@@ -62,7 +73,7 @@ describe('viewer faces', () => {
     const { user } = renderApp('/people/1?image=20')
 
     const section = await screen.findByRole('region', { name: 'People in photo' })
-    await user.click(await within(section).findByRole('button', { name: /Suggested: Anna/ }))
+    await user.click(await within(section).findByRole('button', { name: 'Suggested: Anna' }))
     await user.click(within(section).getByRole('button', { name: 'Accept' }))
 
     await waitFor(() => expect(sent).toEqual(['2/accept']))
@@ -83,11 +94,37 @@ describe('viewer faces', () => {
     const { user } = renderApp('/people/1?image=20')
 
     const section = await screen.findByRole('region', { name: 'People in photo' })
-    await user.click(await within(section).findByRole('button', { name: /❓ Unknown/ }))
+    await user.click(await within(section).findByRole('button', { name: 'Unknown' }))
     await user.click(within(section).getByRole('button', { name: 'Assign person' }))
     await user.type(await screen.findByLabelText('Person name'), 'Bela')
-    await user.click(screen.getByRole('button', { name: "Create 'Bela'" }))
+    await user.click(screen.getByRole('button', { name: /Create new person .*Bela/ }))
 
     await waitFor(() => expect(body).toEqual({ name: 'Bela' }))
+  })
+
+  it('assigning picks an existing person from the list, and Enter creates the typed name', async () => {
+    const bodies: unknown[] = []
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      personImages,
+      faces([confirmed, unknown]),
+      http.post('/api/faces/3/assign', async ({ request }) => {
+        bodies.push(await request.json())
+        return HttpResponse.json(peopleFixture[0])
+      }),
+    )
+    const { user } = renderApp('/people/1?image=20')
+
+    const section = await screen.findByRole('region', { name: 'People in photo' })
+    await user.click(await within(section).findByRole('button', { name: 'Unknown' }))
+    await user.click(within(section).getByRole('button', { name: 'Assign person' }))
+    await user.click(await screen.findByRole('button', { name: /Anna/ }))
+    await waitFor(() => expect(bodies).toEqual([{ personId: 1 }]))
+
+    await user.click(await within(section).findByRole('button', { name: 'Unknown' }))
+    await user.click(within(section).getByRole('button', { name: 'Assign person' }))
+    await user.type(await screen.findByLabelText('Person name'), 'Cili{Enter}')
+    await waitFor(() => expect(bodies).toEqual([{ personId: 1 }, { name: 'Cili' }]))
   })
 })
