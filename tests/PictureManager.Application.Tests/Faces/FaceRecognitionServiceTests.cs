@@ -223,4 +223,29 @@ public class FaceRecognitionServiceTests : IDisposable
         await _jobs.Received(1).TryMarkCompletedAsync(50, JobStatus.Enriching, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _jobs.DidNotReceiveWithAnyArgs().SetFailureResultAsync(default, default, default, default, default, default, default);
     }
+
+    [Fact]
+    public async Task GetFolderCoverageAsync_RollsUpTheCurrentModelsCounts()
+    {
+        _faces.GetFolderFaceCountsAsync(3, Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new FolderFaceCounts(1, null, 1, 1, 0, 0),
+            new FolderFaceCounts(2, 1, 4, 1, 1, 1),
+        });
+
+        var coverage = await Create().GetFolderCoverageAsync();
+
+        coverage.Should().Equal(new FolderFaceCoverage(1, 5, 2, 1, 1), new FolderFaceCoverage(2, 4, 1, 1, 1));
+    }
+
+    [Fact]
+    public async Task GetFolderCoverageAsync_ModelsUnavailable_ReturnsEmpty()
+    {
+        _analyzer.Model.Throws(new FaceModelUnavailableException("missing"));
+
+        var coverage = await Create().GetFolderCoverageAsync();
+
+        coverage.Should().BeEmpty();
+        await _faces.DidNotReceive().GetFolderFaceCountsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
 }

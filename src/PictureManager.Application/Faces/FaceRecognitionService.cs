@@ -130,7 +130,18 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         }
     }
 
-    public async Task<IReadOnlyList<FaceFailure>> GetPermanentFailuresAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FaceFailure>> GetPermanentFailuresAsync(CancellationToken cancellationToken = default) =>
+        await TryGetCurrentModelIdAsync(cancellationToken) is int faceModelId
+            ? await _faceRepository.GetPermanentFailuresAsync(faceModelId, cancellationToken)
+            : Array.Empty<FaceFailure>();
+
+    public async Task<IReadOnlyList<FolderFaceCoverage>> GetFolderCoverageAsync(CancellationToken cancellationToken = default) =>
+        await TryGetCurrentModelIdAsync(cancellationToken) is int faceModelId
+            ? FaceCoverageRollup.Roll(await _faceRepository.GetFolderFaceCountsAsync(faceModelId, cancellationToken))
+            : Array.Empty<FolderFaceCoverage>();
+
+    /// <summary>The current model's FaceModel id, or null when the models are unavailable.</summary>
+    private async Task<int?> TryGetCurrentModelIdAsync(CancellationToken cancellationToken)
     {
         FaceModelDescriptor model;
         try
@@ -139,11 +150,10 @@ public sealed class FaceRecognitionService : IFaceRecognitionService
         }
         catch (FaceModelUnavailableException)
         {
-            return Array.Empty<FaceFailure>();
+            return null;
         }
 
-        var faceModelId = await _faceRepository.GetOrCreateModelIdAsync(model, _clock.UtcNow, cancellationToken);
-        return await _faceRepository.GetPermanentFailuresAsync(faceModelId, cancellationToken);
+        return await _faceRepository.GetOrCreateModelIdAsync(model, _clock.UtcNow, cancellationToken);
     }
 
     /// <summary>How many active roots the job covers (the folder's root, or all active roots) and which are unmounted.</summary>

@@ -15,6 +15,7 @@ public static class FaceRecognitionEndpoints
         admin.MapPost("/face-recognitions", StartAsync);
         admin.MapGet("/face-recognitions/{id:int}/events", StreamEventsAsync);
         admin.MapGet("/face-recognitions/failures", GetFailuresAsync);
+        admin.MapGet("/face-recognitions/coverage", GetCoverageAsync);
         return admin;
     }
 
@@ -67,6 +68,9 @@ public static class FaceRecognitionEndpoints
 
     public static async Task<IResult> GetFailuresAsync(IFaceRecognitionService service, CancellationToken cancellationToken) =>
         TypedResults.Ok(await service.GetPermanentFailuresAsync(cancellationToken));
+
+    public static async Task<IResult> GetCoverageAsync(IFaceRecognitionService service, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await service.GetFolderCoverageAsync(cancellationToken));
 }
 
 public sealed record FaceRecognitionRequest(int? RootId, int? FolderId, bool IsRecursive = true);

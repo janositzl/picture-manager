@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -47,5 +48,17 @@ public class FaceRecognitionEndpointsTests
         var result = await FaceRecognitionEndpoints.StartAsync(new FaceRecognitionRequest(null, 20, true), service, CancellationToken.None);
 
         result.Should().BeOfType<ValidationProblem>().Which.ProblemDetails.Errors.Should().ContainKey("folderId");
+    }
+
+    [Fact]
+    public async Task GetCoverageAsync_ReturnsTheServicesCoverage()
+    {
+        var service = Substitute.For<IFaceRecognitionService>();
+        IReadOnlyList<FolderFaceCoverage> coverage = new[] { new FolderFaceCoverage(2, 4, 1, 1, 1) };
+        service.GetFolderCoverageAsync(Arg.Any<CancellationToken>()).Returns(coverage);
+
+        var result = await FaceRecognitionEndpoints.GetCoverageAsync(service, CancellationToken.None);
+
+        result.Should().BeOfType<Ok<IReadOnlyList<FolderFaceCoverage>>>().Which.Value.Should().Equal(coverage);
     }
 }

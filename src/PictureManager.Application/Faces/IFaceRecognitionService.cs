@@ -22,4 +22,7 @@ public interface IFaceRecognitionService
 
     /// <summary>Images the current model gave up on. Empty when the models are unavailable.</summary>
     Task<IReadOnlyList<FaceFailure>> GetPermanentFailuresAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Face coverage of every folder subtree that has photos, for the current model. Empty when the models are unavailable.</summary>
+    Task<IReadOnlyList<FolderFaceCoverage>> GetFolderCoverageAsync(CancellationToken cancellationToken = default);
 }
