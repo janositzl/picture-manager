@@ -4,6 +4,7 @@ import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
 import type { ImageFilter } from '../api/imageFilter'
+import { faceThumbnailUrl } from '../api/people'
 import { useImages } from '../api/queries'
 import type { ImageListItem } from '../api/types'
 import { PhotoGrid } from '../grid/PhotoGrid'
@@ -23,6 +24,12 @@ type Props = {
   dimUnfavorited?: boolean
   captionFor?: (item: ImageListItem) => string | null
   emptyState: ReactNode
+  /** Person lists: show each photo's face crop instead of its thumbnail. */
+  showFaceCrops?: boolean
+  /** Opens the viewer in face-review mode for this person. */
+  faceReview?: { personId: number }
+  /** False when something else (e.g. a suggestions strip) owns the viewer for ?image=. */
+  viewerEnabled?: boolean
 }
 
 /** Header (or selection bar), banner and virtualized grid for one image filter. */
@@ -33,6 +40,9 @@ export function ImageBrowser({
   dimUnfavorited = false,
   captionFor,
   emptyState,
+  showFaceCrops = false,
+  faceReview,
+  viewerEnabled = true,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { image } = parseGridParams(searchParams)
@@ -82,6 +92,7 @@ export function ImageBrowser({
             selected={selection.selected.has(item.id)}
             onSelect={selection.toggle}
             deferImage
+            thumbnailOverride={showFaceCrops && item.faceId != null ? faceThumbnailUrl(item.faceId) : undefined}
             onOpen={open}
             onToggleFavorite={onToggleFavorite}
           />
@@ -105,8 +116,9 @@ export function ImageBrowser({
       )}
       {banner}
       {body}
-      {image !== null && (
+      {image !== null && viewerEnabled && (
         <PhotoViewer
+          faceReview={faceReview}
           list={{
             items,
             hasNextPage: images.hasNextPage,

@@ -15,8 +15,19 @@ public enum SortDirection
     Desc
 }
 
-/// <summary>AND-combined listing filters. FolderId = images directly in that folder only. PersonId = photos with that person's Auto/Confirmed face.</summary>
-public sealed record ImageListFilter(int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null);
+/// <summary>Which of a person's faces make a photo count: Confirmed ones, or Suggested ones the user hasn't confirmed yet.</summary>
+public enum PersonFaceState
+{
+    Confirmed,
+    Suggested
+}
+
+/// <summary>
+/// AND-combined listing filters. FolderId = images directly in that folder only. PersonId = photos with that person's
+/// Suggested/Confirmed face; PersonState narrows that to Confirmed, or to Suggested-only (no Confirmed face of that person in the photo).
+/// </summary>
+public sealed record ImageListFilter(
+    int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null, PersonFaceState? PersonState = null);
 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);
@@ -36,7 +47,8 @@ public sealed record ImageRow(
     string SortName,
     string RootName,
     string RelativePath,
-    IndexState IndexState = IndexState.Indexed);
+    IndexState IndexState = IndexState.Indexed,
+    int? FaceId = null);
 
 public sealed record ImageDetailRow(
     ImageRow Image,

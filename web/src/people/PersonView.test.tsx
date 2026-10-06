@@ -35,7 +35,7 @@ describe('PersonView', () => {
     await saveName(' anna ')
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent("Merge into existing 'Anna' (10 photos)? This can't be undone.")
+    expect(dialog).toHaveTextContent("Merge into existing 'Anna' (13 photos)? This can't be undone.")
     expect(sent).toEqual([])
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Merge' }))
@@ -83,19 +83,20 @@ describe('PersonView', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('shows the person photo grid filtered by person', async () => {
+  it('shows the confirmed photo grid filtered by person', async () => {
     let requested: string | null = null
     server.use(
       person(peopleFixture[0]),
       http.get('/api/images', ({ request }) => {
-        requested = new URL(request.url).searchParams.get('personId')
+        const params = new URL(request.url).searchParams
+        if (params.get('personState') === 'confirmed') requested = params.get('personId')
         return HttpResponse.json({ items: [], nextCursor: null })
       }),
     )
     renderApp('/people/1')
 
     await waitFor(() => expect(requested).toBe('1'))
-    expect(await screen.findByText('12 faces · 10 photos')).toBeInTheDocument()
+    expect(await screen.findByText('10 confirmed · 3 suggested')).toBeInTheDocument()
   })
 
   it('shows not found, without the grid, when the person does not exist', async () => {

@@ -1,10 +1,14 @@
 namespace PictureManager.Model;
 
-/// <summary>Auto = set by clustering/matching. Confirmed/Rejected = set by the user; automation never changes them.</summary>
+/// <summary>
+/// Stored as an int, so the numbers are fixed. Suggested = set by clustering/matching and awaiting the user.
+/// Confirmed/Ignored = set by the user; automation never changes them. Unknown = no person (not yet identified).
+/// 3 was the old Rejected, now folded into Unknown (+ Face.RejectedPersonId).
+/// </summary>
 public enum FaceAssignmentState
 {
-    Unassigned,
-    Auto,
-    Confirmed,
-    Rejected
+    Unknown = 0,
+    Suggested = 1,
+    Confirmed = 2,
+    Ignored = 4
 }

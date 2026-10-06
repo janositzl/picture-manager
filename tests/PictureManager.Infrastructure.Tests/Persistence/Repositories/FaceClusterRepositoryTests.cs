@@ -28,10 +28,10 @@ public class FaceClusterRepositoryTests
         await db.Context.SaveChangesAsync();
         var query = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0));
         var assignedNear = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.1), person.Id, FaceAssignmentState.Confirmed);
-        var assignedFar = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.5), person.Id, FaceAssignmentState.Auto);
+        var assignedFar = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.5), person.Id, FaceAssignmentState.Suggested);
         var unassignedNear = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.05));
         await FaceTestData.AddFaceAsync(db.Context, image.Id, other, FaceTestData.Embedding(0), person.Id, FaceAssignmentState.Confirmed);
-        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.01), person.Id, FaceAssignmentState.Rejected);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0, 0.01), person.Id, FaceAssignmentState.Ignored);
         var repository = new FaceRepository(db.CreateContext());
 
         var assigned = await repository.GetNearestAsync(query.Id, model, NeighborPool.Assigned, 5);
@@ -102,6 +102,31 @@ public class FaceClusterRepositoryTests
     };
 
     [Fact]
+    public async Task AssignAsync_SkipsFaceThatRejectedThatPerson_AndStoresMatchDistance()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        var rejected = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0));
+        var free = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1));
+        rejected.RejectedPersonId = anna.Id;
+        await db.Context.SaveChangesAsync();
+
+        await new FaceRepository(db.CreateContext()).AssignAsync(new[] { rejected.Id, free.Id }, anna.Id, 0.2f);
+
+        await using var read = db.CreateContext();
+        var skipped = await read.Faces.SingleAsync(f => f.Id == rejected.Id);
+        skipped.PersonId.Should().BeNull();
+        skipped.AssignmentState.Should().Be(FaceAssignmentState.Unknown);
+        (await read.Faces.SingleAsync(f => f.Id == free.Id)).Should().BeEquivalentTo(
+            new { PersonId = (int?)anna.Id, AssignmentState = FaceAssignmentState.Suggested, MatchDistance = (float?)0.2f });
+    }
+
+    [Fact]
     public async Task AssignAsync_OnlyTouchesUnassignedFaces()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
@@ -122,7 +147,7 @@ public class FaceClusterRepositoryTests
         (await read.Faces.SingleAsync(f => f.Id == confirmed.Id)).PersonId.Should().Be(named.Id);
         var assigned = await read.Faces.SingleAsync(f => f.Id == free.Id);
         assigned.PersonId.Should().Be(group.Id);
-        assigned.AssignmentState.Should().Be(FaceAssignmentState.Auto);
+        assigned.AssignmentState.Should().Be(FaceAssignmentState.Suggested);
     }
 
     [Fact]
@@ -137,7 +162,7 @@ public class FaceClusterRepositoryTests
         var group = new Person { CreatedUtc = Now, ModifiedUtc = Now };
         db.Context.People.AddRange(emptyNamed, emptyGroup, group);
         await db.Context.SaveChangesAsync();
-        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), group.Id, FaceAssignmentState.Auto);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), group.Id, FaceAssignmentState.Suggested);
 
         var deleted = await new FaceRepository(db.CreateContext()).DeleteEmptyUnnamedPeopleAsync();
 
@@ -179,7 +204,7 @@ public class FaceClusterRepositoryTests
         var oldNoise = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(2), quality: 0.9f);
         oldNoise.ClusteredUtc = Now;
         await db.Context.SaveChangesAsync();
-        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(3), person.Id, FaceAssignmentState.Auto);
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(3), person.Id, FaceAssignmentState.Suggested);
         await FaceTestData.AddFaceAsync(db.Context, image.Id, other, FaceTestData.Embedding(4));
         var repository = new FaceRepository(db.CreateContext());
 

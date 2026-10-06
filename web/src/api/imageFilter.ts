@@ -7,7 +7,7 @@ export type ImageFilter = (
   | { kind: 'folder'; folderId: number }
   | { kind: 'favorites' }
   | { kind: 'search'; q: string; in?: number }
-  | { kind: 'person'; personId: number }
+  | { kind: 'person'; personId: number; state?: 'confirmed' | 'suggested' }
 ) & { sort: Sort; order: Order }
 
 /** Query string for GET /api/images. */
@@ -26,6 +26,7 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
       break
     case 'person':
       params.set('personId', String(filter.personId))
+      if (filter.state !== undefined) params.set('personState', filter.state)
       break
   }
   params.set('sort', filter.sort)

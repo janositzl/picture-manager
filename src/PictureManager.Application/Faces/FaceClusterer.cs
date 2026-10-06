@@ -8,7 +8,7 @@ using PictureManager.Application.Repositories;
 namespace PictureManager.Application.Faces;
 
 /// <summary>
-/// Idempotent: re-running only touches Unassigned faces; Confirmed/Rejected are never changed. Each pass seeds only
+/// Idempotent: re-running only touches Unknown faces; Confirmed/Ignored are never changed. Each pass seeds only
 /// from faces no earlier pass has seen (ClusteredUtc null) and stamps them, so a job costs O(new faces), not
 /// O(library); the neighbour pool stays global, so a new face can still group with older unassigned faces.
 /// </summary>
@@ -38,12 +38,15 @@ public sealed class FaceClusterer : IFaceClusterer
             cancellationToken.ThrowIfCancellationRequested();
             var neighbors = await _faces.GetNearestAsync(
                 face.Id, faceModelId, NeighborPool.Assigned, MatchNeighbors, minQuality: 0f, cancellationToken);
-            if (FaceClustering.MajorityPerson(neighbors, _options.AutoMatchDistance, MatchMinVotes) is int personId)
-                await _faces.AssignAsync(new[] { face.Id }, personId, cancellationToken);
+            if (FaceClustering.MajorityPerson(neighbors, _options.AutoMatchDistance, MatchMinVotes, face.RejectedPersonId) is int personId)
+            {
+                var distance = neighbors.Where(n => n.PersonId == personId && n.Distance <= _options.AutoMatchDistance).Average(n => n.Distance);
+                await _faces.AssignAsync(new[] { face.Id }, personId, distance, cancellationToken);
+            }
         }
 
         // (b) Group what's left (good-quality faces only) into new unnamed people. DBSCAN starts from the new faces
-        // but may expand into any good-quality Unassigned face of the model (older noise included).
+        // but may expand into any good-quality Unknown face of the model (older noise included).
         var remaining = await _faces.GetUnclusteredFacesAsync(faceModelId, _options.MinQualityForClustering, cancellationToken);
         var quality = remaining.ToDictionary(f => f.Id, f => f.Quality);
         var clusters = await FaceClustering.DbscanAsync(
@@ -62,7 +65,7 @@ public sealed class FaceClusterer : IFaceClusterer
             // Every cluster contains a seed; older members' quality is not loaded, so the best seed is the cover.
             var cover = cluster.Where(quality.ContainsKey).MaxBy(id => quality[id]);
             var personId = await _faces.CreateUnnamedPersonAsync(cover, _clock.UtcNow, cancellationToken);
-            await _faces.AssignAsync(cluster, personId, cancellationToken);
+            await _faces.AssignAsync(cluster, personId, cancellationToken: cancellationToken);
         }
 
         // Matched, grouped or left as noise: these faces are never seeds again (they stay neighbour candidates).

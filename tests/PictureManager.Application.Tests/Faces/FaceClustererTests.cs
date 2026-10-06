@@ -39,7 +39,7 @@ public class FaceClustererTests
 
         await Create().ClusterAsync(ModelId);
 
-        await _faces.Received(1).AssignAsync(Arg.Is<IReadOnlyCollection<int>>(ids => ids.SequenceEqual(new[] { 1 })), 7, Arg.Any<CancellationToken>());
+        await _faces.Received(1).AssignAsync(Arg.Is<IReadOnlyCollection<int>>(ids => ids.SequenceEqual(new[] { 1 })), 7, Arg.Any<float?>(), Arg.Any<CancellationToken>());
         await _faces.DidNotReceiveWithAnyArgs().CreateUnnamedPersonAsync(default, default, default);
         await _faces.Received(1).MarkClusteredAsync(Arg.Is<IReadOnlyCollection<int>>(ids => ids.SequenceEqual(new[] { 1 })), Now, Arg.Any<CancellationToken>());
     }
@@ -59,7 +59,7 @@ public class FaceClustererTests
 
         await _faces.Received(1).CreateUnnamedPersonAsync(2, Now, Arg.Any<CancellationToken>());
         await _faces.Received(1).AssignAsync(
-            Arg.Is<IReadOnlyCollection<int>>(ids => ids.OrderBy(i => i).SequenceEqual(new[] { 1, 2, 3 })), 55, Arg.Any<CancellationToken>());
+            Arg.Is<IReadOnlyCollection<int>>(ids => ids.OrderBy(i => i).SequenceEqual(new[] { 1, 2, 3 })), 55, Arg.Any<float?>(), Arg.Any<CancellationToken>());
         await _faces.Received(1).DeleteEmptyUnnamedPeopleAsync(Arg.Any<CancellationToken>());
     }
 
@@ -134,7 +134,7 @@ public class FaceClustererTests
         await Create().ClusterAsync(ModelId);
 
         await _faces.Received(1).AssignAsync(
-            Arg.Is<IReadOnlyCollection<int>>(ids => ids.OrderBy(i => i).SequenceEqual(new[] { 1, 20, 21 })), 55, Arg.Any<CancellationToken>());
+            Arg.Is<IReadOnlyCollection<int>>(ids => ids.OrderBy(i => i).SequenceEqual(new[] { 1, 20, 21 })), 55, Arg.Any<float?>(), Arg.Any<CancellationToken>());
         await _faces.Received(1).MarkClusteredAsync(Arg.Is<IReadOnlyCollection<int>>(ids => ids.SequenceEqual(new[] { 1 })), Now, Arg.Any<CancellationToken>());
     }
 }

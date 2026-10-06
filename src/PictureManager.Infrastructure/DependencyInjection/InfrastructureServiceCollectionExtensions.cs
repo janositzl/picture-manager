@@ -36,6 +36,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IImageQueryRepository, ImageQueryRepository>();
         services.AddScoped<IFaceRepository, FaceRepository>();
         services.AddScoped<IPeopleRepository, PeopleRepository>();
+        services.AddScoped<IFaceReviewRepository, FaceReviewRepository>();
         services.AddScoped<IFaceCropService, FaceCropService>();
 
         services.AddSingleton<IContentHasher, XxHashContentHasher>();

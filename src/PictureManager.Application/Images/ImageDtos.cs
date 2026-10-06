@@ -19,12 +19,13 @@ public sealed record ImageListItem(
     string? ThumbnailUrl,
     string? PreviewUrl,
     string FolderPath,
-    bool IsInvalid)
+    bool IsInvalid,
+    int? FaceId = null)
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
         ImageUrls.Thumbnail(row.Id, row.ContentHash), ImageUrls.Preview(row.Id, row.ContentHash),
-        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid);
+        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId);
 }
 
 public sealed record ImageDetail(
@@ -60,7 +61,8 @@ public sealed record ImageListRequest(
     string? Order = null,
     string? Cursor = null,
     int? Limit = null,
-    int? PersonId = null);
+    int? PersonId = null,
+    string? PersonState = null);
 
 /// <summary>Cursor payload. Key = SortDate ticks (date sort) or the DB's lower(FileName) (name sort).</summary>
 public sealed record ImageCursor(

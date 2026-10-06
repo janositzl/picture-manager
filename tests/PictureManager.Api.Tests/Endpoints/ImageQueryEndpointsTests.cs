@@ -22,7 +22,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(page));
 
-        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, "name", "desc", "c", 50, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, null, "name", "desc", "c", 50, _service, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<PagedResult<ImageListItem>>>().Which.Value.Should().BeSameAs(page);
         await _service.Received(1).ListAsync(
@@ -35,7 +35,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>(Array.Empty<ImageListItem>(), null)));
 
-        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, _service, CancellationToken.None);
+        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, _service, CancellationToken.None);
 
         await _service.Received(1).ListAsync(new ImageListRequest(), Arg.Any<CancellationToken>());
     }
@@ -46,7 +46,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result.Invalid("limit", "Must be between 1 and 200."));
 
-        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, 0, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, 0, _service, CancellationToken.None);
 
         result.Result.Should().BeOfType<ValidationProblem>();
     }

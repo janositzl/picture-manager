@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace PictureManager.Application.Repositories;
 
-/// <summary>FaceCount/PhotoCount count Auto and Confirmed faces only.</summary>
-public sealed record PersonSummary(int Id, string? Name, int FaceCount, int PhotoCount, int? CoverFaceId);
+/// <summary>Counts are distinct images: Confirmed, and Suggested-but-not-yet-confirmed for that person.</summary>
+public sealed record PersonSummary(int Id, string? Name, int ConfirmedImageCount, int SuggestedImageCount, int? CoverFaceId);
 
 public sealed record FaceCropSource(
     int FaceId, string ContentHash, string MountPath, string RelativePath, string FileName, string Extension, int? Orientation,
@@ -19,10 +19,10 @@ public interface IPeopleRepository
     Task<PersonSummary?> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<int?> FindIdByNameAsync(string name, CancellationToken cancellationToken = default);
 
-    /// <summary>Sets the name and turns the person's Auto faces into Confirmed. False if the person doesn't exist.</summary>
+    /// <summary>Sets the name only; the person's Suggested faces stay Suggested. False if the person doesn't exist.</summary>
     Task<bool> SetNameAsync(int id, string name, DateTime nowUtc, CancellationToken cancellationToken = default);
 
-    /// <summary>Moves every Auto/Confirmed face of source to target as Confirmed, then deletes source.</summary>
+    /// <summary>Moves every Suggested/Confirmed face of source to target, keeping its state, then deletes source.</summary>
     Task MergeAsync(int sourceId, int targetId, DateTime nowUtc, CancellationToken cancellationToken = default);
 
     Task<FaceCropSource?> GetFaceCropSourceAsync(int faceId, CancellationToken cancellationToken = default);

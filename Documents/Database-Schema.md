@@ -186,14 +186,16 @@ A detected face. The box is normalized (0-1) against the orientation-corrected i
 | Id | int (PK) | Row identifier |
 | ImageId | int (FK → Images), indexed | Image containing the face |
 | FaceModelId | int (FK → FaceModels), indexed with AssignmentState | Model that produced the embedding |
-| PersonId | int? (FK → People), indexed | Assigned person; null = unassigned |
-| AssignmentState | enum (Unassigned/Auto/Confirmed/Rejected) | Auto = set by clustering/matching; Confirmed/Rejected = set by the user and never changed by automation (re-processing an image carries PersonId and AssignmentState over to the new face whose box overlaps the old one, IoU ≥ 0.5) |
+| PersonId | int? (FK → People), indexed | Assigned person; null = Unknown or Ignored |
+| AssignmentState | enum, stored as int (Unknown 0 / Suggested 1 / Confirmed 2 / Ignored 4) | Suggested = set by clustering/matching and awaiting the user; Confirmed/Ignored = set by the user and never changed by automation. Unknown = no person yet. 3 was the old Rejected, folded into Unknown + RejectedPersonId. Naming or merging a person does not confirm their Suggested faces. Re-processing an image carries PersonId, AssignmentState, RejectedPersonId and MatchDistance over to the new face whose box overlaps the old one (IoU ≥ 0.5), which is how Ignored survives rescans |
+| RejectedPersonId | int? | The person the user last rejected (or marked unknown) for this face; clustering never suggests them again. No foreign key on purpose; may be stale |
+| MatchDistance | float? | Cosine distance behind a Suggested assignment (for sorting / low-confidence review); null otherwise |
 | X, Y, Width, Height | float | Normalized bounding box |
 | DetectionConfidence | float | Detector score |
 | QualityScore | float | Face quality score; decides whether the face takes part in clustering |
 | Embedding | vector(512), HNSW index (vector_cosine_ops) | L2-normalized embedding, compared with cosine distance. Biometric data |
 | CreatedUtc | timestamptz | Creation time |
-| ClusteredUtc | timestamptz?, indexed with FaceModelId | When a clustering pass last used this face as a seed; null = not yet (new, or re-created by re-processing). Clustering seeds only from Unassigned faces with null here and then sets it |
+| ClusteredUtc | timestamptz?, indexed with FaceModelId | When a clustering pass last used this face as a seed; null = not yet (new, or re-created by re-processing). Clustering seeds only from Unknown faces with null here and then sets it |
 
 Deleting the image cascades; deleting the person sets PersonId to null; deleting a face model is restricted while faces reference it.
 
@@ -205,7 +207,7 @@ A person, or an unnamed group created by clustering.
 |---|---|---|
 | Id | int (PK) | Row identifier |
 | Name | string?(200), indexed | Null = unnamed group |
-| CoverFaceId | int? | Face shown for this person. No foreign key on purpose (avoids a Faces/People cycle); may be stale, so reads use it only while it is still one of the person's Auto/Confirmed faces and otherwise fall back to the best-quality one |
+| CoverFaceId | int? | Face shown for this person. No foreign key on purpose (avoids a Faces/People cycle); may be stale, so reads use it only while it is still one of the person's Suggested/Confirmed faces and otherwise fall back to the best one (Confirmed before Suggested, then quality) |
 | CreatedUtc | timestamptz | Creation time |
 | ModifiedUtc | timestamptz | Last modification time |
 

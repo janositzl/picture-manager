@@ -2,17 +2,39 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import { queryKeys } from './queries'
 
+/** Counts are distinct images: confirmed, and suggested but not yet confirmed. */
 export type PersonSummary = {
   id: number
   name: string | null
-  faceCount: number
-  photoCount: number
+  confirmedImageCount: number
+  suggestedImageCount: number
   coverFaceId: number | null
 }
+
+export type FaceState = 'unknown' | 'suggested' | 'confirmed' | 'ignored'
+
+/** A detected face; the box is normalized (0-1) against the orientation-corrected image. */
+export type ImageFace = {
+  id: number
+  x: number
+  y: number
+  width: number
+  height: number
+  state: FaceState
+  personId: number | null
+  personName: string | null
+}
+
+export type AssignTarget = { personId: number } | { name: string }
 
 export const peopleKeys = {
   all: () => ['people'] as const,
   one: (id: number) => ['people', id] as const,
+}
+
+export const faceKeys = {
+  all: () => ['faces'] as const,
+  forImage: (imageId: number, mode: string) => ['faces', imageId, mode] as const,
 }
 
 export function faceThumbnailUrl(faceId: number): string {
@@ -33,9 +55,19 @@ export function usePerson(id: number) {
   })
 }
 
+/** The "Unknown #n" label of an unnamed group: its place among the unnamed groups, by id. */
+export function unknownLabels(people: readonly PersonSummary[]): Map<number, string> {
+  const labels = new Map<number, string>()
+  people
+    .filter((p) => p.name === null)
+    .sort((a, b) => a.id - b.id)
+    .forEach((p, index) => labels.set(p.id, `Unknown #${index + 1}`))
+  return labels
+}
+
 /** Names a person; naming one after an existing person merges them, so the response may be a different id. */
 export function useNamePerson() {
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidatePeopleData()
   return useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
       apiFetch<PersonSummary>(`/api/people/${id}`, {
@@ -43,9 +75,88 @@ export function useNamePerson() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.all() })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.imageLists() })
-    },
+    onSuccess: invalidate,
+  })
+}
+
+type ImageFacesOptions = { includeIgnored?: boolean; confirmedOnly?: boolean; enabled?: boolean }
+
+/** The detected faces of one photo. confirmedOnly = what the normal viewer may show. */
+export function useImageFaces(imageId: number | null, options: ImageFacesOptions = {}) {
+  const { includeIgnored = false, confirmedOnly = false, enabled = true } = options
+  const params = new URLSearchParams()
+  if (includeIgnored) params.set('includeIgnored', 'true')
+  if (confirmedOnly) params.set('confirmedOnly', 'true')
+  return useQuery({
+    queryKey: faceKeys.forImage(imageId ?? 0, params.toString()),
+    queryFn: ({ signal }) => apiFetch<ImageFace[]>(`/api/images/${imageId}/faces?${params}`, { signal }),
+    enabled: enabled && imageId !== null,
+  })
+}
+
+/** After any change to faces or people: counts, face lists and every photo grid are stale. */
+function useInvalidatePeopleData() {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: peopleKeys.all() })
+    void queryClient.invalidateQueries({ queryKey: faceKeys.all() })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.imageLists() })
+  }
+}
+
+export type FaceAction = 'accept' | 'reject' | 'unknown' | 'ignore' | 'restore'
+
+const post = <T>(path: string, body?: unknown) =>
+  apiFetch<T>(path, {
+    method: 'POST',
+    ...(body === undefined
+      ? {}
+      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  })
+
+/** One decision about one detected face. */
+export function useFaceAction() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({ faceId, action }: { faceId: number; action: FaceAction }) =>
+      post<void>(`/api/faces/${faceId}/${action}`),
+    onSuccess: invalidate,
+  })
+}
+
+/** Confirms a face for an existing person, or for the person with this name (created if new). */
+export function useAssignFace() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({ faceId, target }: { faceId: number; target: AssignTarget }) =>
+      post<PersonSummary>(`/api/faces/${faceId}/assign`, target),
+    onSuccess: invalidate,
+  })
+}
+
+/** Accept all of a person's suggestions; resolves to how many faces were confirmed. */
+export function useAcceptAllSuggestions() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: (personId: number) =>
+      post<{ count: number }>(`/api/people/${personId}/suggestions/accept`),
+    onSuccess: invalidate,
+  })
+}
+
+/** Accept or reject one person's suggestion in one photo. */
+export function useImageSuggestion() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({
+      personId,
+      imageId,
+      action,
+    }: {
+      personId: number
+      imageId: number
+      action: 'accept' | 'reject'
+    }) => post<void>(`/api/people/${personId}/images/${imageId}/${action}`),
+    onSuccess: invalidate,
   })
 }

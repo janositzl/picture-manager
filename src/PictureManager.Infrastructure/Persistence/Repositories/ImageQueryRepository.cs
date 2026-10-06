@@ -46,13 +46,45 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             query = query.Where(i => i.IsFavorite);
 
         if (filter.PersonId is int personId)
-            query = query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
-                && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed)));
+        {
+            query = filter.PersonState switch
+            {
+                PersonFaceState.Confirmed => query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                    && f.AssignmentState == FaceAssignmentState.Confirmed)),
+                PersonFaceState.Suggested => query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                        && f.AssignmentState == FaceAssignmentState.Suggested)
+                    && !_dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                        && f.AssignmentState == FaceAssignmentState.Confirmed)),
+                _ => query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                    && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))),
+            };
+        }
 
         query = ApplyKeyset(query, sort, direction, after);
         query = ApplyOrder(query, sort, direction);
 
-        return await query.Take(take).Select(ImageProjections.ToRow).ToListAsync(cancellationToken);
+        var rows = await query.Take(take).Select(ImageProjections.ToRow).ToListAsync(cancellationToken);
+        if (filter.PersonId is int forPerson && rows.Count > 0)
+            rows = await WithFaceIdsAsync(rows, forPerson, filter.PersonState, cancellationToken);
+        return rows;
+    }
+
+    // Per photo, the person's best face for the state being listed (so a face crop can stand in for the thumbnail).
+    private async Task<List<ImageRow>> WithFaceIdsAsync(List<ImageRow> rows, int personId, PersonFaceState? state, CancellationToken cancellationToken)
+    {
+        var ids = rows.Select(r => r.Id).ToList();
+        var faces = _dbContext.Faces.AsNoTracking().Where(f => ids.Contains(f.ImageId) && f.PersonId == personId);
+        faces = state switch
+        {
+            PersonFaceState.Confirmed => faces.Where(f => f.AssignmentState == FaceAssignmentState.Confirmed),
+            PersonFaceState.Suggested => faces.Where(f => f.AssignmentState == FaceAssignmentState.Suggested),
+            _ => faces.Where(f => f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed),
+        };
+        var best = (await faces.Select(f => new { f.ImageId, f.Id, f.QualityScore, Confirmed = f.AssignmentState == FaceAssignmentState.Confirmed })
+                .ToListAsync(cancellationToken))
+            .GroupBy(f => f.ImageId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(f => f.Confirmed).ThenByDescending(f => f.QualityScore).ThenBy(f => f.Id).First().Id);
+        return rows.Select(r => best.TryGetValue(r.Id, out var faceId) ? r with { FaceId = faceId } : r).ToList();
     }
 
     public async Task<ImageDetailRow?> GetVisibleDetailAsync(int id, CancellationToken cancellationToken = default)

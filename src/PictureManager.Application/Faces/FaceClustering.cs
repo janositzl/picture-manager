@@ -12,11 +12,12 @@ public static class FaceClustering
 {
     /// <summary>
     /// The person that wins among the neighbours within maxDistance: at least minVotes of them, and strictly more
-    /// than half of those within distance (a tie is no decision). Null when nobody qualifies.
+    /// than half of those within distance (a tie is no decision). excludedPersonId (the one the user rejected for this
+    /// face) never wins or votes. Null when nobody qualifies.
     /// </summary>
-    public static int? MajorityPerson(IReadOnlyList<FaceNeighbor> neighbors, float maxDistance, int minVotes)
+    public static int? MajorityPerson(IReadOnlyList<FaceNeighbor> neighbors, float maxDistance, int minVotes, int? excludedPersonId = null)
     {
-        var within = neighbors.Where(n => n.PersonId is not null && n.Distance <= maxDistance).ToList();
+        var within = neighbors.Where(n => n.PersonId is not null && n.PersonId != excludedPersonId && n.Distance <= maxDistance).ToList();
         if (within.Count == 0)
             return null;
 

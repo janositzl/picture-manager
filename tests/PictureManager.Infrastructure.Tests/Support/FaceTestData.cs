@@ -66,7 +66,7 @@ public static class FaceTestData
 
     public static async Task<Face> AddFaceAsync(
         PictureManagerDbContext db, int imageId, int modelId, float[] embedding,
-        int? personId = null, FaceAssignmentState state = FaceAssignmentState.Unassigned, float quality = 0.9f)
+        int? personId = null, FaceAssignmentState state = FaceAssignmentState.Unknown, float quality = 0.9f)
     {
         var face = new Face
         {

@@ -39,6 +39,7 @@ export const handlers = [
     if (fileName) items = items.filter((i) => i.fileName.toLowerCase().includes(fileName))
     return HttpResponse.json({ items, nextCursor: null })
   }),
+  http.get('/api/images/:id/faces', () => HttpResponse.json([])),
   http.get('/api/images/:id', ({ params }) => {
     const item = allImages().find((i) => i.id === Number(params.id))
     return item ? HttpResponse.json(imageDetail(item)) : notFound()

@@ -3,14 +3,14 @@ import { http, HttpResponse } from 'msw'
 export type PersonDto = {
   id: number
   name: string | null
-  faceCount: number
-  photoCount: number
+  confirmedImageCount: number
+  suggestedImageCount: number
   coverFaceId: number | null
 }
 
 export const peopleFixture: [PersonDto, PersonDto] = [
-  { id: 1, name: 'Anna', faceCount: 12, photoCount: 10, coverFaceId: 101 },
-  { id: 2, name: null, faceCount: 5, photoCount: 5, coverFaceId: 102 },
+  { id: 1, name: 'Anna', confirmedImageCount: 10, suggestedImageCount: 3, coverFaceId: 101 },
+  { id: 2, name: null, confirmedImageCount: 0, suggestedImageCount: 5, coverFaceId: 102 },
 ]
 
 export function peopleList(people: PersonDto[] = peopleFixture) {

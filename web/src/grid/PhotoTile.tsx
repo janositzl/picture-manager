@@ -33,6 +33,8 @@ type Props = {
   selected?: boolean
   onSelect?: (id: number, mods: SelectMods) => void
   activator?: TileActivator
+  /** A face crop shown instead of the thumbnail (cover-fitted). */
+  thumbnailOverride?: string
   /** In a fast-scrolling virtualized grid: don't request a thumbnail for a tile scrolled past within IMAGE_REQUEST_DELAY_MS. */
   deferImage?: boolean
   onOpen: (id: number) => void
@@ -51,6 +53,7 @@ function PhotoTileComponent({
   onSelect,
   activator,
   deferImage = false,
+  thumbnailOverride,
   onOpen,
   onToggleFavorite,
 }: Props) {
@@ -58,7 +61,7 @@ function PhotoTileComponent({
   const [imageReady, setImageReady] = useState(!deferImage)
   const [loaded, setLoaded] = useState(false)
   const name = `${item.fileName}${item.extension}`
-  const thumbnail = item.thumbnailUrl
+  const thumbnail = thumbnailOverride ?? item.thumbnailUrl
 
   useEffect(() => {
     if (!deferImage) return
@@ -88,7 +91,7 @@ function PhotoTileComponent({
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain',
+          objectFit: thumbnailOverride === undefined ? 'contain' : 'cover',
           display: 'block',
           opacity: loaded ? 1 : 0,
           transition: 'opacity 0.15s ease-in-out',

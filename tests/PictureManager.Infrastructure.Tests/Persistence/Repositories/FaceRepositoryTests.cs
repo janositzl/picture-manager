@@ -85,7 +85,7 @@ public class FaceRepositoryTests
 
         await using var read = db.CreateContext();
         var faces = await read.Faces.Where(f => f.ImageId == image.Id).ToListAsync();
-        faces.Should().HaveCount(2).And.OnlyContain(f => f.AssignmentState == FaceAssignmentState.Unassigned && f.FaceModelId == model);
+        faces.Should().HaveCount(2).And.OnlyContain(f => f.AssignmentState == FaceAssignmentState.Unknown && f.FaceModelId == model);
         var state = await read.FaceProcessingStates.SingleAsync(s => s.ImageId == image.Id);
         state.Status.Should().Be(FaceProcessingStatus.Completed);
         state.ImageFingerprint.Should().Be("h");
@@ -124,7 +124,7 @@ public class FaceRepositoryTests
         await using var db = await PostgresTestDatabase.CreateAsync();
         var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
         var confirmed = await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Confirmed);
-        await AddFaceAtAsync(db, imageId, model, 0.6f, 0.6f, anna, FaceAssignmentState.Auto); // gone on re-processing
+        await AddFaceAtAsync(db, imageId, model, 0.6f, 0.6f, anna, FaceAssignmentState.Suggested); // gone on re-processing
 
         var saved = await new FaceRepository(db.CreateContext()).SaveResultAsync(
             imageId, model, "h2", new[] { FaceAt(0.11f, 0.1f, 0), FaceAt(0.6f, 0.1f, 1) }, Now);
@@ -134,21 +134,21 @@ public class FaceRepositoryTests
         var faces = await read.Faces.Where(f => f.ImageId == imageId).OrderBy(f => f.X).ToListAsync();
         faces.Should().HaveCount(2).And.NotContain(f => f.Id == confirmed.Id);
         faces[0].Should().BeEquivalentTo(new { X = 0.11f, PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Confirmed });
-        faces[1].Should().BeEquivalentTo(new { X = 0.6f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+        faces[1].Should().BeEquivalentTo(new { X = 0.6f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unknown });
     }
 
     [Fact]
-    public async Task SaveResultAsync_Reprocess_RejectedFaceStaysRejected()
+    public async Task SaveResultAsync_Reprocess_IgnoredFaceStaysIgnored()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
         var (imageId, model, anna) = await SeedImageWithPersonAsync(db);
-        await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Rejected);
+        await AddFaceAtAsync(db, imageId, model, 0.1f, 0.1f, anna, FaceAssignmentState.Ignored);
 
         await new FaceRepository(db.CreateContext()).SaveResultAsync(imageId, model, "h2", new[] { FaceAt(0.1f, 0.12f, 0) }, Now);
 
         await using var read = db.CreateContext();
         (await read.Faces.SingleAsync(f => f.ImageId == imageId))
-            .Should().BeEquivalentTo(new { PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Rejected });
+            .Should().BeEquivalentTo(new { PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Ignored });
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class FaceRepositoryTests
 
         await using var read = db.CreateContext();
         (await read.Faces.SingleAsync(f => f.ImageId == imageId))
-            .Should().BeEquivalentTo(new { PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+            .Should().BeEquivalentTo(new { PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unknown });
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class FaceRepositoryTests
         var faces = await read.Faces.Where(f => f.ImageId == imageId).OrderBy(f => f.X).ToListAsync();
         faces.Should().HaveCount(2);
         faces[0].Should().BeEquivalentTo(new { X = 0.11f, PersonId = (int?)anna, AssignmentState = FaceAssignmentState.Confirmed });
-        faces[1].Should().BeEquivalentTo(new { X = 0.13f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unassigned });
+        faces[1].Should().BeEquivalentTo(new { X = 0.13f, PersonId = (int?)null, AssignmentState = FaceAssignmentState.Unknown });
     }
 
     [Fact]

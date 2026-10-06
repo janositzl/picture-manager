@@ -9,10 +9,10 @@ namespace PictureManager.Application.Repositories;
 
 public sealed record FaceFailure(int ImageId, string FileName, string Extension, int Attempts, string? ErrorMessage, DateTime ProcessedUtc);
 
-public sealed record FaceCandidate(int Id, float Quality);
+public sealed record FaceCandidate(int Id, float Quality, int? RejectedPersonId = null);
 public sealed record FaceNeighbor(int FaceId, int? PersonId, float Distance);
 
-/// <summary>Assigned = has a person, Auto or Confirmed. Unassigned = no person yet. Rejected faces are in neither.</summary>
+/// <summary>Assigned = has a person, Suggested or Confirmed. Unassigned = Unknown (no person yet). Ignored faces are in neither.</summary>
 public enum NeighborPool
 {
     Assigned,
@@ -64,8 +64,11 @@ public interface IFaceRepository
     Task<IReadOnlyList<FaceNeighbor>> GetNearestAsync(
         int faceId, int faceModelId, NeighborPool pool, int k, float minQuality = 0f, CancellationToken cancellationToken = default);
 
-    /// <summary>Sets PersonId and Auto on those of these faces that are still Unassigned. Never touches user decisions.</summary>
-    Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Sets PersonId, Suggested and MatchDistance on those of these faces that are still Unknown and have not had this
+    /// person rejected. Never touches user decisions.
+    /// </summary>
+    Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, float? matchDistance = null, CancellationToken cancellationToken = default);
 
     Task<int> CreateUnnamedPersonAsync(int coverFaceId, DateTime nowUtc, CancellationToken cancellationToken = default);
 

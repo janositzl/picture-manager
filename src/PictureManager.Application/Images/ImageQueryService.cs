@@ -66,7 +66,20 @@ public sealed class ImageQueryService : IImageQueryService
         if (request.FolderId is int folderId && !await _folders.IsVisibleAsync(folderId, cancellationToken))
             return Result.NotFound();
 
-        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId);
+        PersonFaceState? personState = null;
+        if (request.PersonState is not null)
+        {
+            if (request.PersonId is null)
+                return Result.Invalid("personState", "Needs a personId.");
+            switch (request.PersonState.ToLowerInvariant())
+            {
+                case "confirmed": personState = PersonFaceState.Confirmed; break;
+                case "suggested": personState = PersonFaceState.Suggested; break;
+                default: return Result.Invalid("personState", "Must be 'confirmed' or 'suggested'.");
+            }
+        }
+
+        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState);
         var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();

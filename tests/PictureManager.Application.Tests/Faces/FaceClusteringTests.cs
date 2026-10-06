@@ -25,6 +25,15 @@ public class FaceClusteringTests
     }
 
     [Fact]
+    public void MajorityPerson_NeverPicksTheExcludedPerson()
+    {
+        var neighbors = new List<FaceNeighbor> { new(1, 10, 0.1f), new(2, 10, 0.1f), new(3, 10, 0.2f) };
+
+        FaceClustering.MajorityPerson(neighbors, maxDistance: 0.4f, minVotes: 2).Should().Be(10);
+        FaceClustering.MajorityPerson(neighbors, maxDistance: 0.4f, minVotes: 2, excludedPersonId: 10).Should().BeNull();
+    }
+
+    [Fact]
     public void MajorityPerson_TieIsNotAMajority()
     {
         var neighbors = new List<FaceNeighbor> { new(1, 10, 0.1f), new(2, 10, 0.1f), new(3, 11, 0.1f), new(4, 11, 0.1f) };

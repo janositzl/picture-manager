@@ -9,9 +9,11 @@ type Props = {
   isLoading: boolean
   isError: boolean
   onRetry: () => void
+  /** The People section, shown above the details whatever their loading state. */
+  peopleSlot?: ReactNode
 }
 
-export function InfoPanel({ detail, isLoading, isError, onRetry }: Props) {
+export function InfoPanel({ detail, isLoading, isError, onRetry, peopleSlot }: Props) {
   let content: ReactNode
   if (isError) {
     content = (
@@ -47,6 +49,7 @@ export function InfoPanel({ detail, isLoading, isError, onRetry }: Props) {
         borderColor: 'rgba(255,255,255,0.08)',
       }}
     >
+      {peopleSlot}
       {content}
     </Box>
   )

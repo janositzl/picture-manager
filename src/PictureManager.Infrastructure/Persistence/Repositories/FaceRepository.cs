@@ -91,7 +91,7 @@ public sealed class FaceRepository : IFaceRepository
         var previous = await _dbContext.Faces.AsNoTracking()
             .Where(f => f.ImageId == imageId)
             .OrderBy(f => f.Id)
-            .Select(f => new { f.PersonId, f.AssignmentState, f.X, f.Y, f.Width, f.Height })
+            .Select(f => new { f.PersonId, f.AssignmentState, f.RejectedPersonId, f.MatchDistance, f.X, f.Y, f.Width, f.Height })
             .ToListAsync(cancellationToken);
         var matches = FaceMatching.MatchByOverlap(
             previous.Select(p => new FaceBox(p.X, p.Y, p.Width, p.Height)).ToList(),
@@ -106,7 +106,9 @@ public sealed class FaceRepository : IFaceRepository
                 ImageId = imageId,
                 FaceModelId = faceModelId,
                 PersonId = inherited?.PersonId,
-                AssignmentState = inherited?.AssignmentState ?? FaceAssignmentState.Unassigned,
+                AssignmentState = inherited?.AssignmentState ?? FaceAssignmentState.Unknown,
+                RejectedPersonId = inherited?.RejectedPersonId,
+                MatchDistance = inherited?.MatchDistance,
                 X = f.X, Y = f.Y, Width = f.Width, Height = f.Height,
                 DetectionConfidence = f.DetectionConfidence,
                 QualityScore = f.QualityScore,
@@ -174,17 +176,17 @@ public sealed class FaceRepository : IFaceRepository
 
     public async Task<IReadOnlyList<FaceCandidate>> GetUnassignedFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
         await _dbContext.Faces.AsNoTracking()
-            .Where(f => f.FaceModelId == faceModelId && f.AssignmentState == FaceAssignmentState.Unassigned && f.QualityScore >= minQuality)
+            .Where(f => f.FaceModelId == faceModelId && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality)
             .OrderByDescending(f => f.QualityScore)
-            .Select(f => new FaceCandidate(f.Id, f.QualityScore))
+            .Select(f => new FaceCandidate(f.Id, f.QualityScore, f.RejectedPersonId))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<FaceCandidate>> GetUnclusteredFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
         await _dbContext.Faces.AsNoTracking()
             .Where(f => f.FaceModelId == faceModelId && f.ClusteredUtc == null
-                        && f.AssignmentState == FaceAssignmentState.Unassigned && f.QualityScore >= minQuality)
+                        && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality)
             .OrderByDescending(f => f.QualityScore).ThenBy(f => f.Id)
-            .Select(f => new FaceCandidate(f.Id, f.QualityScore))
+            .Select(f => new FaceCandidate(f.Id, f.QualityScore, f.RejectedPersonId))
             .ToListAsync(cancellationToken);
 
     public async Task MarkClusteredAsync(IReadOnlyCollection<int> faceIds, DateTime nowUtc, CancellationToken cancellationToken = default)
@@ -209,8 +211,8 @@ public sealed class FaceRepository : IFaceRepository
             .Where(f => f.FaceModelId == faceModelId && f.Id != faceId && f.QualityScore >= minQuality);
         faces = pool == NeighborPool.Assigned
             ? faces.Where(f => f.PersonId != null
-                               && (f.AssignmentState == FaceAssignmentState.Auto || f.AssignmentState == FaceAssignmentState.Confirmed))
-            : faces.Where(f => f.AssignmentState == FaceAssignmentState.Unassigned);
+                               && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))
+            : faces.Where(f => f.AssignmentState == FaceAssignmentState.Unknown);
 
         // The HNSW index scan yields only ef_search candidates and the filters run afterwards, so on a big table a
         // plain scan can return fewer than k (or no) rows. An iterative scan keeps scanning until k rows pass the
@@ -230,13 +232,14 @@ public sealed class FaceRepository : IFaceRepository
         return neighbors;
     }
 
-    public async Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, CancellationToken cancellationToken = default)
+    public async Task AssignAsync(IReadOnlyCollection<int> faceIds, int personId, float? matchDistance = null, CancellationToken cancellationToken = default)
     {
         await _dbContext.Faces
-            .Where(f => faceIds.Contains(f.Id) && f.AssignmentState == FaceAssignmentState.Unassigned)
+            .Where(f => faceIds.Contains(f.Id) && f.AssignmentState == FaceAssignmentState.Unknown && f.RejectedPersonId != personId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(f => f.PersonId, personId)
-                .SetProperty(f => f.AssignmentState, FaceAssignmentState.Auto),
+                .SetProperty(f => f.AssignmentState, FaceAssignmentState.Suggested)
+                .SetProperty(f => f.MatchDistance, matchDistance),
                 cancellationToken);
     }
 

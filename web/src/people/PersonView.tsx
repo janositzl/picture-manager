@@ -1,6 +1,6 @@
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { useState, type FormEvent } from 'react'
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link as RouterLink, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useNamePerson, usePeople, usePerson, type PersonSummary } from '../api/people'
 import { useNotify } from '../app/notify'
 import { parseGridParams } from '../routing/urlState'
@@ -8,6 +8,13 @@ import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { GridHeader } from '../views/GridHeader'
 import { ImageBrowser } from '../views/ImageBrowser'
+import { FACE_MODES } from './faceModes'
+import { FaceModeToggle } from './FaceModeToggle'
+import { openedFromStrip } from './openedFromStrip'
+import { SuggestedStrip } from './SuggestedStrip'
+import { useStoredChoice } from './useStoredChoice'
+
+const imageCount = (person: PersonSummary) => person.confirmedImageCount + person.suggestedImageCount
 
 type NameFormProps = { personId: number; name: string | null }
 
@@ -55,7 +62,7 @@ function NameForm({ personId, name }: NameFormProps) {
       {mergeTarget && (
         <ConfirmDialog
           title="Merge people?"
-          message={`Merge into existing '${mergeTarget.name}' (${mergeTarget.photoCount} ${mergeTarget.photoCount === 1 ? 'photo' : 'photos'})? This can't be undone.`}
+          message={`Merge into existing '${mergeTarget.name}' (${imageCount(mergeTarget)} ${imageCount(mergeTarget) === 1 ? 'photo' : 'photos'})? This can't be undone.`}
           confirmLabel="Merge"
           onConfirm={() => {
             setMergeTarget(null)
@@ -84,28 +91,66 @@ type PersonContentProps = { personId: number }
 function PersonContent({ personId }: PersonContentProps) {
   const person = usePerson(personId)
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const { sort, order } = parseGridParams(searchParams)
+  const [gridMode, setGridMode] = useStoredChoice('pm.people.gridMode', FACE_MODES, 'photos')
+  const [stripMode, setStripMode] = useStoredChoice('pm.people.stripMode', FACE_MODES, 'faces')
 
   if (person.isError) return <PersonNotFound />
+  // The grid's filter depends on whether the person is named, so wait for that.
+  if (person.data === undefined) return null
+
+  // A named person's grid holds what the user confirmed; the AI's suggestions wait in the strip above it.
+  // An unnamed group has nothing confirmed yet, so its grid is the suggestions themselves.
+  const isGroup = person.data.name === null
+  const gridState = isGroup ? 'suggested' : 'confirmed'
 
   return (
-    <ImageBrowser
-      filter={{ kind: 'person', personId, sort, order }}
-      header={
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {person.data && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, pt: 2 }}>
-              <NameForm key={person.data.id} personId={person.data.id} name={person.data.name} />
-              <Typography variant="body2" color="text.secondary">
-                {person.data.faceCount} faces · {person.data.photoCount} photos
-              </Typography>
+    <>
+      {person.data && !isGroup && (
+        <SuggestedStrip
+          personId={personId}
+          sort={sort}
+          order={order}
+          mode={stripMode}
+          onModeChange={setStripMode}
+        />
+      )}
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <ImageBrowser
+          filter={{ kind: 'person', personId, state: gridState, sort, order }}
+          showFaceCrops={gridMode === 'faces'}
+          faceReview={{ personId }}
+          viewerEnabled={!openedFromStrip(location.state)}
+          header={
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {person.data && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, pt: 2, flexWrap: 'wrap' }}>
+                  <NameForm key={person.data.id} personId={person.data.id} name={person.data.name} />
+                  <Typography variant="body2" color="text.secondary">
+                    {person.data.name === null
+                      ? `${person.data.suggestedImageCount} suggested`
+                      : `${person.data.confirmedImageCount} confirmed · ${person.data.suggestedImageCount} suggested`}
+                  </Typography>
+                  <Box sx={{ flex: 1 }} />
+                  <FaceModeToggle value={gridMode} onChange={setGridMode} label="Grid view" />
+                </Box>
+              )}
+              <GridHeader
+                title={person.data?.name ?? 'Unknown person'}
+                sort={sort}
+                order={order}
+              />
             </Box>
-          )}
-          <GridHeader title={person.data?.name ?? 'Unnamed person'} sort={sort} order={order} />
-        </Box>
-      }
-      emptyState={<EmptyMessage>No photos for this person.</EmptyMessage>}
-    />
+          }
+          emptyState={
+            <EmptyMessage>
+              {isGroup ? 'No photos for this person.' : 'No confirmed photos yet.'}
+            </EmptyMessage>
+          }
+        />
+      </Box>
+    </>
   )
 }
 

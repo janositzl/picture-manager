@@ -29,7 +29,10 @@ import { albumsQuery, useImage } from '../api/queries'
 import type { AlbumRef, ImageListItem } from '../api/types'
 import { useNotify } from '../app/notify'
 import { parseGridParams, withParams } from '../routing/urlState'
+import { FaceOverlay } from './FaceOverlay'
 import { InfoPanel } from './InfoPanel'
+import { ConfirmedPeople, PeopleInPhoto } from './PeopleInPhoto'
+import { useFaceReview } from './useFaceReview'
 
 const INFO_PANEL_KEY = 'pm.viewer.infoOpen'
 
@@ -65,7 +68,10 @@ const isMissingItem = (item: object): boolean => 'isMissing' in item && item.isM
 export function PhotoViewer({
   list,
   onRemoveFromAlbum,
+  faceReview,
 }: {
+  /** Set when opened from a person: shows the detected faces and lets the user decide about them. */
+  faceReview?: { personId: number }
   list: ViewerList
   /** Set when the list is an album: Shift+D removes from it. Resolves true once the photo is removed. */
   onRemoveFromAlbum?: (imageId: number) => Promise<boolean>
@@ -78,6 +84,7 @@ export function PhotoViewer({
   const setFavorite = useSetFavorite()
   const [infoOpen, setInfoOpen] = useState(readInfoOpen)
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
+  const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null)
   const pendingNext = useRef(false)
   const queryClient = useQueryClient()
   const notify = useNotify()
@@ -96,6 +103,7 @@ export function PhotoViewer({
   const canGoNext = inList && (next !== undefined || list.hasNextPage)
   const notFound = !inList && isNotFound(detail.error)
 
+  const review = useFaceReview(current?.id ?? null, faceReview)
   const canAdd = current !== undefined && !isMissingItem(current)
 
   // Shift+A: straight into the last used album; without one (or if it's gone), fall back to the picker.
@@ -288,11 +296,22 @@ export function PhotoViewer({
         {loadedSrc !== src && <CircularProgress color="inherit" sx={{ position: 'absolute' }} />}
         <img
           key={src}
+          ref={setImageEl}
           src={src}
           alt={name}
           onLoad={() => setLoadedSrc(src)}
           style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
         />
+        {faceReview !== undefined && loadedSrc === src && (
+          <FaceOverlay
+            image={imageEl}
+            faces={review.faces}
+            hoveredId={review.hoveredId}
+            selectedId={review.selectedId}
+            onHover={review.setHoveredId}
+            onSelect={review.select}
+          />
+        )}
       </>
     )
   }
@@ -428,12 +447,19 @@ export function PhotoViewer({
               </Tooltip>
             </Box>
           </Box>
-          {infoOpen && !notFound && (
+          {(infoOpen || faceReview !== undefined) && !notFound && (
             <InfoPanel
               detail={detail.data}
               isLoading={detail.isPending}
               isError={detail.isError}
               onRetry={() => void detail.refetch()}
+              peopleSlot={
+                current === undefined ? null : faceReview !== undefined ? (
+                  <PeopleInPhoto review={review} />
+                ) : (
+                  <ConfirmedPeople imageId={current.id} />
+                )
+              }
             />
           )}
         </Box>
