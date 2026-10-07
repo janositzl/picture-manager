@@ -17,11 +17,22 @@ type Props = {
   sort: Sort
   order: Order
   actions?: ReactNode
+  /** Pinned to the far right, after sort (e.g. a "more" menu). */
+  menu?: ReactNode
   /** Rendered right after the title (e.g. an edit button). */
   titleAdornment?: ReactNode
 }
 
-export function GridHeader({ title, path, count, sort, order, actions, titleAdornment }: Props) {
+export function GridHeader({
+  title,
+  path,
+  count,
+  sort,
+  order,
+  actions,
+  menu,
+  titleAdornment,
+}: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
 
   return (
@@ -159,6 +170,7 @@ export function GridHeader({ title, path, count, sort, order, actions, titleAdor
           )}
         </IconButton>
       </Box>
+      {menu}
     </Box>
   )
 }

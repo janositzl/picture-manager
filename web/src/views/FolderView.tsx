@@ -1,13 +1,10 @@
-import AutorenewIcon from '@mui/icons-material/Autorenew'
-import CreateNewFolderOutlinedIcon from '@mui/icons-material/CreateNewFolderOutlined'
-import { Alert, Box, Button, IconButton, Link, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Link, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useFolder } from '../api/queries'
-import { BORDER } from '../design/accent'
 import { parseFacesParam, parseGridParams, parseHiddenParam, parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { useFolderJobs } from '../tree/FolderJobsContext'
@@ -16,7 +13,7 @@ import { GridHeader } from './GridHeader'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { FacesFilterToggle } from './FacesFilterToggle'
 import { GridSkeleton } from './GridSkeleton'
-import { HiddenToggle } from './HiddenToggle'
+import { FolderMenu } from './FolderMenu'
 import { ImageBrowser } from './ImageBrowser'
 import { writeLastFolderId } from './preferences'
 
@@ -96,49 +93,19 @@ export function FolderView() {
             sort={sort}
             order={order}
             actions={
+              !detail.isMissing && detail.imageCount > 0 ? (
+                <FacesFilterToggle value={faces} />
+              ) : undefined
+            }
+            menu={
               !detail.isMissing ? (
-                <>
-                  <HiddenToggle checked={showHidden} />
-                  {detail.imageCount > 0 && (
-                    <>
-                      <Tooltip title="Re-analyse faces in this folder">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label="Re-analyse faces"
-                            disabled={activeJob !== null}
-                            onClick={() => setConfirmingReanalyse(true)}
-                            sx={{
-                              border: `1px solid ${BORDER}`,
-                              borderRadius: '10px',
-                              bgcolor: 'background.paper',
-                            }}
-                          >
-                            <AutorenewIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <FacesFilterToggle value={faces} />
-                      <Button
-                        size="small"
-                        startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
-                        onClick={() => setPickerTarget({ folderId })}
-                        sx={{
-                          color: 'text.primary',
-                          border: `1px solid ${BORDER}`,
-                          borderRadius: '10px',
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          px: 1.5,
-                          py: '7px',
-                          '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
-                        }}
-                      >
-                        Add folder to album…
-                      </Button>
-                    </>
-                  )}
-                </>
+                <FolderMenu
+                  showHidden={showHidden}
+                  hasPhotos={detail.imageCount > 0}
+                  reanalyseDisabled={activeJob !== null}
+                  onReanalyse={() => setConfirmingReanalyse(true)}
+                  onAddToAlbum={() => setPickerTarget({ folderId })}
+                />
               ) : undefined
             }
           />

@@ -77,13 +77,19 @@ describe('FolderView', () => {
       http.get('/api/images', ({ request }) => {
         const query = new URL(request.url).searchParams
         requests.push(query)
-        return HttpResponse.json({ items: query.get('faces') === 'without' ? [] : madeiraImages, nextCursor: null })
+        return HttpResponse.json({
+          items: query.get('faces') === 'without' ? [] : madeiraImages,
+          nextCursor: null,
+        })
       }),
     )
     const { user, router } = renderApp('/folders/3')
     await screen.findByRole('button', { name: 'IMG_0001.jpg' })
     expect(requests[0]?.get('faces')).toBeNull()
-    expect(screen.getByRole('button', { name: 'All photos' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'All photos' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
 
     await user.click(screen.getByRole('button', { name: 'Photos with a face' }))
     await waitFor(() => expect(requests.some((q) => q.get('faces') === 'with')).toBe(true))
@@ -105,17 +111,32 @@ describe('FolderView', () => {
         return HttpResponse.json({ faceRecognitionJobId: 9 })
       }),
       faceRecognitionEvents(9, [
-        { Id: 9, Status: 'Completed', ImagesFound: 0, ImagesProcessed: 0, FacesFound: 0, ErrorMessage: null },
+        {
+          Id: 9,
+          Status: 'Completed',
+          ImagesFound: 0,
+          ImagesProcessed: 0,
+          FacesFound: 0,
+          ErrorMessage: null,
+        },
       ]),
     )
     const { user } = renderApp('/folders/3')
 
-    await user.click(await screen.findByRole('button', { name: 'Re-analyse faces' }))
+    await user.click(await screen.findByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Re-analyse faces…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Re-analyse faces?' })
     expect(body).toBeNull()
     await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))
 
-    await waitFor(() => expect(body).toEqual({ folderId: 3, isRecursive: false, reanalyze: true, preset: 'detailed' }))
+    await waitFor(() =>
+      expect(body).toEqual({
+        folderId: 3,
+        isRecursive: false,
+        reanalyze: true,
+        preset: 'detailed',
+      }),
+    )
   })
 
   it('re-analyses with the fast preset when chosen in the dialog', async () => {
@@ -126,12 +147,20 @@ describe('FolderView', () => {
         return HttpResponse.json({ faceRecognitionJobId: 9 })
       }),
       faceRecognitionEvents(9, [
-        { Id: 9, Status: 'Completed', ImagesFound: 0, ImagesProcessed: 0, FacesFound: 0, ErrorMessage: null },
+        {
+          Id: 9,
+          Status: 'Completed',
+          ImagesFound: 0,
+          ImagesProcessed: 0,
+          FacesFound: 0,
+          ErrorMessage: null,
+        },
       ]),
     )
     const { user } = renderApp('/folders/3')
 
-    await user.click(await screen.findByRole('button', { name: 'Re-analyse faces' }))
+    await user.click(await screen.findByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Re-analyse faces…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Re-analyse faces?' })
     await user.click(within(dialog).getByRole('button', { name: 'Fast' }))
     await user.click(within(dialog).getByRole('button', { name: 'Re-analyse' }))

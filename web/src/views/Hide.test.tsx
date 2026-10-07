@@ -15,7 +15,7 @@ describe('hiding photos', () => {
     expect(screen.getByRole('button', { name: 'IMG_0002.jpg' })).toBeInTheDocument()
   })
 
-  it('"Show hidden" lists hidden photos, and selecting them offers Unhide instead of Hide', async () => {
+  it('"Show hidden photos" lists hidden photos, and selecting them offers Unhide instead of Hide', async () => {
     const { user } = renderApp('/folders/3')
     await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
     await user.click(within(await selectionBar()).getByRole('button', { name: 'Hide' }))
@@ -23,13 +23,15 @@ describe('hiding photos', () => {
       expect(screen.queryByRole('button', { name: 'IMG_0001.jpg' })).not.toBeInTheDocument(),
     )
 
-    await user.click(screen.getByRole('switch', { name: 'Show hidden' }))
+    await user.click(screen.getByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Show hidden photos' }))
     await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
     const bar = await selectionBar()
     expect(within(bar).queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument()
     await user.click(within(bar).getByRole('button', { name: 'Unhide' }))
 
-    await user.click(screen.getByRole('switch', { name: 'Show hidden' }))
+    await user.click(screen.getByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Show hidden photos' }))
     expect(await screen.findByRole('button', { name: 'IMG_0001.jpg' })).toBeInTheDocument()
   })
 
@@ -37,7 +39,8 @@ describe('hiding photos', () => {
     const { user } = renderApp('/folders/3')
     await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
     await user.click(within(await selectionBar()).getByRole('button', { name: 'Hide' }))
-    await user.click(screen.getByRole('switch', { name: 'Show hidden' }))
+    await user.click(screen.getByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Show hidden photos' }))
     await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
     await user.click(screen.getByRole('checkbox', { name: 'Select IMG_0002.jpg' }))
     const bar = await selectionBar()
@@ -45,12 +48,12 @@ describe('hiding photos', () => {
     expect(within(bar).queryByRole('button', { name: 'Unhide' })).not.toBeInTheDocument()
   })
 
-  it('only the folder view offers Hide or Show hidden', async () => {
+  it('only the folder view offers Hide or the folder actions menu', async () => {
     const { user } = renderApp('/favorites')
     await user.click(await screen.findByRole('checkbox', { name: /^Select / }))
     expect(
       within(await selectionBar()).queryByRole('button', { name: 'Hide' }),
     ).not.toBeInTheDocument()
-    expect(screen.queryByRole('switch', { name: 'Show hidden' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Folder actions' })).not.toBeInTheDocument()
   })
 })

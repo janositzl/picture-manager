@@ -83,14 +83,20 @@ describe('selecting photos', () => {
 
   it('adds a whole folder from its header', async () => {
     const { user } = renderApp('/folders/3')
-    await user.click(await screen.findByRole('button', { name: 'Add folder to album…' }))
+    await user.click(await screen.findByRole('button', { name: 'Folder actions' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Add folder to album…' }))
     await user.click(await screen.findByRole('button', { name: /^Empty/ }))
     expect(await screen.findByText('Added 3 photos to Empty.')).toBeInTheDocument()
   })
 
-  it('offers no folder add when the folder has no photos of its own', async () => {
-    renderApp('/folders/1')
+  it('offers no folder add or re-analyse when the folder has no photos of its own', async () => {
+    const { user } = renderApp('/folders/1')
     expect(await screen.findByRole('heading', { name: 'dev' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add folder to album…' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Folder actions' }))
+    expect(
+      await screen.findByRole('menuitemcheckbox', { name: 'Show hidden photos' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Add folder to album…' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Re-analyse faces…' })).not.toBeInTheDocument()
   })
 })
