@@ -26,14 +26,15 @@ public sealed class PeopleRepository : IPeopleRepository
         people.Select(p => new PersonSummary(
             p.Id,
             p.Name,
-            p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Confirmed).Select(f => f.ImageId).Distinct().Count(),
-            p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Suggested
+            p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Confirmed && !f.Image!.IsHidden).Select(f => f.ImageId).Distinct().Count(),
+            p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Suggested && !f.Image!.IsHidden
                                && !p.Faces.Any(c => c.ImageId == f.ImageId && c.AssignmentState == FaceAssignmentState.Confirmed))
                 .Select(f => f.ImageId).Distinct().Count(),
-            p.Faces.Any(f => f.Id == p.CoverFaceId
+            p.Faces.Any(f => f.Id == p.CoverFaceId && !f.Image!.IsHidden
                              && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))
                 ? p.CoverFaceId
-                : p.Faces.Where(f => f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed)
+                : p.Faces.Where(f => !f.Image!.IsHidden
+                                     && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))
                     .OrderByDescending(f => f.AssignmentState == FaceAssignmentState.Confirmed)
                     .ThenByDescending(f => f.QualityScore).ThenBy(f => f.Id)
                     .Select(f => (int?)f.Id)
@@ -44,7 +45,8 @@ public sealed class PeopleRepository : IPeopleRepository
         // Filter on the entity (a constructor projection can't be filtered on), then order the small result in memory.
         var summaries = await Summaries(_dbContext.People.AsNoTracking()
                 .Where(p => p.Name != null
-                            || p.Faces.Any(f => f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed)))
+                            || p.Faces.Any(f => !f.Image!.IsHidden
+                                                && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))))
             .ToListAsync(cancellationToken);
         return summaries.OrderByDescending(s => s.ConfirmedImageCount).ThenByDescending(s => s.SuggestedImageCount).ThenBy(s => s.Id).ToList();
     }

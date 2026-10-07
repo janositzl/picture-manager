@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PictureManager.Application.Faces;
+using PictureManager.Application.Repositories;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Model;
 using PictureManager.Tests.Support;
@@ -69,6 +70,48 @@ public class FaceRepositoryTests
         (await repository.GetCandidateImageIdsAsync(model, top.Id, isRecursive: true))
             .Should().HaveCount(5);
         (await repository.GetCandidateImageIdsAsync(model, folderId: 999_999, isRecursive: true)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetCandidateImageIdsAsync_SkipsHiddenImages_AndTheyReturnWhenUnhidden()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var folder = await FaceTestData.AddFolderAsync(db.Context, top, "Trips");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var shown = await FaceTestData.AddImageAsync(db.Context, folder, "shown");
+        var hidden = await FaceTestData.AddImageAsync(db.Context, folder, "hidden");
+        hidden.IsHidden = true;
+        await db.Context.SaveChangesAsync();
+
+        (await new FaceRepository(db.CreateContext()).GetCandidateImageIdsAsync(model, null, isRecursive: true))
+            .Should().Equal(shown.Id);
+
+        hidden.IsHidden = false;
+        await db.Context.SaveChangesAsync();
+        (await new FaceRepository(db.CreateContext()).GetCandidateImageIdsAsync(model, null, isRecursive: true))
+            .Should().BeEquivalentTo(new[] { shown.Id, hidden.Id });
+    }
+
+    [Fact]
+    public async Task FaceQueries_IgnoreFacesOnHiddenImages()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var folder = await FaceTestData.AddFolderAsync(db.Context, top, "Trips");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var shown = await FaceTestData.AddImageAsync(db.Context, folder, "shown");
+        var hidden = await FaceTestData.AddImageAsync(db.Context, folder, "hidden");
+        var shownFace = await FaceTestData.AddFaceAsync(db.Context, shown.Id, model, FaceTestData.Embedding(0));
+        await FaceTestData.AddFaceAsync(db.Context, hidden.Id, model, FaceTestData.Embedding(0, 0.01));
+        hidden.IsHidden = true;
+        await db.Context.SaveChangesAsync();
+
+        var repository = new FaceRepository(db.CreateContext());
+
+        (await repository.GetUnassignedFacesAsync(model, 0f)).Select(f => f.Id).Should().Equal(shownFace.Id);
+        (await repository.GetUnclusteredFacesAsync(model, 0f)).Select(f => f.Id).Should().Equal(shownFace.Id);
+        (await repository.GetNearestAsync(shownFace.Id, model, NeighborPool.Unassigned, 10)).Should().BeEmpty();
     }
 
     [Fact]

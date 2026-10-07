@@ -15,6 +15,28 @@ public class PeopleRepositoryTests
     private static readonly DateTime Now = new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public async Task GetAllAsync_IgnoresFacesOnHiddenImages()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var shown = await FaceTestData.AddImageAsync(db.Context, top, "shown");
+        var hidden = await FaceTestData.AddImageAsync(db.Context, top, "hidden");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        await FaceTestData.AddFaceAsync(db.Context, shown.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Confirmed);
+        await FaceTestData.AddFaceAsync(db.Context, hidden.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Confirmed);
+        await FaceTestData.AddFaceAsync(db.Context, hidden.Id, model, FaceTestData.Embedding(2), anna.Id, FaceAssignmentState.Suggested);
+        hidden.IsHidden = true;
+        await db.Context.SaveChangesAsync();
+
+        var people = await new PeopleRepository(db.CreateContext()).GetAllAsync();
+
+        people.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Id = anna.Id, ConfirmedImageCount = 1, SuggestedImageCount = 0 });
+    }
+
+    [Fact]
     public async Task GetAllAsync_CountsAssignedFacesAndDistinctPhotos_SkipsEmptyUnnamed()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

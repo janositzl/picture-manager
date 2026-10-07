@@ -242,7 +242,8 @@ public sealed class FaceRepository : IFaceRepository
 
     public async Task<IReadOnlyList<FaceCandidate>> GetUnassignedFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
         await _dbContext.Faces.AsNoTracking()
-            .Where(f => f.FaceModelId == faceModelId && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality)
+            .Where(f => f.FaceModelId == faceModelId && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality
+                        && !f.Image!.IsHidden)
             .OrderByDescending(f => f.QualityScore)
             .Select(f => new FaceCandidate(f.Id, f.QualityScore, f.RejectedPersonId))
             .ToListAsync(cancellationToken);
@@ -250,7 +251,8 @@ public sealed class FaceRepository : IFaceRepository
     public async Task<IReadOnlyList<FaceCandidate>> GetUnclusteredFacesAsync(int faceModelId, float minQuality, CancellationToken cancellationToken = default) =>
         await _dbContext.Faces.AsNoTracking()
             .Where(f => f.FaceModelId == faceModelId && f.ClusteredUtc == null
-                        && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality)
+                        && f.AssignmentState == FaceAssignmentState.Unknown && f.QualityScore >= minQuality
+                        && !f.Image!.IsHidden)
             .OrderByDescending(f => f.QualityScore).ThenBy(f => f.Id)
             .Select(f => new FaceCandidate(f.Id, f.QualityScore, f.RejectedPersonId))
             .ToListAsync(cancellationToken);
@@ -274,7 +276,8 @@ public sealed class FaceRepository : IFaceRepository
             return Array.Empty<FaceNeighbor>();
 
         var faces = _dbContext.Faces.AsNoTracking()
-            .Where(f => f.FaceModelId == faceModelId && f.Id != faceId && f.QualityScore >= minQuality);
+            .Where(f => f.FaceModelId == faceModelId && f.Id != faceId && f.QualityScore >= minQuality
+                        && !f.Image!.IsHidden);
         faces = pool == NeighborPool.Assigned
             ? faces.Where(f => f.PersonId != null
                                && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed))
