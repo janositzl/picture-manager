@@ -118,7 +118,7 @@ public sealed class ImageQueryService : IImageQueryService
         var image = row.Image;
         return Result<ImageDetail>.Ok(new ImageDetail(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
-            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash),
+            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash, image.ThumbnailRotation),
             row.FileSize, row.FileModified, row.Orientation, row.CameraMake, row.CameraModel, row.LensModel,
             row.Latitude, row.Longitude, ParseJson(row.RawMetadata), FolderDisplayPath.For(row.RootName, row.RelativePath),
             albums, image.IndexState == IndexState.Invalid, image.IsHidden));

@@ -139,7 +139,7 @@ public sealed class DuplicateService : IDuplicateService
         var image = row.Image;
         return new DuplicateImageItem(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
-            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash),
+            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash, image.ThumbnailRotation),
             FolderDisplayPath.For(row.RootName, row.RelativePath), row.FileSize);
     }
 }

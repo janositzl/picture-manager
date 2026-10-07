@@ -60,7 +60,7 @@ public static class ImageEndpoints
             return Results.NotFound();
 
         var derivativePath = await thumbnailService.GetOrCreateDerivativePathAsync(
-            image.ContentHash, physicalPath, image.Orientation, DerivativeSize.Preview, cancellationToken);
+            image.ContentHash, physicalPath, image.Orientation, DerivativeSize.Preview, cancellationToken, image.ThumbnailRotation);
         if (derivativePath is null)
             return Results.NotFound();
 

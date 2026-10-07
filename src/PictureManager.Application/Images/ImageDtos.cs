@@ -25,7 +25,7 @@ public sealed record ImageListItem(
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
-        ImageUrls.Thumbnail(row.Id, row.ContentHash, row.ThumbnailRotation), ImageUrls.Preview(row.Id, row.ContentHash),
+        ImageUrls.Thumbnail(row.Id, row.ContentHash, row.ThumbnailRotation), ImageUrls.Preview(row.Id, row.ContentHash, row.ThumbnailRotation),
         FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId, row.IsHidden);
 }
 

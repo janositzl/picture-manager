@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import FaceRetouchingNaturalIcon from '@mui/icons-material/FaceRetouchingNatural'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
+import RotateRightIcon from '@mui/icons-material/RotateRight'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import {
@@ -27,6 +28,7 @@ import { isNotFound } from '../api/client'
 import { useRemoveImagesFromAlbum } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
 import { albumsQuery, useImage } from '../api/queries'
+import { useRotateThumbnails } from '../api/rotation'
 import type { AlbumRef, ImageListItem } from '../api/types'
 import { useNotify } from '../app/notify'
 import { parseGridParams, withParams } from '../routing/urlState'
@@ -86,6 +88,7 @@ export function PhotoViewer({
   const imageId = parseGridParams(searchParams).image
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
+  const rotate = useRotateThumbnails()
   // Any viewer can switch to face review (for photos no person's grid leads to); opened from a person it starts on.
   const [reviewing, setReviewing] = useState(false)
   const faceReview: { personId: number | null } | undefined =
@@ -208,6 +211,11 @@ export function PhotoViewer({
       setFavorite.mutate({ id: current.id, isFavorite: !current.isFavorite })
   }
 
+  const rotateRight = () => {
+    if (current !== undefined && canAdd && !rotate.isPending)
+      rotate.mutate({ imageIds: [current.id], degrees: 90 })
+  }
+
   const toggleReview = () => {
     if (!reviewing) setInfoOpen(false)
     setReviewing(!reviewing)
@@ -252,6 +260,10 @@ export function PhotoViewer({
       case 'i':
       case 'I':
         toggleInfo()
+        break
+      case 'r':
+      case 'R':
+        rotateRight()
         break
       case 'a':
       case 'A':
@@ -413,6 +425,23 @@ export function PhotoViewer({
                     }}
                   >
                     {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                  </IconButton>
+                </Tooltip>
+              )}
+              {canAdd && (
+                <Tooltip title="Rotate right (R)">
+                  <IconButton
+                    aria-label="Rotate right"
+                    onClick={rotateRight}
+                    className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                    sx={{
+                      color: 'common.white',
+                      bgcolor: 'rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(4px)',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                    }}
+                  >
+                    <RotateRightIcon />
                   </IconButton>
                 </Tooltip>
               )}

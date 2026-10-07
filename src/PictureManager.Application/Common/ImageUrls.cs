@@ -12,7 +12,8 @@ public static class ImageUrls
     public static string? Thumbnail(int id, string contentHash, int rotation = 0) =>
         Build(id, "thumbnail", contentHash, rotation);
 
-    public static string? Preview(int id, string contentHash) => Build(id, "preview", contentHash);
+    public static string? Preview(int id, string contentHash, int rotation = 0) =>
+        Build(id, "preview", contentHash, rotation);
 
     private static string? Build(int id, string kind, string contentHash, int rotation = 0)
     {
