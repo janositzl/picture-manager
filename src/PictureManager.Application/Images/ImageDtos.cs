@@ -20,12 +20,13 @@ public sealed record ImageListItem(
     string? PreviewUrl,
     string FolderPath,
     bool IsInvalid,
-    int? FaceId = null)
+    int? FaceId = null,
+    bool IsHidden = false)
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
         ImageUrls.Thumbnail(row.Id, row.ContentHash), ImageUrls.Preview(row.Id, row.ContentHash),
-        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId);
+        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId, row.IsHidden);
 }
 
 public sealed record ImageDetail(
@@ -50,7 +51,10 @@ public sealed record ImageDetail(
     JsonElement? RawMetadata,
     string FolderPath,
     IReadOnlyList<AlbumRef> Albums,
-    bool IsInvalid);
+    bool IsInvalid,
+    bool IsHidden);
+
+public sealed record HiddenResult(int Affected);
 
 public sealed record ImageListRequest(
     int? FolderId = null,
@@ -63,7 +67,8 @@ public sealed record ImageListRequest(
     int? Limit = null,
     int? PersonId = null,
     string? PersonState = null,
-    string? Faces = null);
+    string? Faces = null,
+    bool IncludeHidden = false);
 
 /// <summary>Cursor payload. Key = SortDate ticks (date sort) or the DB's lower(FileName) (name sort).</summary>
 public sealed record ImageCursor(

@@ -29,7 +29,7 @@ public enum PersonFaceState
 /// </summary>
 public sealed record ImageListFilter(
     int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null, PersonFaceState? PersonState = null,
-    bool? HasFaces = null);
+    bool? HasFaces = null, bool IncludeHidden = false);
 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);
@@ -50,7 +50,8 @@ public sealed record ImageRow(
     string RootName,
     string RelativePath,
     IndexState IndexState = IndexState.Indexed,
-    int? FaceId = null);
+    int? FaceId = null,
+    bool IsHidden = false);
 
 public sealed record ImageDetailRow(
     ImageRow Image,

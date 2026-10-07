@@ -90,7 +90,7 @@ public sealed class ImageQueryService : IImageQueryService
             }
         }
 
-        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces);
+        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces, request.IncludeHidden);
         var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();
@@ -121,7 +121,20 @@ public sealed class ImageQueryService : IImageQueryService
             image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash), ImageUrls.Preview(image.Id, image.ContentHash),
             row.FileSize, row.FileModified, row.Orientation, row.CameraMake, row.CameraModel, row.LensModel,
             row.Latitude, row.Longitude, ParseJson(row.RawMetadata), FolderDisplayPath.For(row.RootName, row.RelativePath),
-            albums, image.IndexState == IndexState.Invalid));
+            albums, image.IndexState == IndexState.Invalid, image.IsHidden));
+    }
+
+    private const int MaxHideBatch = 5000;
+
+    public async Task<Result<HiddenResult>> SetHiddenAsync(IReadOnlyCollection<int> imageIds, bool isHidden, CancellationToken cancellationToken = default)
+    {
+        if (imageIds.Count == 0)
+            return Result.Invalid("imageIds", "Must not be empty.");
+        if (imageIds.Count > MaxHideBatch)
+            return Result.Invalid("imageIds", $"Must not contain more than {MaxHideBatch} ids.");
+
+        var affected = await _images.SetHiddenAsync(imageIds, isHidden, _clock.UtcNow, cancellationToken);
+        return Result<HiddenResult>.Ok(new HiddenResult(affected));
     }
 
     public async Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default)

@@ -33,7 +33,7 @@
 ## File Structure
 
 - Modify `src/PictureManager.Model/Image.cs` — add `IsHidden`.
-- Modify `src/PictureManager.Infrastructure/Persistence/Configurations/ImageConfiguration.cs` — default + partial index.
+- Modify `ImageConfiguration.cs` — default (no extra index).
 - Create migration `AddImageIsHidden` in `src/PictureManager.Infrastructure/Migrations/`.
 - Modify `src/PictureManager.Infrastructure/Persistence/Queries/VisibilityExtensions.cs` — `WhereVisible` hides, new `WhereExisting`.
 - Modify `src/PictureManager.Infrastructure/Persistence/Repositories/FaceRepository.cs`, `PeopleRepository.cs`, `AlbumRepository.cs`, `FolderRepository.cs`, `ImageQueryRepository.cs`.

@@ -25,7 +25,10 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         ImageListFilter filter, ImageSort sort, SortDirection direction, ImageKeyset? after, int take,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Images.AsNoTracking().WhereVisible();
+        // Hidden images are listed only for one folder's "Show hidden" view.
+        var query = filter.IncludeHidden && filter.FolderId is not null
+            ? _dbContext.Images.AsNoTracking().WhereExisting()
+            : _dbContext.Images.AsNoTracking().WhereVisible();
 
         if (filter.FolderId is int folderId)
             query = query.Where(i => i.FolderId == folderId);
@@ -96,11 +99,11 @@ public sealed class ImageQueryRepository : IImageQueryRepository
 
     public async Task<ImageDetailRow?> GetVisibleDetailAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Images.AsNoTracking().WhereVisible()
+        return await _dbContext.Images.AsNoTracking().WhereExisting()
             .Where(i => i.Id == id)
             .Select(i => new ImageDetailRow(
                 new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
+                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden),
                 i.FileSize, i.FileModified, i.Orientation, i.CameraMake, i.CameraModel, i.LensModel,
                 i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath))
             .FirstOrDefaultAsync(cancellationToken);
@@ -113,6 +116,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .OrderBy(ai => ai.Album!.Name.ToLower()).ThenBy(ai => ai.AlbumId)
             .Select(ai => new AlbumRef(ai.AlbumId, ai.Album!.Name))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> SetHiddenAsync(IReadOnlyCollection<int> ids, bool isHidden, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToList();
+        return await _dbContext.Images.WhereExisting()
+            .Where(i => idList.Contains(i.Id) && i.IsHidden != isHidden)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.IsHidden, isHidden)
+                .SetProperty(i => i.UpdatedAt, updatedAtUtc),
+                cancellationToken);
     }
 
     public async Task<bool> SetFavoriteAsync(int id, bool isFavorite, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
@@ -192,7 +206,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
 
     private static readonly System.Linq.Expressions.Expression<Func<Image, DuplicateMemberRow>> MemberProjection = i => new DuplicateMemberRow(
         new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-            i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState),
+            i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden),
         i.Folder!.Root!.Name,
         i.Folder.RelativePath,
         i.FileSize);

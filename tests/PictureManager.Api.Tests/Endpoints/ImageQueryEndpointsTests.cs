@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -22,7 +23,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(page));
 
-        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, null, null, "name", "desc", "c", 50, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, null, null, null, "name", "desc", "c", 50, _service, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<PagedResult<ImageListItem>>>().Which.Value.Should().BeSameAs(page);
         await _service.Received(1).ListAsync(
@@ -35,7 +36,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>(Array.Empty<ImageListItem>(), null)));
 
-        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, _service, CancellationToken.None);
+        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, null, _service, CancellationToken.None);
 
         await _service.Received(1).ListAsync(new ImageListRequest(), Arg.Any<CancellationToken>());
     }
@@ -46,7 +47,42 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result.Invalid("limit", "Must be between 1 and 200."));
 
-        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, 0, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, 0, _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<ValidationProblem>();
+    }
+
+    [Fact]
+    public async Task ListAsync_IncludeHidden_IsPassedThrough()
+    {
+        _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>(Array.Empty<ImageListItem>(), null)));
+
+        await ImageQueryEndpoints.ListAsync(3, null, null, null, null, null, null, true, null, null, null, null, _service, CancellationToken.None);
+
+        await _service.Received(1).ListAsync(new ImageListRequest(FolderId: 3, IncludeHidden: true), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetHiddenAsync_ReturnsTheAffectedCount()
+    {
+        _service.SetHiddenAsync(Arg.Any<IReadOnlyCollection<int>>(), true, Arg.Any<CancellationToken>())
+            .Returns(Result<HiddenResult>.Ok(new HiddenResult(2)));
+
+        var result = await ImageQueryEndpoints.SetHiddenAsync(
+            new ImageQueryEndpoints.SetHiddenRequest(new[] { 1, 2 }, true), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<Ok<HiddenResult>>().Which.Value!.Affected.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task SetHiddenAsync_MissingIdList_IsTreatedAsEmpty_AndRejected()
+    {
+        _service.SetHiddenAsync(Arg.Is<IReadOnlyCollection<int>>(ids => ids.Count == 0), true, Arg.Any<CancellationToken>())
+            .Returns(Result.Invalid("imageIds", "Must not be empty."));
+
+        var result = await ImageQueryEndpoints.SetHiddenAsync(
+            new ImageQueryEndpoints.SetHiddenRequest(null, true), _service, CancellationToken.None);
 
         result.Result.Should().BeOfType<ValidationProblem>();
     }

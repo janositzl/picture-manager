@@ -102,7 +102,7 @@ public sealed class AlbumRepository : IAlbumRepository
                     ai.Image.Height, ai.Image.DateTaken, ai.Image.IsFavorite, ai.Image.ContentHash, ai.Image.SortDate,
                     ai.Image.FileName.ToLower(), ai.Image.Folder!.Root!.Name, ai.Image.Folder.RelativePath),
                 ai.SortOrder,
-                ai.Image.MissingSinceUtc != null || !ai.Image.Folder!.IsActive || ai.Image.Folder.MissingSinceUtc != null || !ai.Image.Folder.Root!.IsActive))
+                ai.Image.IsHidden || ai.Image.MissingSinceUtc != null || !ai.Image.Folder!.IsActive || ai.Image.Folder.MissingSinceUtc != null || !ai.Image.Folder.Root!.IsActive))
             .ToListAsync(cancellationToken);
     }
 

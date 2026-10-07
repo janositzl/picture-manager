@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Common;
@@ -9,6 +10,8 @@ public interface IImageQueryService
     Task<Result<PagedResult<ImageListItem>>> ListAsync(ImageListRequest request, CancellationToken cancellationToken = default);
 
     Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<Result<HiddenResult>> SetHiddenAsync(IReadOnlyCollection<int> imageIds, bool isHidden, CancellationToken cancellationToken = default);
 
     Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default);
 }

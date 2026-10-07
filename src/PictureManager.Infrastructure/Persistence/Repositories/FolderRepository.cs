@@ -78,7 +78,7 @@ public sealed class FolderRepository : IFolderRepository
                 f.RootId,
                 RootName = f.Root!.Name,
                 f.RelativePath,
-                ImageCount = f.Images.Count(i => i.MissingSinceUtc == null),
+                ImageCount = f.Images.Count(i => i.MissingSinceUtc == null && !i.IsHidden),
                 IsMissing = f.MissingSinceUtc != null
             })
             .FirstOrDefaultAsync(cancellationToken);

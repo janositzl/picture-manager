@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -12,6 +13,7 @@ public static class ImageQueryEndpoints
     public static IEndpointRouteBuilder MapImageQueryEndpoints(this IEndpointRouteBuilder user)
     {
         user.MapGet("/images", ListAsync);
+        user.MapPut("/images/hidden", SetHiddenAsync);
         user.MapGet("/images/{id:int}", GetAsync);
         user.MapPut("/images/{id:int}/favorite", SetFavoriteAsync);
         user.MapDelete("/images/{id:int}/favorite", ClearFavoriteAsync);
@@ -19,12 +21,18 @@ public static class ImageQueryEndpoints
     }
 
     public static async Task<Results<Ok<PagedResult<ImageListItem>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListAsync(
-        int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? personState, string? faces, string? sort, string? order, string? cursor, int? limit,
+        int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? personState, string? faces, bool? includeHidden, string? sort, string? order, string? cursor, int? limit,
         IImageQueryService service, CancellationToken cancellationToken)
     {
-        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit, personId, personState, faces);
+        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit, personId, personState, faces, includeHidden ?? false);
         return (await service.ListAsync(request, cancellationToken)).ToOk();
     }
+
+    public sealed record SetHiddenRequest(IReadOnlyList<int>? ImageIds, bool IsHidden);
+
+    public static async Task<Results<Ok<HiddenResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetHiddenAsync(
+        SetHiddenRequest request, IImageQueryService service, CancellationToken cancellationToken) =>
+        (await service.SetHiddenAsync(request.ImageIds ?? [], request.IsHidden, cancellationToken)).ToOk();
 
     public static async Task<Results<Ok<ImageDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetAsync(
         int id, IImageQueryService service, CancellationToken cancellationToken) =>

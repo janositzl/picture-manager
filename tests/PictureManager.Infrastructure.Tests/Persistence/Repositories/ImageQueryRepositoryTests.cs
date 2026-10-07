@@ -73,6 +73,81 @@ public class ImageQueryRepositoryTests
     }
 
     [Fact]
+    public async Task ListAsync_IncludeHiddenInAFolder_ListsHiddenImagesWithTheFlag()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("active");
+        var folder = TestData.Folder(root, "");
+        var other = TestData.Folder(root, "other");
+        var shown = TestData.Image(folder, "shown");
+        var hidden = TestData.Image(folder, "hidden", isHidden: true);
+        db.Context.Images.AddRange(shown, hidden, TestData.Image(other, "elsewhere", isHidden: true));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var filter = new ImageListFilter(folder.Id, null, null, false, IncludeHidden: true);
+        var rows = await new ImageQueryRepository(context).ListAsync(filter, ImageSort.Name, SortDirection.Asc, null, 50);
+
+        rows.Select(r => (r.Id, r.IsHidden)).Should().Equal((hidden.Id, true), (shown.Id, false));
+    }
+
+    [Fact]
+    public async Task ListAsync_IncludeHiddenWithoutAFolder_StillHidesThem()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("active");
+        var folder = TestData.Folder(root, "");
+        var shown = TestData.Image(folder, "shown");
+        db.Context.Images.AddRange(shown, TestData.Image(folder, "hidden", isHidden: true));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var filter = new ImageListFilter(null, null, null, false, IncludeHidden: true);
+        var rows = await new ImageQueryRepository(context).ListAsync(filter, ImageSort.Date, SortDirection.Desc, null, 50);
+
+        rows.Select(r => r.Id).Should().Equal(shown.Id);
+    }
+
+    [Fact]
+    public async Task SetHiddenAsync_HidesAndUnhides_SkipsUnknownAndMissing_AndReturnsTheAffectedCount()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("active");
+        var folder = TestData.Folder(root, "");
+        var a = TestData.Image(folder, "a");
+        var b = TestData.Image(folder, "b");
+        var missing = TestData.Image(folder, "missing", missingSinceUtc: TestData.Utc);
+        db.Context.Images.AddRange(a, b, missing);
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var repository = new ImageQueryRepository(context);
+
+        (await repository.SetHiddenAsync(new[] { a.Id, missing.Id, 999_999 }, true, TestData.Utc)).Should().Be(1);
+        (await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Select(r => r.Id).Should().Equal(b.Id);
+
+        (await repository.SetHiddenAsync(new[] { a.Id }, false, TestData.Utc)).Should().Be(1);
+        (await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetVisibleDetailAsync_ReturnsAHiddenImage_SoTheViewerCanOpenIt()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("active");
+        var folder = TestData.Folder(root, "");
+        var hidden = TestData.Image(folder, "hidden", isHidden: true);
+        db.Context.Images.Add(hidden);
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var detail = await new ImageQueryRepository(context).GetVisibleDetailAsync(hidden.Id);
+
+        detail.Should().NotBeNull();
+        detail!.Image.IsHidden.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ListAsync_HasFacesFilter_SplitsPhotosByNonIgnoredFaces()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

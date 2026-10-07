@@ -245,6 +245,31 @@ public class ImageQueryServiceTests
     }
 
     [Fact]
+    public async Task SetHiddenAsync_EmptyList_IsInvalid()
+    {
+        (await CreateService().SetHiddenAsync(Array.Empty<int>(), true)).Status.Should().Be(ResultStatus.Invalid);
+        await _images.DidNotReceiveWithAnyArgs().SetHiddenAsync(default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task SetHiddenAsync_TooManyIds_IsInvalid()
+    {
+        (await CreateService().SetHiddenAsync(Enumerable.Range(1, 5001).ToArray(), true)).Status.Should().Be(ResultStatus.Invalid);
+        await _images.DidNotReceiveWithAnyArgs().SetHiddenAsync(default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task SetHiddenAsync_ReturnsTheRepositoryCount_AndStampsTheClock()
+    {
+        _images.SetHiddenAsync(Arg.Any<IReadOnlyCollection<int>>(), true, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(2);
+
+        var result = await CreateService().SetHiddenAsync(new[] { 1, 2, 3 }, true);
+
+        result.Value!.Affected.Should().Be(2);
+        await _images.Received(1).SetHiddenAsync(Arg.Any<IReadOnlyCollection<int>>(), true, _clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SetFavoriteAsync_NoVisibleImage_ReturnsNotFound()
     {
         _images.SetFavoriteAsync(9, true, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
