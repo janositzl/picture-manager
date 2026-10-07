@@ -163,10 +163,11 @@ export function GridHeader({
           className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
           sx={{ borderRadius: 0 }}
         >
+          {/* Ascending points down (first item at the top, flowing downward). */}
           {order === 'asc' ? (
-            <ArrowUpwardIcon fontSize="small" />
-          ) : (
             <ArrowDownwardIcon fontSize="small" />
+          ) : (
+            <ArrowUpwardIcon fontSize="small" />
           )}
         </IconButton>
       </Box>

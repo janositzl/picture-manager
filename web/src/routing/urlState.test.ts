@@ -25,10 +25,10 @@ describe('parseGridParams', () => {
   it('defaults to name, ascending, no image', () =>
     expect(parseGridParams(params(''))).toEqual({ sort: 'name', order: 'asc', image: null }))
 
-  it('defaults date sorts to descending', () =>
+  it('defaults date sorts to ascending', () =>
     expect(parseGridParams(params('?sort=date'))).toEqual({
       sort: 'date',
-      order: 'desc',
+      order: 'asc',
       image: null,
     }))
 

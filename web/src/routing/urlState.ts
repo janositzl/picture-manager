@@ -4,9 +4,9 @@ export type Order = 'asc' | 'desc'
 export type GridParams = { sort: Sort; order: Order; image: number | null }
 export type SearchParamsState = { q: string; in: number | null }
 
-/** The API's default direction for each sort. */
-export function defaultOrder(sort: Sort): Order {
-  return sort === 'date' ? 'desc' : 'asc'
+/** Every sort starts ascending; the grid always sends its order explicitly, so this isn't the API's default. */
+export function defaultOrder(_sort: Sort): Order {
+  return 'asc'
 }
 
 /** A positive integer id, or null for anything else ("", "0", "-3", "1.5", "07", "abc", overflow). */

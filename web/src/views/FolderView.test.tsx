@@ -66,7 +66,7 @@ describe('FolderView', () => {
 
     await waitFor(() => expect(requests.some((q) => q.get('sort') === 'date')).toBe(true))
     const firstDateRequest = requests.find((q) => q.get('sort') === 'date')!
-    expect(firstDateRequest.get('order')).toBe('desc')
+    expect(firstDateRequest.get('order')).toBe('asc')
     expect(firstDateRequest.get('cursor')).toBeNull()
     expect(router.state.location.search).toBe('?sort=date')
   })
