@@ -44,6 +44,22 @@ public class SkiaSharpThumbnailServiceTests : IDisposable
     private SkiaSharpThumbnailService CreateService() =>
         new(new ThumbnailCacheOptions { RootPath = _cacheRoot, PreviewEnabled = true });
 
+    [Fact]
+    public async Task DeleteDerivatives_RemovesBothSizes_AndLeavesOtherHashesAlone()
+    {
+        var service = CreateService();
+        var thumb = await service.GetOrCreateDerivativePathAsync("abcd1234", _sourcePath, null, DerivativeSize.Thumbnail);
+        var preview = await service.GetOrCreateDerivativePathAsync("abcd1234", _sourcePath, null, DerivativeSize.Preview);
+        var other = await service.GetOrCreateDerivativePathAsync("wxyz9876", _sourcePath, null, DerivativeSize.Thumbnail);
+
+        service.DeleteDerivatives("abcd1234");
+        service.DeleteDerivatives("abcd1234"); // already gone: must not throw
+
+        File.Exists(thumb).Should().BeFalse();
+        File.Exists(preview).Should().BeFalse();
+        File.Exists(other).Should().BeTrue();
+    }
+
     // Distinguishable-quadrant source used to verify EXIF orientation transforms pixel-by-pixel, not just
     // by dimension swap. Index order matches the ORIGINAL (pre-transform) source layout: 0=top-left,
     // 1=top-right, 2=bottom-left, 3=bottom-right.

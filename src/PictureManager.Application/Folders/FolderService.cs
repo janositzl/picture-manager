@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Thumbnails;
 
 namespace PictureManager.Application.Folders;
 
@@ -11,12 +12,14 @@ public sealed class FolderService : IFolderService
     private readonly IFolderRepository _folders;
     private readonly IJobRepository _scanJobs;
     private readonly IClock _clock;
+    private readonly IThumbnailService _thumbnails;
 
-    public FolderService(IFolderRepository folders, IJobRepository scanJobs, IClock clock)
+    public FolderService(IFolderRepository folders, IJobRepository scanJobs, IClock clock, IThumbnailService thumbnails)
     {
         _folders = folders;
         _scanJobs = scanJobs;
         _clock = clock;
+        _thumbnails = thumbnails;
     }
 
     public Task<IReadOnlyList<FolderNode>> GetRootsAsync(CancellationToken cancellationToken = default) =>
@@ -52,7 +55,12 @@ public sealed class FolderService : IFolderService
         if (await _scanJobs.HasActiveJobAsync(cancellationToken))
             return Result.Conflict("A scan is running; remove the folder after it finishes.");
 
-        await _folders.RemoveFromCollectionAsync(id, cancellationToken);
+        var orphanedHashes = await _folders.RemoveFromCollectionAsync(id, cancellationToken);
+
+        // The database delete is committed; freeing the cached thumbnails is best effort (they regenerate on demand).
+        foreach (var hash in orphanedHashes)
+            _thumbnails.DeleteDerivatives(hash);
+
         return Result.Ok();
     }
 

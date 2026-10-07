@@ -184,7 +184,7 @@ export function FolderActionsMenu({
         <div onClick={(event: MouseEvent) => event.stopPropagation()}>
           <ConfirmDialog
             title="Remove folder"
-            message={`Remove ${folderName} from the collection? This permanently deletes its images and subfolders from the database (the files on disk are untouched). The folder itself can be restored from Admin > Removed folders, but its deleted images and subfolders cannot.`}
+            message={`Remove ${folderName} from the collection? This permanently deletes its images and subfolders from the database, along with their cached thumbnails (the files on disk are untouched). The folder itself can be restored from Admin > Removed folders, but its deleted images and subfolders cannot.`}
             confirmLabel="Remove"
             busy={removeFolder.isPending}
             onConfirm={confirmRemove}

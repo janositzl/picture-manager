@@ -32,8 +32,10 @@ public interface IFolderRepository
     /// <summary>
     /// In one transaction: hard-deletes the folder's images and every folder beneath it (with their images
     /// and album entries, via the database's cascades), then marks the folder itself IsActive = false.
+    /// Returns the content hashes of the deleted images that no remaining image shares, i.e. the ones
+    /// whose cached thumbnails are now orphaned.
     /// </summary>
-    Task RemoveFromCollectionAsync(int folderId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> RemoveFromCollectionAsync(int folderId, CancellationToken cancellationToken = default);
 
     /// <summary>Hard-deletes the folder and everything beneath it (no tombstone).</summary>
     Task DeleteSubtreeAsync(int folderId, CancellationToken cancellationToken = default);

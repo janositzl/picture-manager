@@ -17,4 +17,10 @@ public interface IThumbnailService
         int? orientation,
         DerivativeSize size,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes every cached derivative of the content hash. Best effort: files that are missing or
+    /// can't be deleted are skipped, and nothing is thrown for them.
+    /// </summary>
+    void DeleteDerivatives(string contentHash);
 }

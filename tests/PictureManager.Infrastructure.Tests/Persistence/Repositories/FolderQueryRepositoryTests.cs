@@ -131,6 +131,29 @@ public class FolderQueryRepositoryTests
     }
 
     [Fact]
+    public async Task RemoveFromCollectionAsync_ReturnsHashesOfDeletedImages_ExceptThoseSharedWithRemainingImages()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("r");
+        var top = TestData.Folder(root, "");
+        var target = TestData.Folder(root, "Target", top);
+        var child = TestData.Folder(root, "Target/Child", target);
+        var sibling = TestData.Folder(root, "Sibling", top);
+        db.Context.Images.AddRange(
+            TestData.Image(target, "a", contentHash: "AAAA1111"),
+            TestData.Image(target, "dup", contentHash: "BBBB2222"),
+            TestData.Image(target, "dup2", contentHash: "BBBB2222"),
+            TestData.Image(child, "c", contentHash: "CCCC3333"),
+            TestData.Image(sibling, "kept", contentHash: "AAAA1111"));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var orphaned = await new FolderRepository(context).RemoveFromCollectionAsync(target.Id);
+
+        orphaned.Should().BeEquivalentTo(["BBBB2222", "CCCC3333"]);
+    }
+
+    [Fact]
     public async Task GetRemovedAsync_ListsTombstonesWithRootName()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

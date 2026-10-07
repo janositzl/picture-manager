@@ -6,6 +6,7 @@ using NSubstitute;
 using PictureManager.Application.Common;
 using PictureManager.Application.Folders;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Thumbnails;
 using PictureManager.Model;
 using Xunit;
 
@@ -16,13 +17,14 @@ public class FolderServiceTests
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly IJobRepository _scanJobs = Substitute.For<IJobRepository>();
+    private readonly IThumbnailService _thumbnails = Substitute.For<IThumbnailService>();
 
     public FolderServiceTests()
     {
         _clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
 
-    private FolderService CreateService() => new(_folders, _scanJobs, _clock);
+    private FolderService CreateService() => new(_folders, _scanJobs, _clock, _thumbnails);
 
     [Fact]
     public async Task GetChildrenAsync_ParentNotVisible_ReturnsNotFound()
@@ -95,6 +97,29 @@ public class FolderServiceTests
 
         (await CreateService().RemoveAsync(4)).IsSuccess.Should().BeTrue();
         await _folders.Received(1).RemoveFromCollectionAsync(4, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoveAsync_DeletesThumbnailsOfOrphanedImages()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = true });
+        _folders.RemoveFromCollectionAsync(4, Arg.Any<CancellationToken>()).Returns(["AAAA1111", "BBBB2222"]);
+
+        (await CreateService().RemoveAsync(4)).IsSuccess.Should().BeTrue();
+
+        _thumbnails.Received(1).DeleteDerivatives("AAAA1111");
+        _thumbnails.Received(1).DeleteDerivatives("BBBB2222");
+    }
+
+    [Fact]
+    public async Task RemoveAsync_Rejected_DeletesNoThumbnails()
+    {
+        _folders.GetByIdAsync(4, Arg.Any<CancellationToken>()).Returns(new Folder { Id = 4, ParentId = 1, IsActive = true });
+        _scanJobs.HasActiveJobAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        await CreateService().RemoveAsync(4);
+
+        _thumbnails.DidNotReceive().DeleteDerivatives(Arg.Any<string>());
     }
 
     [Fact]

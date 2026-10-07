@@ -48,6 +48,24 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
         }
     }
 
+    public void DeleteDerivatives(string contentHash)
+    {
+        if (_options.RootPath is not { } rootPath || contentHash.Length < 4)
+            return;
+
+        foreach (var size in Enum.GetValues<DerivativeSize>())
+        {
+            try
+            {
+                File.Delete(ThumbnailCachePathResolver.GetPath(rootPath, contentHash, size));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Best effort: a stuck file only costs disk space, and is regenerated or overwritten later.
+            }
+        }
+    }
+
     private static string? Generate(
         string sourcePath, int? orientation, DerivativeSize size, string rootPath, string contentHash, string finalPath)
     {

@@ -109,9 +109,19 @@ public sealed class FolderRepository : IFolderRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task RemoveFromCollectionAsync(int folderId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> RemoveFromCollectionAsync(int folderId, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var hashes = await _dbContext.Database.SqlQuery<string>($"""
+            WITH RECURSIVE subtree AS (
+                SELECT "Id" FROM "Folders" WHERE "Id" = {folderId}
+                UNION ALL
+                SELECT f."Id" FROM "Folders" f JOIN subtree s ON f."ParentId" = s."Id"
+            )
+            SELECT DISTINCT i."ContentHash" AS "Value" FROM "Images" i
+            WHERE i."FolderId" IN (SELECT "Id" FROM subtree)
+            """).ToListAsync(cancellationToken);
 
         // The folder's own images go explicitly (the folder row survives as a tombstone). Everything
         // beneath goes by deleting the direct children: the database cascades Folder.ParentId ->
@@ -121,7 +131,15 @@ public sealed class FolderRepository : IFolderRepository
         await _dbContext.Folders.Where(f => f.Id == folderId)
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsActive, false), cancellationToken);
 
+        // Identical copies elsewhere share thumbnails (keyed by content hash), so only hashes that no
+        // remaining image uses are reported as orphaned.
+        var stillUsed = hashes.Count == 0
+            ? []
+            : await _dbContext.Images.Where(i => hashes.Contains(i.ContentHash))
+                .Select(i => i.ContentHash).Distinct().ToListAsync(cancellationToken);
+
         await transaction.CommitAsync(cancellationToken);
+        return hashes.Except(stillUsed).Where(h => h.Length >= 4).ToList();
     }
 
     public async Task DeleteSubtreeAsync(int folderId, CancellationToken cancellationToken = default)
