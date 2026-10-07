@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Scanning;
+using PictureManager.Infrastructure.Imaging;
 using SkiaSharp;
 
 namespace PictureManager.Infrastructure.Scanning;
@@ -15,6 +16,12 @@ public sealed class SkiaImageValidator : IImageValidator
 
         try
         {
+            if (HeicDecoder.IsHeic(filePath))
+            {
+                using var heic = HeicDecoder.Decode(filePath, null);
+                return Task.FromResult(heic is not null);
+            }
+
             using var stream = File.OpenRead(filePath);
             using var bitmap = SKBitmap.Decode(stream);
             return Task.FromResult(bitmap is not null);

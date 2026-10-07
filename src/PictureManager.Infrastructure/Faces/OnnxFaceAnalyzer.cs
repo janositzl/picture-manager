@@ -53,7 +53,7 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         using var decoded = SkiaBitmapOps.DecodeDownsampled(imagePath, MaxDecodeSide);
         if (decoded is null)
             return null;
-        using var image = SkiaBitmapOps.ApplyOrientation(decoded, ThumbnailResizeCalculator.NormalizeOrientation(orientation));
+        using var image = SkiaBitmapOps.ApplyOrientation(decoded, ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(imagePath, orientation)));
 
         await _inference.WaitAsync(cancellationToken);
         try

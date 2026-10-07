@@ -55,7 +55,7 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
         if (sourceBitmap is null)
             return null;
 
-        var normalizedOrientation = ThumbnailResizeCalculator.NormalizeOrientation(orientation);
+        var normalizedOrientation = ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(sourcePath, orientation));
         using var orientedBitmap = SkiaBitmapOps.ApplyOrientation(sourceBitmap, normalizedOrientation);
 
         var (targetWidth, targetHeight) = ThumbnailResizeCalculator.CalculateTargetDimensions(

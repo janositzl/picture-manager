@@ -8,6 +8,9 @@ internal static class SkiaBitmapOps
 {
     internal static SKBitmap? DecodeSafely(string path)
     {
+        if (HeicDecoder.IsHeic(path))
+            return HeicDecoder.Decode(path, null);
+
         try
         {
             using var stream = File.OpenRead(path);
@@ -26,6 +29,9 @@ internal static class SkiaBitmapOps
     /// </summary>
     internal static SKBitmap? DecodeDownsampled(string path, int maxSide)
     {
+        if (HeicDecoder.IsHeic(path))
+            return HeicDecoder.Decode(path, maxSide);
+
         // Read in managed code first: an IOException here is transient-or-missing, never "corrupt image".
         var bytes = File.ReadAllBytes(path);
         try
