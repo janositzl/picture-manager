@@ -7,6 +7,19 @@ describe('toImageQuery', () => {
       toImageQuery({ kind: 'folder', folderId: 3, sort: 'date', order: 'desc' }, null).toString(),
     ).toBe('folderId=3&sort=date&order=desc&limit=100'))
 
+  it('adds includeHidden for a folder filter that asks for it', () => {
+    const params = toImageQuery(
+      { kind: 'folder', folderId: 3, includeHidden: true, sort: 'date', order: 'desc' },
+      null,
+    )
+    expect(params.get('includeHidden')).toBe('true')
+    expect(
+      toImageQuery({ kind: 'folder', folderId: 3, sort: 'date', order: 'desc' }, null).has(
+        'includeHidden',
+      ),
+    ).toBe(false)
+  })
+
   it('maps favorites and appends the cursor', () =>
     expect(toImageQuery({ kind: 'favorites', sort: 'name', order: 'asc' }, 'abc').toString()).toBe(
       'favoritesOnly=true&sort=name&order=asc&limit=100&cursor=abc',

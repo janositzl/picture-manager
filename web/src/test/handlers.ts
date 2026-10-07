@@ -14,6 +14,13 @@ import {
 import { jobHandlers } from './jobHandlers'
 
 const allImages = (): ImageListItem[] => [...holidaysImages, ...madeiraImages]
+
+let hiddenIds = new Set<number>()
+
+/** Called before every test (setup.ts): nothing is hidden. */
+export function resetHiddenStore(): void {
+  hiddenIds = new Set()
+}
 const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { status: 404 })
 
 /**
@@ -33,8 +40,10 @@ export const handlers = [
   }),
   http.get('/api/images', ({ request }) => {
     const query = new URL(request.url).searchParams
-    let items = allImages()
+    let items = allImages().map((i) => ({ ...i, isHidden: hiddenIds.has(i.id) }))
     const folderId = query.get('folderId')
+    // Like the real API: hidden photos are listed only for one folder with includeHidden=true.
+    if (folderId === null || query.get('includeHidden') !== 'true') items = items.filter((i) => !i.isHidden)
     if (folderId !== null) items = items.filter((i) => i.folderId === Number(folderId))
     if (query.get('favoritesOnly') === 'true') items = items.filter((i) => i.isFavorite)
     const fileName = query.get('fileName')?.toLowerCase()
@@ -45,6 +54,14 @@ export const handlers = [
   http.get('/api/images/:id', ({ params }) => {
     const item = allImages().find((i) => i.id === Number(params.id))
     return item ? HttpResponse.json(imageDetail(item)) : notFound()
+  }),
+  http.put('/api/images/hidden', async ({ request }) => {
+    const body = (await request.json()) as { imageIds: number[]; isHidden: boolean }
+    for (const id of body.imageIds) {
+      if (body.isHidden) hiddenIds.add(id)
+      else hiddenIds.delete(id)
+    }
+    return HttpResponse.json({ affected: body.imageIds.length })
   }),
   http.put('/api/images/:id/favorite', () => new HttpResponse(null, { status: 204 })),
   http.delete('/api/images/:id/favorite', () => new HttpResponse(null, { status: 204 })),

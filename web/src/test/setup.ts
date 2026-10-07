@@ -3,6 +3,7 @@ import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { resetAdminStore } from './adminHandlers'
 import { resetAlbumStore } from './albumHandlers'
+import { resetHiddenStore } from './handlers'
 import { server } from './server'
 
 // Default findBy* timeout (1000ms) is tight when several test files run in parallel on a loaded
@@ -14,6 +15,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 beforeEach(() => {
   resetAlbumStore()
   resetAdminStore()
+  resetHiddenStore()
 })
 afterEach(() => {
   server.resetHandlers()

@@ -49,6 +49,8 @@ export type ImageListItem = {
   folderPath: string
   /** True when the file couldn't be decoded as an image during enrichment (corrupt or misnamed). */
   isInvalid: boolean
+  /** Only true in the folder view's "Show hidden" list; hidden photos appear nowhere else. */
+  isHidden?: boolean
   /** In a person's list: that person's face in this photo (for its crop). */
   faceId?: number | null
   /** Bytes; present on duplicate-group results (exact and similar). */

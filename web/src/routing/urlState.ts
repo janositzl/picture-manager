@@ -30,6 +30,11 @@ export function parseFacesParam(params: URLSearchParams): 'with' | 'without' | u
   return value === 'with' || value === 'without' ? value : undefined
 }
 
+/** The folder view's "Show hidden" switch (?hidden=1). */
+export function parseHiddenParam(params: URLSearchParams): boolean {
+  return params.get('hidden') === '1'
+}
+
 export function parseSearchState(params: URLSearchParams): SearchParamsState {
   return { q: (params.get('q') ?? '').trim(), in: parseId(params.get('in')) }
 }

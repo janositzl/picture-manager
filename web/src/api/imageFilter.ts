@@ -7,7 +7,7 @@ export type FacesFilter = 'with' | 'without'
 
 /** What a grid shows. It is also the query key, so each view caches separately. */
 export type ImageFilter = (
-  | { kind: 'folder'; folderId: number; faces?: FacesFilter }
+  | { kind: 'folder'; folderId: number; faces?: FacesFilter; includeHidden?: boolean }
   | { kind: 'favorites' }
   | { kind: 'search'; q: string; in?: number }
   | { kind: 'person'; personId: number; state?: 'confirmed' | 'suggested' }
@@ -20,6 +20,7 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
     case 'folder':
       params.set('folderId', String(filter.folderId))
       if (filter.faces !== undefined) params.set('faces', filter.faces)
+      if (filter.includeHidden === true) params.set('includeHidden', 'true')
       break
     case 'favorites':
       params.set('favoritesOnly', 'true')

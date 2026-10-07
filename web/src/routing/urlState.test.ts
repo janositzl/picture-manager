@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseGridParams, parseId, parseSearchState, withParams } from './urlState'
+import {
+  parseGridParams,
+  parseHiddenParam,
+  parseId,
+  parseSearchState,
+  withParams,
+} from './urlState'
 
 const params = (search: string) => new URLSearchParams(search)
 
@@ -66,4 +72,12 @@ describe('withParams', () => {
 
   it('removes a key set to an empty string', () =>
     expect(withParams(params('?q=x'), { q: '' }).toString()).toBe(''))
+})
+
+describe('parseHiddenParam', () => {
+  it('is true for ?hidden=1 only', () => {
+    expect(parseHiddenParam(params('hidden=1'))).toBe(true)
+    expect(parseHiddenParam(params('hidden=0'))).toBe(false)
+    expect(parseHiddenParam(params(''))).toBe(false)
+  })
 })
