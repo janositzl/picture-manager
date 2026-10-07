@@ -8,10 +8,21 @@ type Props = {
   onAssign?: () => void
   onClear: () => void
   onRemove?: () => void
+  /** Folder view: hide the selected photos (or unhide them, when they are all hidden). */
+  onHide?: () => void
+  hideLabel?: 'Hide' | 'Unhide'
 }
 
 /** Replaces a grid's header while photos are selected. */
-export function SelectionBar({ count, onAddToAlbum, onAssign, onClear, onRemove }: Props) {
+export function SelectionBar({
+  count,
+  onAddToAlbum,
+  onAssign,
+  onClear,
+  onRemove,
+  onHide,
+  hideLabel = 'Hide',
+}: Props) {
   return (
     <Box
       role="toolbar"
@@ -55,6 +66,16 @@ export function SelectionBar({ count, onAddToAlbum, onAssign, onClear, onRemove 
           sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
         >
           Assign to person…
+        </Button>
+      )}
+      {onHide && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onHide}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+        >
+          {hideLabel}
         </Button>
       )}
       {onRemove && (

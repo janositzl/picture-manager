@@ -8,7 +8,7 @@ import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { useFolder } from '../api/queries'
 import { BORDER } from '../design/accent'
-import { parseFacesParam, parseGridParams, parseId } from '../routing/urlState'
+import { parseFacesParam, parseGridParams, parseHiddenParam, parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { useFolderJobs } from '../tree/FolderJobsContext'
 import { ReanalyseFacesConfirm } from '../tree/ReanalyseFacesConfirm'
@@ -16,6 +16,7 @@ import { GridHeader } from './GridHeader'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { FacesFilterToggle } from './FacesFilterToggle'
 import { GridSkeleton } from './GridSkeleton'
+import { HiddenToggle } from './HiddenToggle'
 import { ImageBrowser } from './ImageBrowser'
 import { writeLastFolderId } from './preferences'
 
@@ -25,6 +26,7 @@ export function FolderView() {
   const [searchParams] = useSearchParams()
   const { sort, order } = parseGridParams(searchParams)
   const faces = parseFacesParam(searchParams)
+  const showHidden = parseHiddenParam(searchParams)
   const folder = useFolder(folderId)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
   const [confirmingReanalyse, setConfirmingReanalyse] = useState(false)
@@ -76,7 +78,15 @@ export function FolderView() {
   return (
     <>
       <ImageBrowser
-        filter={{ kind: 'folder', folderId, sort, order, ...(faces !== undefined && { faces }) }}
+        hideable
+        filter={{
+          kind: 'folder',
+          folderId,
+          sort,
+          order,
+          ...(faces !== undefined && { faces }),
+          ...(showHidden && { includeHidden: true }),
+        }}
         header={
           <GridHeader
             title={detail.name}
@@ -86,43 +96,48 @@ export function FolderView() {
             sort={sort}
             order={order}
             actions={
-              !detail.isMissing && detail.imageCount > 0 ? (
+              !detail.isMissing ? (
                 <>
-                  <Tooltip title="Re-analyse faces in this folder">
-                    <span>
-                      <IconButton
+                  <HiddenToggle checked={showHidden} />
+                  {detail.imageCount > 0 && (
+                    <>
+                      <Tooltip title="Re-analyse faces in this folder">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label="Re-analyse faces"
+                            disabled={activeJob !== null}
+                            onClick={() => setConfirmingReanalyse(true)}
+                            sx={{
+                              border: `1px solid ${BORDER}`,
+                              borderRadius: '10px',
+                              bgcolor: 'background.paper',
+                            }}
+                          >
+                            <AutorenewIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <FacesFilterToggle value={faces} />
+                      <Button
                         size="small"
-                        aria-label="Re-analyse faces"
-                        disabled={activeJob !== null}
-                        onClick={() => setConfirmingReanalyse(true)}
+                        startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
+                        onClick={() => setPickerTarget({ folderId })}
                         sx={{
+                          color: 'text.primary',
                           border: `1px solid ${BORDER}`,
                           borderRadius: '10px',
-                          bgcolor: 'background.paper',
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          px: 1.5,
+                          py: '7px',
+                          '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
                         }}
                       >
-                        <AutorenewIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <FacesFilterToggle value={faces} />
-                  <Button
-                    size="small"
-                    startIcon={<CreateNewFolderOutlinedIcon fontSize="small" />}
-                    onClick={() => setPickerTarget({ folderId })}
-                    sx={{
-                      color: 'text.primary',
-                      border: `1px solid ${BORDER}`,
-                      borderRadius: '10px',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      px: 1.5,
-                      py: '7px',
-                      '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
-                    }}
-                  >
-                    Add folder to album…
-                  </Button>
+                        Add folder to album…
+                      </Button>
+                    </>
+                  )}
                 </>
               ) : undefined
             }

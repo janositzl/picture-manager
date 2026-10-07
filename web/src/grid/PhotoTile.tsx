@@ -1,6 +1,7 @@
 import BrokenImageIcon from '@mui/icons-material/BrokenImage'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported'
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Checkbox, Chip, IconButton, Typography } from '@mui/material'
@@ -147,7 +148,7 @@ function PhotoTileComponent({
         borderRadius: '10px',
         cursor: 'pointer',
         bgcolor: 'action.hover',
-        opacity: dimmed ? 0.4 : 1,
+        opacity: dimmed ? 0.4 : item.isHidden ? 0.55 : 1,
         outline: selected ? '3px solid' : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -3,
@@ -168,6 +169,20 @@ function PhotoTileComponent({
             inset: 0,
             bgcolor: 'primary.main',
             opacity: 0.2,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {item.isHidden && (
+        <VisibilityOffOutlinedIcon
+          aria-hidden
+          fontSize="small"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            color: 'common.white',
+            filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.7))',
             pointerEvents: 'none',
           }}
         />

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
+import { useSetHidden } from '../api/hidden'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl } from '../api/people'
 import { useImages } from '../api/queries'
@@ -32,6 +33,8 @@ type Props = {
   onAssignSelected?: (imageIds: number[], clearSelection: () => void) => void
   /** False when something else (e.g. a suggestions strip) owns the viewer for ?image=. */
   viewerEnabled?: boolean
+  /** Folder view only: the selection bar offers Hide / Unhide. */
+  hideable?: boolean
 }
 
 /** Header (or selection bar), banner and virtualized grid for one image filter. */
@@ -46,6 +49,7 @@ export function ImageBrowser({
   faceReview,
   onAssignSelected,
   viewerEnabled = true,
+  hideable = false,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { image } = parseGridParams(searchParams)
@@ -56,6 +60,16 @@ export function ImageBrowser({
   const filterKey = JSON.stringify(filter)
   const selection = useSelection(ids, filterKey)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
+  const setHidden = useSetHidden()
+  const selectedItems = items.filter((item) => selection.selected.has(item.id))
+  // Unhide only when every selected photo is hidden; a mixed selection hides the rest.
+  const allHidden =
+    selectedItems.length > 0 && selectedItems.every((item) => item.isHidden === true)
+  const hideSelected = () =>
+    setHidden.mutate(
+      { imageIds: selectedItems.map((item) => item.id), isHidden: !allHidden },
+      { onSuccess: selection.clear },
+    )
 
   // Opening is a push (Back closes the viewer); the state marks it as opened in-app.
   // The functional update keeps `open` stable across renders instead of depending on `searchParams`.
@@ -95,7 +109,9 @@ export function ImageBrowser({
             selected={selection.selected.has(item.id)}
             onSelect={selection.toggle}
             deferImage
-            thumbnailOverride={showFaceCrops && item.faceId != null ? faceThumbnailUrl(item.faceId) : undefined}
+            thumbnailOverride={
+              showFaceCrops && item.faceId != null ? faceThumbnailUrl(item.faceId) : undefined
+            }
             onOpen={open}
             onToggleFavorite={onToggleFavorite}
           />
@@ -114,8 +130,14 @@ export function ImageBrowser({
           }
           onAssign={
             onAssignSelected &&
-            (() => onAssignSelected(ids.filter((id) => selection.selected.has(id)), selection.clear))
+            (() =>
+              onAssignSelected(
+                ids.filter((id) => selection.selected.has(id)),
+                selection.clear,
+              ))
           }
+          onHide={hideable ? hideSelected : undefined}
+          hideLabel={allHidden ? 'Unhide' : 'Hide'}
           onClear={selection.clear}
         />
       ) : (
