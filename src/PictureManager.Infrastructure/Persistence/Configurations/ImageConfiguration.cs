@@ -78,6 +78,8 @@ public class ImageConfiguration : IEntityTypeConfiguration<Image>
         builder.HasIndex(x => x.ContentHash);
         builder.HasIndex(x => x.IsFavorite);
 
+        builder.Property(x => x.IsHidden).HasDefaultValue(false);
+
         // Folder grid, date sort. The lower(FileName) and favorites indexes are expression/partial
         // indexes that EF's fluent API can't express; they are raw SQL in the Phase5RestApi migration.
         builder.HasIndex(x => new { x.FolderId, x.SortDate, x.Id });

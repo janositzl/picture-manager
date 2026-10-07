@@ -31,6 +31,10 @@ public class Image
     public double? Longitude { get; set; }
     public string? RawMetadata { get; set; }
     public bool IsFavorite { get; set; }
+
+    /// <summary>User-hidden: out of every view and out of face recognition; only the folder view's "Show hidden" lists it.</summary>
+    public bool IsHidden { get; set; }
+
     public IndexState IndexState { get; set; } = IndexState.Pending;
     public DateTime FirstSeenUtc { get; set; }
     public DateTime? MissingSinceUtc { get; set; }

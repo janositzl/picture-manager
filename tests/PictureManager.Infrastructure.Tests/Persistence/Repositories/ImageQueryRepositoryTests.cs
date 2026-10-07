@@ -57,6 +57,22 @@ public class ImageQueryRepositoryTests
     }
 
     [Fact]
+    public async Task ListAsync_ExcludesHiddenImages()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var root = TestData.Root("active");
+        var folder = TestData.Folder(root, "");
+        var shown = TestData.Image(folder, "shown");
+        db.Context.Images.AddRange(shown, TestData.Image(folder, "hidden", isHidden: true));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
+
+        rows.Select(r => r.Id).Should().Equal(shown.Id);
+    }
+
+    [Fact]
     public async Task ListAsync_HasFacesFilter_SplitsPhotosByNonIgnoredFaces()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

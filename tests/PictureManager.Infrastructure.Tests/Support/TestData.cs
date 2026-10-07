@@ -41,7 +41,8 @@ public static class TestData
         string? contentHash = null,
         bool isFavorite = false,
         DateTime? missingSinceUtc = null,
-        IndexState indexState = IndexState.Indexed) => new()
+        IndexState indexState = IndexState.Indexed,
+        bool isHidden = false) => new()
     {
         Folder = folder,
         FileName = fileName,
@@ -52,6 +53,7 @@ public static class TestData
         DateTaken = dateTaken,
         IsFavorite = isFavorite,
         IndexState = indexState,
+        IsHidden = isHidden,
         FirstSeenUtc = Utc,
         MissingSinceUtc = missingSinceUtc,
         CreatedAt = Utc,
