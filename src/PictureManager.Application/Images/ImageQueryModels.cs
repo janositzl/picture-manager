@@ -51,7 +51,8 @@ public sealed record ImageRow(
     string RelativePath,
     IndexState IndexState = IndexState.Indexed,
     int? FaceId = null,
-    bool IsHidden = false);
+    bool IsHidden = false,
+    int ThumbnailRotation = 0);
 
 public sealed record ImageDetailRow(
     ImageRow Image,

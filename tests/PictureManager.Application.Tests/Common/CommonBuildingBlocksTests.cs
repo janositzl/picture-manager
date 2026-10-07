@@ -50,6 +50,13 @@ public class CommonBuildingBlocksTests
     }
 
     [Fact]
+    public void ImageUrls_RotatedThumbnail_VersionIncludesTheRotation()
+    {
+        ImageUrls.Thumbnail(12, "D5A2", 90).Should().Be("/api/images/12/thumbnail?v=D5A2-r90");
+        ImageUrls.Thumbnail(12, "D5A2", 0).Should().Be("/api/images/12/thumbnail?v=D5A2");
+    }
+
+    [Fact]
     public void ImageUrls_WithoutHash_AreNull()
     {
         ImageUrls.Thumbnail(12, string.Empty).Should().BeNull();

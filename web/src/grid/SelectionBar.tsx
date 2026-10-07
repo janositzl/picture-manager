@@ -1,4 +1,5 @@
 import CloseIcon from '@mui/icons-material/Close'
+import RotateRightIcon from '@mui/icons-material/RotateRight'
 import { Box, Button, IconButton, Typography } from '@mui/material'
 
 type Props = {
@@ -11,6 +12,8 @@ type Props = {
   /** Folder view: hide the selected photos (or unhide them, when they are all hidden). */
   onHide?: () => void
   hideLabel?: 'Hide' | 'Unhide'
+  /** Folder view: turn the selected photos' thumbnails 90° right (for photos with wrong EXIF orientation). */
+  onRotate?: () => void
 }
 
 /** Replaces a grid's header while photos are selected. */
@@ -22,6 +25,7 @@ export function SelectionBar({
   onRemove,
   onHide,
   hideLabel = 'Hide',
+  onRotate,
 }: Props) {
   return (
     <Box
@@ -66,6 +70,17 @@ export function SelectionBar({
           sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
         >
           Assign to person…
+        </Button>
+      )}
+      {onRotate && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onRotate}
+          startIcon={<RotateRightIcon fontSize="small" />}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+        >
+          Rotate right
         </Button>
       )}
       {onHide && (

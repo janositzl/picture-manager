@@ -30,7 +30,7 @@ public sealed record AlbumImageItem(
         return new AlbumImageItem(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
             image.IsFavorite,
-            row.IsMissing ? null : ImageUrls.Thumbnail(image.Id, image.ContentHash),
+            row.IsMissing ? null : ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation),
             row.IsMissing ? null : ImageUrls.Preview(image.Id, image.ContentHash),
             row.IsMissing,
             FolderDisplayPath.For(image.RootName, image.RelativePath));

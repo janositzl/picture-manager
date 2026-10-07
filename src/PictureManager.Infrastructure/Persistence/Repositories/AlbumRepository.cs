@@ -100,7 +100,7 @@ public sealed class AlbumRepository : IAlbumRepository
             .Select(ai => new AlbumImageRow(
                 new ImageRow(ai.Image!.Id, ai.Image.FolderId, ai.Image.FileName, ai.Image.Extension, ai.Image.Width,
                     ai.Image.Height, ai.Image.DateTaken, ai.Image.IsFavorite, ai.Image.ContentHash, ai.Image.SortDate,
-                    ai.Image.FileName.ToLower(), ai.Image.Folder!.Root!.Name, ai.Image.Folder.RelativePath),
+                    ai.Image.FileName.ToLower(), ai.Image.Folder!.Root!.Name, ai.Image.Folder.RelativePath, IndexState.Indexed, null, false, ai.Image.ThumbnailRotation),
                 ai.SortOrder,
                 ai.Image.IsHidden || ai.Image.MissingSinceUtc != null || !ai.Image.Folder!.IsActive || ai.Image.Folder.MissingSinceUtc != null || !ai.Image.Folder.Root!.IsActive))
             .ToListAsync(cancellationToken);

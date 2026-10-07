@@ -103,7 +103,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Where(i => i.Id == id)
             .Select(i => new ImageDetailRow(
                 new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden),
+                    i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden, i.ThumbnailRotation),
                 i.FileSize, i.FileModified, i.Orientation, i.CameraMake, i.CameraModel, i.LensModel,
                 i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath))
             .FirstOrDefaultAsync(cancellationToken);
@@ -125,6 +125,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Where(i => idList.Contains(i.Id) && i.IsHidden != isHidden)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(i => i.IsHidden, isHidden)
+                .SetProperty(i => i.UpdatedAt, updatedAtUtc),
+                cancellationToken);
+    }
+
+    public async Task<int> RotateThumbnailsAsync(IReadOnlyCollection<int> ids, int degrees, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToList();
+        return await _dbContext.Images.WhereExisting()
+            .Where(i => idList.Contains(i.Id))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.ThumbnailRotation, i => (i.ThumbnailRotation + degrees) % 360)
                 .SetProperty(i => i.UpdatedAt, updatedAtUtc),
                 cancellationToken);
     }
@@ -206,7 +217,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
 
     private static readonly System.Linq.Expressions.Expression<Func<Image, DuplicateMemberRow>> MemberProjection = i => new DuplicateMemberRow(
         new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
-            i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden),
+            i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden, i.ThumbnailRotation),
         i.Folder!.Root!.Name,
         i.Folder.RelativePath,
         i.FileSize);

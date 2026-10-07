@@ -76,6 +76,7 @@ export function FolderView() {
     <>
       <ImageBrowser
         hideable
+        rotatable
         filter={{
           kind: 'folder',
           folderId,

@@ -9,14 +9,16 @@ public interface IThumbnailService
     /// Returns the absolute path to a cached WebP derivative of the source image at the requested size,
     /// generating and caching it first if it doesn't already exist. Returns null if the source file cannot
     /// be decoded as an image (never throws for that case). A filesystem error while writing the cache
-    /// propagates as an exception -- it is not mapped to null.
+    /// propagates as an exception -- it is not mapped to null. <paramref name="rotation"/> (0, 90, 180 or 270
+    /// clockwise degrees) is applied on top of the EXIF orientation and cached under its own key.
     /// </summary>
     Task<string?> GetOrCreateDerivativePathAsync(
         string contentHash,
         string sourcePath,
         int? orientation,
         DerivativeSize size,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int rotation = 0);
 
     /// <summary>
     /// Deletes every cached derivative of the content hash. Best effort: files that are missing or

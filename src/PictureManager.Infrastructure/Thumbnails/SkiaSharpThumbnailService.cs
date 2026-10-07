@@ -21,10 +21,12 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
     }
 
     public async Task<string?> GetOrCreateDerivativePathAsync(
-        string contentHash, string sourcePath, int? orientation, DerivativeSize size, CancellationToken cancellationToken = default)
+        string contentHash, string sourcePath, int? orientation, DerivativeSize size, CancellationToken cancellationToken = default, int rotation = 0)
     {
         var rootPath = _options.RootPath ?? throw new InvalidOperationException("ThumbnailCache:RootPath is not configured.");
-        var finalPath = ThumbnailCachePathResolver.GetPath(rootPath, contentHash, size);
+        // A rotated derivative is cached under its own key, so it never clashes with an unrotated copy of the same content.
+        var cacheKey = RotatedKey(contentHash, rotation);
+        var finalPath = ThumbnailCachePathResolver.GetPath(rootPath, cacheKey, size);
 
         if (File.Exists(finalPath))
             return finalPath;
@@ -32,7 +34,7 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
         if (!File.Exists(sourcePath))
             return null;
 
-        var key = $"{contentHash}-{(int)size}";
+        var key = $"{cacheKey}-{(int)size}";
         var gate = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -40,7 +42,7 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
             if (File.Exists(finalPath))
                 return finalPath;
 
-            return Generate(sourcePath, orientation, size, rootPath, contentHash, finalPath);
+            return Generate(sourcePath, orientation, rotation, size, rootPath, cacheKey, finalPath);
         }
         finally
         {
@@ -53,28 +55,42 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
         if (_options.RootPath is not { } rootPath || contentHash.Length < 4)
             return;
 
-        foreach (var size in Enum.GetValues<DerivativeSize>())
+        foreach (var rotation in new[] { 0, 90, 180, 270 })
         {
-            try
+            foreach (var size in Enum.GetValues<DerivativeSize>())
             {
-                File.Delete(ThumbnailCachePathResolver.GetPath(rootPath, contentHash, size));
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // Best effort: a stuck file only costs disk space, and is regenerated or overwritten later.
+                try
+                {
+                    File.Delete(ThumbnailCachePathResolver.GetPath(rootPath, RotatedKey(contentHash, rotation), size));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: a stuck file only costs disk space, and is regenerated or overwritten later.
+                }
             }
         }
     }
 
+    private static string RotatedKey(string contentHash, int rotation) =>
+        rotation == 0 ? contentHash : $"{contentHash}r{rotation}";
+
     private static string? Generate(
-        string sourcePath, int? orientation, DerivativeSize size, string rootPath, string contentHash, string finalPath)
+        string sourcePath, int? orientation, int rotation, DerivativeSize size, string rootPath, string contentHash, string finalPath)
     {
         using var sourceBitmap = SkiaBitmapOps.DecodeSafely(sourcePath);
         if (sourceBitmap is null)
             return null;
 
         var normalizedOrientation = ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(sourcePath, orientation));
-        using var orientedBitmap = SkiaBitmapOps.ApplyOrientation(sourceBitmap, normalizedOrientation);
+        using var exifOrientedBitmap = SkiaBitmapOps.ApplyOrientation(sourceBitmap, normalizedOrientation);
+        // Clockwise 90/180/270 equal EXIF orientations 6/3/8, so the extra user rotation reuses the same transform.
+        using var orientedBitmap = rotation switch
+        {
+            90 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 6),
+            180 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 3),
+            270 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 8),
+            _ => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 1),
+        };
 
         var (targetWidth, targetHeight) = ThumbnailResizeCalculator.CalculateTargetDimensions(
             orientedBitmap.Width, orientedBitmap.Height, (int)size);

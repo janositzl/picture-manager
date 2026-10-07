@@ -118,7 +118,7 @@ public sealed class ImageQueryService : IImageQueryService
         var image = row.Image;
         return Result<ImageDetail>.Ok(new ImageDetail(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
-            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash), ImageUrls.Preview(image.Id, image.ContentHash),
+            image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash),
             row.FileSize, row.FileModified, row.Orientation, row.CameraMake, row.CameraModel, row.LensModel,
             row.Latitude, row.Longitude, ParseJson(row.RawMetadata), FolderDisplayPath.For(row.RootName, row.RelativePath),
             albums, image.IndexState == IndexState.Invalid, image.IsHidden));
@@ -134,6 +134,19 @@ public sealed class ImageQueryService : IImageQueryService
             return Result.Invalid("imageIds", $"Must not contain more than {MaxHideBatch} ids.");
 
         var affected = await _images.SetHiddenAsync(imageIds, isHidden, _clock.UtcNow, cancellationToken);
+        return Result<HiddenResult>.Ok(new HiddenResult(affected));
+    }
+
+    public async Task<Result<HiddenResult>> RotateThumbnailsAsync(IReadOnlyCollection<int> imageIds, int degrees, CancellationToken cancellationToken = default)
+    {
+        if (imageIds.Count == 0)
+            return Result.Invalid("imageIds", "Must not be empty.");
+        if (imageIds.Count > MaxHideBatch)
+            return Result.Invalid("imageIds", $"Must not contain more than {MaxHideBatch} ids.");
+        if (degrees is not (90 or 180 or 270))
+            return Result.Invalid("degrees", "Must be 90, 180 or 270.");
+
+        var affected = await _images.RotateThumbnailsAsync(imageIds, degrees, _clock.UtcNow, cancellationToken);
         return Result<HiddenResult>.Ok(new HiddenResult(affected));
     }
 

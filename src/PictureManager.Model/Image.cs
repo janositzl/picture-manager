@@ -35,6 +35,9 @@ public class Image
     /// <summary>User-hidden: out of every view and out of face recognition; only the folder view's "Show hidden" lists it.</summary>
     public bool IsHidden { get; set; }
 
+    /// <summary>Clockwise degrees (0, 90, 180 or 270) applied to the thumbnail on top of the EXIF orientation, for photos whose EXIF is wrong. The original file is never touched.</summary>
+    public int ThumbnailRotation { get; set; }
+
     public IndexState IndexState { get; set; } = IndexState.Pending;
     public DateTime FirstSeenUtc { get; set; }
     public DateTime? MissingSinceUtc { get; set; }

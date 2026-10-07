@@ -269,6 +269,33 @@ public class ImageQueryServiceTests
         await _images.Received(1).SetHiddenAsync(Arg.Any<IReadOnlyCollection<int>>(), true, _clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(45)]
+    [InlineData(360)]
+    public async Task RotateThumbnailsAsync_DegreesNotAQuarterTurn_IsInvalid(int degrees)
+    {
+        (await CreateService().RotateThumbnailsAsync(new[] { 1 }, degrees)).Status.Should().Be(ResultStatus.Invalid);
+        await _images.DidNotReceiveWithAnyArgs().RotateThumbnailsAsync(default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task RotateThumbnailsAsync_EmptyList_IsInvalid()
+    {
+        (await CreateService().RotateThumbnailsAsync(Array.Empty<int>(), 90)).Status.Should().Be(ResultStatus.Invalid);
+    }
+
+    [Fact]
+    public async Task RotateThumbnailsAsync_ReturnsTheRepositoryCount_AndStampsTheClock()
+    {
+        _images.RotateThumbnailsAsync(Arg.Any<IReadOnlyCollection<int>>(), 90, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(2);
+
+        var result = await CreateService().RotateThumbnailsAsync(new[] { 1, 2 }, 90);
+
+        result.Value!.Affected.Should().Be(2);
+        await _images.Received(1).RotateThumbnailsAsync(Arg.Any<IReadOnlyCollection<int>>(), 90, _clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task SetFavoriteAsync_NoVisibleImage_ReturnsNotFound()
     {

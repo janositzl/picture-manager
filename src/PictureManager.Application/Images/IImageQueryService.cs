@@ -13,5 +13,8 @@ public interface IImageQueryService
 
     Task<Result<HiddenResult>> SetHiddenAsync(IReadOnlyCollection<int> imageIds, bool isHidden, CancellationToken cancellationToken = default);
 
+    /// <summary>Turns the thumbnails of the photos clockwise by `degrees` (90, 180 or 270), on top of any rotation they already have.</summary>
+    Task<Result<HiddenResult>> RotateThumbnailsAsync(IReadOnlyCollection<int> imageIds, int degrees, CancellationToken cancellationToken = default);
+
     Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default);
 }

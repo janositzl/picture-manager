@@ -14,6 +14,7 @@ public static class ImageQueryEndpoints
     {
         user.MapGet("/images", ListAsync);
         user.MapPut("/images/hidden", SetHiddenAsync);
+        user.MapPut("/images/thumbnail-rotation", RotateThumbnailsAsync);
         user.MapGet("/images/{id:int}", GetAsync);
         user.MapPut("/images/{id:int}/favorite", SetFavoriteAsync);
         user.MapDelete("/images/{id:int}/favorite", ClearFavoriteAsync);
@@ -33,6 +34,12 @@ public static class ImageQueryEndpoints
     public static async Task<Results<Ok<HiddenResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetHiddenAsync(
         SetHiddenRequest request, IImageQueryService service, CancellationToken cancellationToken) =>
         (await service.SetHiddenAsync(request.ImageIds ?? [], request.IsHidden, cancellationToken)).ToOk();
+
+    public sealed record RotateThumbnailsRequest(IReadOnlyList<int>? ImageIds, int Degrees);
+
+    public static async Task<Results<Ok<HiddenResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> RotateThumbnailsAsync(
+        RotateThumbnailsRequest request, IImageQueryService service, CancellationToken cancellationToken) =>
+        (await service.RotateThumbnailsAsync(request.ImageIds ?? [], request.Degrees, cancellationToken)).ToOk();
 
     public static async Task<Results<Ok<ImageDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetAsync(
         int id, IImageQueryService service, CancellationToken cancellationToken) =>

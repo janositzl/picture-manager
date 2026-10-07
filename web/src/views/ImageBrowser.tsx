@@ -7,6 +7,7 @@ import { useSetHidden } from '../api/hidden'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl } from '../api/people'
 import { useImages } from '../api/queries'
+import { useRotateThumbnails } from '../api/rotation'
 import type { ImageListItem } from '../api/types'
 import { PhotoGrid } from '../grid/PhotoGrid'
 import { PhotoTile } from '../grid/PhotoTile'
@@ -35,6 +36,8 @@ type Props = {
   viewerEnabled?: boolean
   /** Folder view only: the selection bar offers Hide / Unhide. */
   hideable?: boolean
+  /** Folder view only: the selection bar offers Rotate right (thumbnails only). */
+  rotatable?: boolean
 }
 
 /** Header (or selection bar), banner and virtualized grid for one image filter. */
@@ -50,6 +53,7 @@ export function ImageBrowser({
   onAssignSelected,
   viewerEnabled = true,
   hideable = false,
+  rotatable = false,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { image } = parseGridParams(searchParams)
@@ -65,6 +69,9 @@ export function ImageBrowser({
   // Unhide only when every selected photo is hidden; a mixed selection hides the rest.
   const allHidden =
     selectedItems.length > 0 && selectedItems.every((item) => item.isHidden === true)
+  const rotateThumbnails = useRotateThumbnails()
+  const rotateSelected = () =>
+    rotateThumbnails.mutate({ imageIds: selectedItems.map((item) => item.id), degrees: 90 })
   const hideSelected = () =>
     setHidden.mutate(
       { imageIds: selectedItems.map((item) => item.id), isHidden: !allHidden },
@@ -136,6 +143,7 @@ export function ImageBrowser({
                 selection.clear,
               ))
           }
+          onRotate={rotatable ? rotateSelected : undefined}
           onHide={hideable ? hideSelected : undefined}
           hideLabel={allHidden ? 'Unhide' : 'Hide'}
           onClear={selection.clear}
