@@ -1,5 +1,4 @@
 import AutorenewIcon from '@mui/icons-material/Autorenew'
-import BlockIcon from '@mui/icons-material/Block'
 import {
   Alert,
   Box,
