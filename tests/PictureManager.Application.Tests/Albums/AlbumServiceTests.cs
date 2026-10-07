@@ -300,6 +300,36 @@ public class AlbumServiceTests
     }
 
     [Fact]
+    public async Task SetCoverAsync_ImageInAlbum_StoresItAndTouchesAlbum()
+    {
+        _albums.GetOrderedImageIdsAsync(7, Arg.Any<CancellationToken>()).Returns(new List<int> { 101, 102 });
+
+        (await CreateService().SetCoverAsync(7, 102)).IsSuccess.Should().BeTrue();
+
+        await _albums.Received(1).SetCoverAsync(7, 102, Arg.Any<CancellationToken>());
+        await _albums.Received(1).TouchAsync(7, _clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(999)]
+    public async Task SetCoverAsync_ImageNotInAlbum_ReturnsInvalid_WithoutStoring(int? imageId)
+    {
+        _albums.GetOrderedImageIdsAsync(7, Arg.Any<CancellationToken>()).Returns(new List<int> { 101, 102 });
+
+        var result = await CreateService().SetCoverAsync(7, imageId);
+
+        result.Errors!.Keys.Should().Contain("imageId");
+        await _albums.DidNotReceive().SetCoverAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetCoverAsync_UnknownAlbum_ReturnsNotFound()
+    {
+        (await CreateService().SetCoverAsync(8, 101)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
     public async Task ExportAsync_FormatsLines_AndUsesAlbumNameForFile()
     {
         _albums.GetExportRowsAsync(7, Arg.Any<CancellationToken>()).Returns(new[]

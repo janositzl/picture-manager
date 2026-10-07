@@ -82,6 +82,52 @@ public class PeopleRepositoryTests
     }
 
     [Fact]
+    public async Task SetCoverAsync_OwnVisibleFace_BecomesTheCover()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var image = await FaceTestData.AddImageAsync(db.Context, top, "a");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.Add(anna);
+        await db.Context.SaveChangesAsync();
+        await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Confirmed, quality: 0.9f);
+        var chosen = await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Suggested, quality: 0.1f);
+        var repository = new PeopleRepository(db.CreateContext());
+
+        (await repository.SetCoverAsync(anna.Id, chosen.Id, Now)).Should().BeTrue();
+
+        (await repository.GetAsync(anna.Id))!.CoverFaceId.Should().Be(chosen.Id);
+    }
+
+    [Fact]
+    public async Task SetCoverAsync_FaceOfAnotherPersonOrIgnoredOrHidden_IsRefused()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var shown = await FaceTestData.AddImageAsync(db.Context, top, "shown");
+        var hidden = await FaceTestData.AddImageAsync(db.Context, top, "hidden");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        var bela = new Person { Name = "Bela", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(anna, bela);
+        await db.Context.SaveChangesAsync();
+        var annaBest = await FaceTestData.AddFaceAsync(db.Context, shown.Id, model, FaceTestData.Embedding(0), anna.Id, FaceAssignmentState.Confirmed);
+        var belaFace = await FaceTestData.AddFaceAsync(db.Context, shown.Id, model, FaceTestData.Embedding(1), bela.Id, FaceAssignmentState.Confirmed);
+        var ignored = await FaceTestData.AddFaceAsync(db.Context, shown.Id, model, FaceTestData.Embedding(2), anna.Id, FaceAssignmentState.Ignored);
+        var onHidden = await FaceTestData.AddFaceAsync(db.Context, hidden.Id, model, FaceTestData.Embedding(3), anna.Id, FaceAssignmentState.Confirmed);
+        hidden.IsHidden = true;
+        await db.Context.SaveChangesAsync();
+        var repository = new PeopleRepository(db.CreateContext());
+
+        (await repository.SetCoverAsync(anna.Id, belaFace.Id, Now)).Should().BeFalse();
+        (await repository.SetCoverAsync(anna.Id, ignored.Id, Now)).Should().BeFalse();
+        (await repository.SetCoverAsync(anna.Id, onHidden.Id, Now)).Should().BeFalse();
+
+        (await repository.GetAsync(anna.Id))!.CoverFaceId.Should().Be(annaBest.Id);
+    }
+
+    [Fact]
     public async Task CoverFaceId_CoverOfAnotherPersonOrRejectedFallsBack_ValidCoverIsKept()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();

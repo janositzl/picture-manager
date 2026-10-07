@@ -48,10 +48,10 @@ public sealed class AlbumRepository : IAlbumRepository
                 a.Description,
                 a.AlbumImages.Count(),
                 a.AlbumImages.Where(ai => ai.Image!.ContentHash != "")
-                    .OrderBy(ai => ai.SortOrder).ThenBy(ai => ai.ImageId)
+                    .OrderByDescending(ai => ai.ImageId == a.CoverImageId).ThenBy(ai => ai.SortOrder).ThenBy(ai => ai.ImageId)
                     .Select(ai => (int?)ai.ImageId).FirstOrDefault(),
                 a.AlbumImages.Where(ai => ai.Image!.ContentHash != "")
-                    .OrderBy(ai => ai.SortOrder).ThenBy(ai => ai.ImageId)
+                    .OrderByDescending(ai => ai.ImageId == a.CoverImageId).ThenBy(ai => ai.SortOrder).ThenBy(ai => ai.ImageId)
                     .Select(ai => ai.Image!.ContentHash).FirstOrDefault(),
                 a.UpdatedAt))
             .ToListAsync(cancellationToken);
@@ -170,6 +170,12 @@ public sealed class AlbumRepository : IAlbumRepository
     {
         await _dbContext.Albums.Where(a => a.Id == albumId)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.UpdatedAt, updatedAtUtc), cancellationToken);
+    }
+
+    public async Task SetCoverAsync(int albumId, int imageId, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Albums.Where(a => a.Id == albumId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.CoverImageId, imageId), cancellationToken);
     }
 
     public async Task<IReadOnlyList<AlbumExportRow>> GetExportRowsAsync(int albumId, CancellationToken cancellationToken = default)

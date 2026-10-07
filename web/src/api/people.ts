@@ -79,6 +79,20 @@ export function useNamePerson() {
   })
 }
 
+/** Chooses which of the person's faces is shown as their cover. */
+export function useSetPersonCover() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({ id, faceId }: { id: number; faceId: number }) =>
+      apiFetch<PersonSummary>(`/api/people/${id}/cover`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faceId }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
 /** Forgets a person: their faces become unassigned and may regroup on the next recognition run. */
 export function useDeletePerson() {
   const invalidate = useInvalidatePeopleData()

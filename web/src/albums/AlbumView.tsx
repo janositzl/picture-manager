@@ -15,6 +15,7 @@ import {
   useDeleteAlbum,
   useMoveInAlbum,
   useRemoveFromAlbum,
+  useSetAlbumCover,
   useSortAlbum,
   type AddTarget,
   type AlbumSort,
@@ -77,6 +78,7 @@ export function AlbumView() {
   const moveImage = useMoveInAlbum(albumId ?? 0)
   const deleteAlbum = useDeleteAlbum(albumId ?? 0)
   const sortAlbum = useSortAlbum(albumId ?? 0)
+  const setCover = useSetAlbumCover(albumId ?? 0)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
   const selection = useSelection(ids, `album-${albumId}`)
@@ -158,6 +160,16 @@ export function AlbumView() {
     }
   }
 
+  const confirmSetCover = async (imageId: number) => {
+    try {
+      await setCover.mutateAsync(imageId)
+      notify(`Cover of ${detail.name} updated.`)
+      selection.clear()
+    } catch {
+      notify("Couldn't change the cover.")
+    }
+  }
+
   const confirmSort = async () => {
     if (sortBy === null) return
     try {
@@ -224,6 +236,9 @@ export function AlbumView() {
       count={selection.count}
       onAddToAlbum={addSelection}
       onRemove={() => setDialog('remove')}
+      onSetCover={
+        selectedIds.length === 1 ? () => void confirmSetCover(selectedIds[0]!) : undefined
+      }
       onClear={selection.clear}
     />
   ) : (

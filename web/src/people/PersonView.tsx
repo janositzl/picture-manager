@@ -4,7 +4,8 @@ import HideSourceIcon from '@mui/icons-material/HideSource'
 import { Box, Button, IconButton, Tooltip } from '@mui/material'
 import { useState } from 'react'
 import { Link as RouterLink, useLocation, useParams, useSearchParams } from 'react-router'
-import { unknownLabels, usePeople, usePerson } from '../api/people'
+import { unknownLabels, usePeople, usePerson, useSetPersonCover } from '../api/people'
+import { useNotify } from '../app/notify'
 import { parseGridParams } from '../routing/urlState'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { GridHeader } from '../views/GridHeader'
@@ -33,6 +34,8 @@ type PersonContentProps = { personId: number }
 function PersonContent({ personId }: PersonContentProps) {
   const person = usePerson(personId)
   const people = usePeople()
+  const setCover = useSetPersonCover()
+  const notify = useNotify()
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const { sort, order } = parseGridParams(searchParams)
@@ -59,6 +62,18 @@ function PersonContent({ personId }: PersonContentProps) {
         showFaceCrops={gridMode === 'faces'}
         faceReview={{ personId }}
         onAssignSelected={isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined}
+        onSetCoverSelected={(faceId, clearSelection) =>
+          setCover.mutate(
+            { id: personId, faceId },
+            {
+              onSuccess: () => {
+                notify('Cover updated.')
+                clearSelection()
+              },
+              onError: () => notify("Couldn't change the cover."),
+            },
+          )
+        }
         viewerEnabled={!openedFromStrip(location.state)}
         banner={
           !isGroup && (

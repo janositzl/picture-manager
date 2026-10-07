@@ -9,6 +9,10 @@ public class Album
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int OwnerUserId { get; set; }
+
+    /// <summary>Image chosen as the album's cover. No foreign key on purpose; may be stale, so reads use it only while the image is still in the album.</summary>
+    public int? CoverImageId { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

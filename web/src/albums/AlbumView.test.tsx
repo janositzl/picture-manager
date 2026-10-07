@@ -84,6 +84,21 @@ describe('AlbumView', () => {
     await waitFor(() => expect(tileIds()).toEqual(['tile-21']))
   })
 
+  it('sets the one selected photo as the album cover', async () => {
+    const { user } = renderApp('/albums/5')
+    await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
+    await user.click(screen.getByRole('button', { name: 'Set as cover' }))
+    expect(await screen.findByText('Cover of Best of 2025 updated.')).toBeInTheDocument()
+    expect(albumStore.get(5)!.coverImageId).toBe(20)
+  })
+
+  it('offers Set as cover only while exactly one photo is selected', async () => {
+    const { user } = renderApp('/albums/5')
+    await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select IMG_0002.jpg' }))
+    expect(screen.queryByRole('button', { name: 'Set as cover' })).not.toBeInTheDocument()
+  })
+
   it('adding a selection with a missing file skips it and says so', async () => {
     albumStore.get(5)!.missing.add(20)
     const { user } = renderApp('/albums/5')

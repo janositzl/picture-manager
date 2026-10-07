@@ -95,6 +95,16 @@ export function useSortAlbum(albumId: number) {
   })
 }
 
+/** Chooses which of the album's photos is shown as its cover. */
+export function useSetAlbumCover(albumId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (imageId: number) =>
+      apiFetch<void>(`/api/albums/${albumId}/cover`, jsonRequest('PUT', { imageId })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.albums() }),
+  })
+}
+
 export function useMoveInAlbum(albumId: number) {
   const queryClient = useQueryClient()
   const notify = useNotify()

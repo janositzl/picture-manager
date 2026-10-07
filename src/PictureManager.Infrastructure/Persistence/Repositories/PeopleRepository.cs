@@ -71,6 +71,20 @@ public sealed class PeopleRepository : IPeopleRepository
         return rows > 0;
     }
 
+    public async Task<bool> SetCoverAsync(int id, int faceId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        var isCandidate = await _dbContext.Faces.AnyAsync(
+            f => f.Id == faceId && f.PersonId == id && !f.Image!.IsHidden
+                 && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed),
+            cancellationToken);
+        if (!isCandidate)
+            return false;
+
+        var rows = await _dbContext.People.Where(p => p.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.CoverFaceId, faceId).SetProperty(p => p.ModifiedUtc, nowUtc), cancellationToken);
+        return rows > 0;
+    }
+
     // Faces keep their state: a merge neither confirms nor un-confirms anything.
     public async Task MergeAsync(int sourceId, int targetId, DateTime nowUtc, CancellationToken cancellationToken = default)
     {

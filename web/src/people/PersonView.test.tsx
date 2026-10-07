@@ -283,4 +283,30 @@ describe('PersonView', () => {
 
     expect(await screen.findByText('Person not found')).toBeInTheDocument()
     expect(requested).toEqual([])
-  })})
+  })
+
+  it("sets the single selected photo's face as the person's cover", async () => {
+    const sent: unknown[] = []
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      http.get('/api/images', () =>
+        HttpResponse.json({
+          items: [image(20, 3, { faceId: 301 }), image(21, 3, { faceId: 302 })],
+          nextCursor: null,
+        }),
+      ),
+      http.put('/api/people/1/cover', async ({ request }) => {
+        sent.push(await request.json())
+        return HttpResponse.json(peopleFixture[0])
+      }),
+    )
+    const { user } = renderApp('/people/1')
+
+    await user.click((await screen.findAllByRole('checkbox', { name: 'Select IMG_0020.jpg' }))[0]!)
+    await user.click(screen.getByRole('button', { name: 'Set as cover' }))
+
+    await waitFor(() => expect(sent).toEqual([{ faceId: 301 }]))
+    expect(await screen.findByText('Cover updated.')).toBeInTheDocument()
+  })
+})

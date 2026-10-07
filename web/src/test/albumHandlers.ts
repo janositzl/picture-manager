@@ -7,6 +7,7 @@ type StoredAlbum = {
   name: string
   description: string | null
   imageIds: number[]
+  coverImageId?: number
   missing: Set<number>
   createdAt: string
   updatedAt: string
@@ -43,7 +44,10 @@ const albumFor = (params: PathParams) => albumStore.get(Number(params.id))
 const now = () => new Date(Date.UTC(2026, 9, 1, 0, ++tick)).toISOString()
 
 const summary = (album: StoredAlbum): AlbumSummary => {
-  const first = album.imageIds[0]
+  const first =
+    album.coverImageId !== undefined && album.imageIds.includes(album.coverImageId)
+      ? album.coverImageId
+      : album.imageIds[0]
   return {
     id: album.id,
     name: album.name,
@@ -210,6 +214,24 @@ export const albumHandlers = [
     album.imageIds = [...album.imageIds].sort(
       (a, b) => sign * key(a).localeCompare(key(b)) || a - b,
     )
+    album.updatedAt = now()
+    return new HttpResponse(null, { status: 204 })
+  }),
+  http.put('/api/albums/:id/cover', async ({ params, request }) => {
+    const album = albumFor(params)
+    if (!album) return notFound()
+    const { imageId } = (await request.json()) as { imageId: number }
+    if (!album.imageIds.includes(imageId)) {
+      return HttpResponse.json(
+        {
+          title: 'One or more validation errors occurred.',
+          status: 400,
+          errors: { imageId: ['Choose a photo from this album.'] },
+        },
+        { status: 400 },
+      )
+    }
+    album.coverImageId = imageId
     album.updatedAt = now()
     return new HttpResponse(null, { status: 204 })
   }),

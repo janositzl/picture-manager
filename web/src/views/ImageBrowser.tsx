@@ -32,6 +32,8 @@ type Props = {
   faceReview?: { personId: number }
   /** Unknown-group views: offers assigning the selected photos; clearSelection ends the selection. */
   onAssignSelected?: (imageIds: number[], clearSelection: () => void) => void
+  /** Person views: offers using the single selected photo's face as the person's cover; clearSelection ends the selection. */
+  onSetCoverSelected?: (faceId: number, clearSelection: () => void) => void
   /** False when something else (e.g. a suggestions strip) owns the viewer for ?image=. */
   viewerEnabled?: boolean
   /** Folder view only: the selection bar offers Hide / Unhide. */
@@ -51,6 +53,7 @@ export function ImageBrowser({
   showFaceCrops = false,
   faceReview,
   onAssignSelected,
+  onSetCoverSelected,
   viewerEnabled = true,
   hideable = false,
   rotatable = false,
@@ -69,6 +72,7 @@ export function ImageBrowser({
   // Unhide only when every selected photo is hidden; a mixed selection hides the rest.
   const allHidden =
     selectedItems.length > 0 && selectedItems.every((item) => item.isHidden === true)
+  const coverFaceId = selectedItems.length === 1 ? (selectedItems[0]?.faceId ?? null) : null
   const rotateThumbnails = useRotateThumbnails()
   const rotateSelected = () =>
     rotateThumbnails.mutate({ imageIds: selectedItems.map((item) => item.id), degrees: 90 })
@@ -142,6 +146,11 @@ export function ImageBrowser({
                 ids.filter((id) => selection.selected.has(id)),
                 selection.clear,
               ))
+          }
+          onSetCover={
+            onSetCoverSelected && coverFaceId !== null
+              ? () => onSetCoverSelected(coverFaceId, selection.clear)
+              : undefined
           }
           onRotate={rotatable ? rotateSelected : undefined}
           onHide={hideable ? hideSelected : undefined}

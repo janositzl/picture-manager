@@ -26,6 +26,33 @@ public class PeopleServiceTests
     private PeopleService Create() => new(_people, _clock);
 
     [Fact]
+    public async Task SetCoverAsync_AcceptedFace_ReturnsThePerson()
+    {
+        _people.SetCoverAsync(2, 55, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await Create().SetCoverAsync(2, 55);
+
+        result.Status.Should().Be(ResultStatus.Success);
+        result.Value!.Id.Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(55)]
+    public async Task SetCoverAsync_NoFaceOrRefusedFace_IsInvalid(int? faceId)
+    {
+        _people.SetCoverAsync(2, 55, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        (await Create().SetCoverAsync(2, faceId)).Status.Should().Be(ResultStatus.Invalid);
+    }
+
+    [Fact]
+    public async Task SetCoverAsync_UnknownPerson_IsNotFound()
+    {
+        (await Create().SetCoverAsync(99, 55)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
     public async Task AssignGroupAsync_GroupToNamedPerson_AssignsAndReturnsTarget()
     {
         var result = await Create().AssignGroupAsync(1, 2);

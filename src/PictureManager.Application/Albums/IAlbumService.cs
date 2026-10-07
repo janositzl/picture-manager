@@ -29,5 +29,8 @@ public interface IAlbumService
     /// <summary>Rewrites the album's stored order to the given sort: "dateAsc", "dateDesc" or "name".</summary>
     Task<Result> SortAsync(int id, string? by, CancellationToken cancellationToken = default);
 
+    /// <summary>Chooses the album's cover; the image must be in the album.</summary>
+    Task<Result> SetCoverAsync(int id, int? imageId, CancellationToken cancellationToken = default);
+
     Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default);
 }

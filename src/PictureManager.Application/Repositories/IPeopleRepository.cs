@@ -22,6 +22,12 @@ public interface IPeopleRepository
     /// <summary>Sets the name only; the person's Suggested faces stay Suggested. False if the person doesn't exist.</summary>
     Task<bool> SetNameAsync(int id, string name, DateTime nowUtc, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Makes the face the person's cover. False (nothing changed) if the person doesn't exist or the face is not one of
+    /// their Suggested/Confirmed faces on a visible photo.
+    /// </summary>
+    Task<bool> SetCoverAsync(int id, int faceId, DateTime nowUtc, CancellationToken cancellationToken = default);
+
     /// <summary>Moves every Suggested/Confirmed face of source to target, keeping its state, then deletes source.</summary>
     Task MergeAsync(int sourceId, int targetId, DateTime nowUtc, CancellationToken cancellationToken = default);
 

@@ -42,6 +42,33 @@ public class AlbumQueryRepositoryTests
         rows[1].CoverContentHash.Should().Be("COVERHASH");
     }
 
+    [Fact]
+    public async Task GetSummariesAsync_ChosenCoverWins_UnlessItLeftTheAlbum()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var first = TestData.Image(folder, "first", contentHash: "FIRST");
+        var chosen = TestData.Image(folder, "chosen", contentHash: "CHOSEN");
+        var removed = TestData.Image(folder, "removed", contentHash: "REMOVED");
+        var picked = TestData.Album("picked");
+        var stale = TestData.Album("stale");
+        db.Context.AlbumImages.AddRange(
+            TestData.AlbumImage(picked, first, 0), TestData.AlbumImage(picked, chosen, 1),
+            TestData.AlbumImage(stale, first, 0));
+        db.Context.Images.Add(removed);
+        await db.Context.SaveChangesAsync();
+        picked.CoverImageId = chosen.Id;
+        stale.CoverImageId = removed.Id;
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var rows = await new AlbumRepository(context).GetSummariesAsync(AppUser.SystemUserId);
+
+        rows.Single(r => r.Name == "picked").CoverImageId.Should().Be(chosen.Id);
+        rows.Single(r => r.Name == "picked").CoverContentHash.Should().Be("CHOSEN");
+        rows.Single(r => r.Name == "stale").CoverImageId.Should().Be(first.Id);
+    }
+
     [Theory]
     [InlineData(AlbumSortKey.DateAscending, new[] { "c", "a", "b" })]
     [InlineData(AlbumSortKey.DateDescending, new[] { "b", "a", "c" })]

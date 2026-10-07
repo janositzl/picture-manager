@@ -113,6 +113,16 @@ public class AlbumEndpointsTests
     }
 
     [Fact]
+    public async Task SetCoverAsync_PassesImageId_AndReturnsNoContent()
+    {
+        _service.SetCoverAsync(42, 7, Arg.Any<CancellationToken>()).Returns(Result.Ok());
+
+        var result = await AlbumEndpoints.SetCoverAsync(42, new AlbumCoverRequest(7), _service, CancellationToken.None);
+
+        result.Result.Should().BeOfType<NoContent>();
+    }
+
+    [Fact]
     public async Task ExportAsync_ReturnsUtf8TextWithoutBom_AndAlbumFileName()
     {
         _service.ExportAsync(42, "/mnt", Arg.Any<CancellationToken>())

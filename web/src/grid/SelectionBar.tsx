@@ -14,6 +14,8 @@ type Props = {
   hideLabel?: 'Hide' | 'Unhide'
   /** Folder view: turn the selected photos' thumbnails 90° right (for photos with wrong EXIF orientation). */
   onRotate?: () => void
+  /** Album and person views, one photo selected: use it as the album's / person's cover. */
+  onSetCover?: () => void
 }
 
 /** Replaces a grid's header while photos are selected. */
@@ -26,6 +28,7 @@ export function SelectionBar({
   onHide,
   hideLabel = 'Hide',
   onRotate,
+  onSetCover,
 }: Props) {
   return (
     <Box
@@ -70,6 +73,16 @@ export function SelectionBar({
           sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
         >
           Assign to person…
+        </Button>
+      )}
+      {onSetCover && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onSetCover}
+          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+        >
+          Set as cover
         </Button>
       )}
       {onRotate && (

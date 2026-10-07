@@ -233,6 +233,19 @@ public sealed class AlbumService : IAlbumService
         return Result.Ok();
     }
 
+    public async Task<Result> SetCoverAsync(int id, int? imageId, CancellationToken cancellationToken = default)
+    {
+        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+            return Result.NotFound();
+
+        if (imageId is not int coverId || !(await _albums.GetOrderedImageIdsAsync(id, cancellationToken)).Contains(coverId))
+            return Result.Invalid("imageId", "Choose a photo from this album.");
+
+        await _albums.SetCoverAsync(id, coverId, cancellationToken);
+        await _albums.TouchAsync(id, _clock.UtcNow, cancellationToken);
+        return Result.Ok();
+    }
+
     public async Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default)
     {
         var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);

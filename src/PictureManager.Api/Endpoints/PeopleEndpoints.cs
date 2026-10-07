@@ -14,6 +14,7 @@ public static class PeopleEndpoints
         user.MapGet("/people", GetAllAsync);
         user.MapGet("/people/{id:int}", GetAsync);
         user.MapPatch("/people/{id:int}", NameAsync);
+        user.MapPut("/people/{id:int}/cover", SetCoverAsync);
         user.MapDelete("/people/{id:int}", DeleteAsync);
         user.MapPost("/people/{id:int}/ignore", IgnoreGroupAsync);
         user.MapPost("/people/{id:int}/assign", AssignGroupAsync);
@@ -97,6 +98,10 @@ public static class PeopleEndpoints
         int id, PersonNameRequest request, IPeopleService service, CancellationToken cancellationToken) =>
         (await service.NameAsync(id, request.Name, cancellationToken)).ToOk();
 
+    public static async Task<Results<Ok<PersonSummary>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetCoverAsync(
+        int id, PersonCoverRequest request, IPeopleService service, CancellationToken cancellationToken) =>
+        (await service.SetCoverAsync(id, request.FaceId, cancellationToken)).ToOk();
+
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> DeleteAsync(
         int id, IPeopleService service, CancellationToken cancellationToken) =>
         (await service.DeleteAsync(id, cancellationToken)).ToNoContent();
@@ -115,6 +120,8 @@ public static class PeopleEndpoints
         return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
     }
 }
+
+public sealed record PersonCoverRequest(int? FaceId);
 
 public sealed record PersonNameRequest(string? Name);
 

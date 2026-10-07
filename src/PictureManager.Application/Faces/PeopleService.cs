@@ -47,6 +47,16 @@ public sealed class PeopleService : IPeopleService
         return await GetAsync(id, cancellationToken);
     }
 
+    public async Task<Result<PersonSummary>> SetCoverAsync(int id, int? faceId, CancellationToken cancellationToken = default)
+    {
+        if (await _people.GetAsync(id, cancellationToken) is null)
+            return Result.NotFound();
+        if (faceId is not int coverFaceId || !await _people.SetCoverAsync(id, coverFaceId, _clock.UtcNow, cancellationToken))
+            return Result.Invalid("faceId", "Choose one of this person's faces.");
+
+        return await GetAsync(id, cancellationToken);
+    }
+
     public async Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, IReadOnlyCollection<int>? imageIds = null, CancellationToken cancellationToken = default)
     {
         if (imageIds is { Count: 0 })

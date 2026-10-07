@@ -13,7 +13,10 @@ public interface IAlbumRepository
     Task<IReadOnlyList<Album>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Album> AddAsync(Album album, CancellationToken cancellationToken = default);
 
-    /// <summary>The owner's albums ordered by lower(Name); cover = first entry by SortOrder with a content hash.</summary>
+    /// <summary>
+    /// The owner's albums ordered by lower(Name); cover = the chosen CoverImageId while it is still in the album with a
+    /// content hash, otherwise the first entry by SortOrder with a content hash.
+    /// </summary>
     Task<IReadOnlyList<AlbumSummaryRow>> GetSummariesAsync(int ownerUserId, CancellationToken cancellationToken = default);
 
     /// <summary>Tracked album if it exists AND belongs to the owner; otherwise null.</summary>
@@ -44,6 +47,9 @@ public interface IAlbumRepository
     Task ReorderAsync(int albumId, IReadOnlyList<int> orderedImageIds, CancellationToken cancellationToken = default);
 
     Task TouchAsync(int albumId, DateTime updatedAtUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>Stores the album's chosen cover image; the caller checks that the image is in the album.</summary>
+    Task SetCoverAsync(int albumId, int imageId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AlbumExportRow>> GetExportRowsAsync(int albumId, CancellationToken cancellationToken = default);
 }

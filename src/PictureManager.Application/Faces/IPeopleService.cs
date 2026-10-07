@@ -23,6 +23,9 @@ public interface IPeopleService
     /// </summary>
     Task<Result<PersonSummary>> AssignGroupAsync(int id, int targetId, IReadOnlyCollection<int>? imageIds = null, CancellationToken cancellationToken = default);
 
+    /// <summary>Chooses the face shown for a person or group; it must be one of their Suggested/Confirmed faces on a visible photo.</summary>
+    Task<Result<PersonSummary>> SetCoverAsync(int id, int? faceId, CancellationToken cancellationToken = default);
+
     /// <summary>Forgets a person or group: their faces become unassigned and may regroup on the next recognition run.</summary>
     Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
