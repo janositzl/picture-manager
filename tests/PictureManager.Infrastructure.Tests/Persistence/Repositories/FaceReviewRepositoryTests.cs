@@ -199,4 +199,18 @@ public class FaceReviewRepositoryTests
         (await repository.GetImageFacesAsync(s.ImageId, includeIgnored: true))!.Should().HaveCount(2);
         (await repository.GetImageFacesAsync(9999, includeIgnored: true)).Should().BeNull();
     }
+
+    [Fact]
+    public async Task HiddenImage_FacesAreListedForTheViewer_ButNotOfferedForRecheck()
+    {
+        var s = await SeedAsync();
+        await using var _ = s.Db;
+        await AddAsync(s, 0, s.Anna.Id, FaceAssignmentState.Confirmed);
+        await AddAsync(s, 1, null, FaceAssignmentState.Unknown);
+        await s.Db.Context.Images.Where(i => i.Id == s.ImageId).ExecuteUpdateAsync(u => u.SetProperty(i => i.IsHidden, true));
+        var repository = new FaceReviewRepository(s.Db.CreateContext());
+
+        (await repository.GetImageFacesAsync(s.ImageId, includeIgnored: false))!.Should().HaveCount(2);
+        (await repository.GetUnknownFacesAsync(s.ImageId)).Should().BeNull();
+    }
 }

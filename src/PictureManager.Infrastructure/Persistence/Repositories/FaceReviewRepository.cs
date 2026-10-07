@@ -22,7 +22,8 @@ public sealed class FaceReviewRepository : IFaceReviewRepository
 
     public async Task<IReadOnlyList<ImageFace>?> GetImageFacesAsync(int imageId, bool includeIgnored, CancellationToken cancellationToken = default)
     {
-        if (!await _dbContext.Images.AsNoTracking().WhereVisible().AnyAsync(i => i.Id == imageId, cancellationToken))
+        // Existing, not just visible: the folder view's "Show hidden" opens hidden photos in the viewer, which lists their faces.
+        if (!await _dbContext.Images.AsNoTracking().WhereExisting().AnyAsync(i => i.Id == imageId, cancellationToken))
             return null;
 
         return await _dbContext.Faces.AsNoTracking()

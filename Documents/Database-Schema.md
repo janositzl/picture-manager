@@ -65,6 +65,7 @@ Individual image files with metadata.
 | Longitude | double? | GPS longitude |
 | RawMetadata | jsonb? | Raw extracted metadata |
 | IsFavorite | bool, indexed | User favorite flag |
+| IsHidden | bool, default false | User-hidden: out of every view and out of face recognition; only the folder view's Show hidden lists it. Never written by the scanner. |
 | IndexState | enum (Pending/Indexed) | Whether metadata indexing is done |
 | FirstSeenUtc | timestamptz | When the image was first discovered |
 | MissingSinceUtc | timestamptz? | Set when file is gone from disk |
