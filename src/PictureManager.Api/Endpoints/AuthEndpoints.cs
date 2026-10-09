@@ -24,7 +24,7 @@ public static class AuthEndpoints
         auth.MapPost("/login", LoginAsync).RequireRateLimiting(AuthPolicies.LoginRateLimit);
         auth.MapPost("/logout", LogoutAsync);
         auth.MapGet("/me", MeAsync);
-        auth.MapPost("/password", ChangePasswordAsync).RequireAuthorization(AuthPolicies.SignedIn);
+        auth.MapPost("/password", ChangePasswordAsync).RequireAuthorization(AuthPolicies.SignedIn).RequireRateLimiting(AuthPolicies.PasswordRateLimit);
     }
 
     public static async Task<Results<Ok<MeDto>, ProblemHttpResult>> LoginAsync(

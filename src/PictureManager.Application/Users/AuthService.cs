@@ -9,13 +9,22 @@ namespace PictureManager.Application.Users;
 
 public sealed class AuthService(IAppUserRepository users, IPasswordHasher hasher, IClock clock) : IAuthService
 {
+    // Verified against when no usable account exists, so response time does not reveal which usernames exist.
+    private readonly Lazy<string> _dummyHash = new(() => hasher.Hash("dummy-password-for-timing"));
+
     public async Task<AuthenticatedUser?> LoginAsync(string? username, string? password, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
             return null;
 
         var user = await users.GetByNormalizedUsernameAsync(AppUser.NormalizeUsername(username), cancellationToken);
-        if (user is not { IsActive: true, PasswordHash: { } hash } || !hasher.Verify(hash, password))
+        if (user is not { IsActive: true, PasswordHash: { } hash })
+        {
+            hasher.Verify(_dummyHash.Value, password);
+            return null;
+        }
+
+        if (!hasher.Verify(hash, password))
             return null;
 
         user.LastLoginAt = clock.UtcNow;

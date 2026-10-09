@@ -17,6 +17,7 @@ public static class AuthPolicies
     public const string AdminOnly = "AdminOnly";
     public const string FolderActions = "FolderActions";
     public const string LoginRateLimit = "login";
+    public const string PasswordRateLimit = "password";
 }
 
 public static class AuthSetup
@@ -62,6 +63,10 @@ public static class AuthSetup
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             limiter.AddPolicy(AuthPolicies.LoginRateLimit, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = options.LoginAttemptsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+            // Password changes verify the current password, so they are guessable too: limit per signed-in user.
+            limiter.AddPolicy(AuthPolicies.PasswordRateLimit, http => RateLimitPartition.GetFixedWindowLimiter(
+                AuthClaims.GetUserId(http.User)?.ToString() ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = options.LoginAttemptsPerMinute, Window = TimeSpan.FromMinutes(1) }));
         });
 

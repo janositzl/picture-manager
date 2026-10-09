@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using PictureManager.Api.Auth;
 using PictureManager.Api.Endpoints;
@@ -46,6 +47,10 @@ try
         LoginAttemptsPerMinute = builder.Configuration.GetValue("Auth:LoginAttemptsPerMinute", 10)
     };
     builder.Services.AddPictureManagerAuth(authOptions);
+    // Behind a reverse proxy the real client address and scheme arrive in X-Forwarded-*; without this every client
+    // looks like the proxy (one shared login rate-limit bucket) and SameAsRequest cookies never see https.
+    // Only loopback proxies are trusted by default; an external proxy needs KnownNetworks/KnownProxies configured.
+    builder.Services.Configure<ForwardedHeadersOptions>(o => o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
     builder.Services.AddProblemDetails();
     builder.Services.AddOpenApi();
 
@@ -74,6 +79,8 @@ try
         .AddNpgSql(connectionString, name: "postgres");
 
     var app = builder.Build();
+
+    app.UseForwardedHeaders();
 
     // Outside Development, unhandled exceptions become a 500 ProblemDetails with no stack trace.
     if (!app.Environment.IsDevelopment())

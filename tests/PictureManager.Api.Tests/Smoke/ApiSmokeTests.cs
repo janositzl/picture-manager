@@ -105,7 +105,8 @@ public partial class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
         var roots = await client.GetFromJsonAsync<JsonElement>("/api/folders/roots");
         var smokeRoot = roots.EnumerateArray().Single(n => n.GetProperty("name").GetString() == "smoke-browse");
         var children = await client.GetFromJsonAsync<JsonElement>($"/api/folders/{smokeRoot.GetProperty("id").GetInt32()}/children");
-        children[0].GetProperty("imageCount").GetInt32().Should().Be(3);
+        children[0].GetProperty("name").GetString().Should().Be("Trip");
+        (await client.GetFromJsonAsync<JsonElement>($"/api/folders/{tripFolderId}")).GetProperty("imageCount").GetInt32().Should().Be(3);
 
         var firstPage = await client.GetFromJsonAsync<JsonElement>($"/api/images?folderId={tripFolderId}&sort=name&limit=2");
         firstPage.GetProperty("items").GetArrayLength().Should().Be(2);

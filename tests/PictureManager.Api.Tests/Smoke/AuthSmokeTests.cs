@@ -84,4 +84,32 @@ public partial class ApiSmokeTests
 
         (await client.GetAsync("/api/albums")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public void ChangePassword_Endpoint_IsRateLimited()
+    {
+        var endpoint = ApiEndpoints().Single(e =>
+            e.RoutePattern.RawText == "/api/auth/password"
+            && e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.IHttpMethodMetadata>()!.HttpMethods.Contains("POST"));
+
+        endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()!.PolicyName
+            .Should().Be(AuthPolicies.PasswordRateLimit);
+    }
+
+    [Fact]
+    public async Task Login_BehindProxyForwardingHttps_IssuesASecureCookie()
+    {
+        using var client = _fixture.Factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new { username = "admin", password = ApiSmokeFixture.AdminPassword })
+        };
+        request.Headers.Add("X-Forwarded-Proto", "https");
+        request.Headers.Add("X-Forwarded-For", "203.0.113.7");
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.GetValues("Set-Cookie").Should().Contain(c => c.StartsWith("pm.auth=") && c.Contains("secure"));
+    }
 }

@@ -55,6 +55,14 @@ public class AuthServiceTests
         (await _service.LoginAsync(username, password)).Should().BeNull();
 
     [Fact]
+    public async Task Login_UnknownUser_StillVerifiesAgainstADummyHash_AndReturnsNull()
+    {
+        (await _service.LoginAsync("nobody", "whatever-pw")).Should().BeNull();
+
+        _hasher.Received(1).Verify(Arg.Any<string>(), "whatever-pw");
+    }
+
+    [Fact]
     public async Task Login_DisabledUser_ReturnsNull()
     {
         _bob.IsActive = false;
