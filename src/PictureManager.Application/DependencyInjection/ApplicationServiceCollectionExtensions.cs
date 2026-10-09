@@ -26,6 +26,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IImageRootSeeder, ImageRootSeeder>();
         services.AddScoped<IRootService, RootService>();
         services.AddScoped<IAdminBootstrapper, AdminBootstrapper>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPeopleService, PeopleService>();
         services.AddScoped<IFaceReviewService, FaceReviewService>();
         services.AddScoped<IImageQueryService, ImageQueryService>();
