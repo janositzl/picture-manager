@@ -10,12 +10,12 @@ namespace PictureManager.Api.Endpoints;
 
 public static class FaceRecognitionEndpoints
 {
-    public static IEndpointRouteBuilder MapFaceRecognitionEndpoints(this IEndpointRouteBuilder admin)
+    public static IEndpointRouteBuilder MapFaceRecognitionEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions, IEndpointRouteBuilder admin)
     {
-        admin.MapPost("/face-recognitions", StartAsync);
-        admin.MapGet("/face-recognitions/{id:int}/events", StreamEventsAsync);
+        folderActions.MapPost("/face-recognitions", StartAsync);
+        user.MapGet("/face-recognitions/{id:int}/events", StreamEventsAsync);
         admin.MapGet("/face-recognitions/failures", GetFailuresAsync);
-        admin.MapGet("/face-recognitions/coverage", GetCoverageAsync);
+        user.MapGet("/face-recognitions/coverage", GetCoverageAsync);
         return admin;
     }
 

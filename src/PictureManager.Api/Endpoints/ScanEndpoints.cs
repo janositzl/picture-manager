@@ -9,11 +9,11 @@ namespace PictureManager.Api.Endpoints;
 
 public static class ScanEndpoints
 {
-    public static IEndpointRouteBuilder MapScanEndpoints(this IEndpointRouteBuilder admin)
+    public static IEndpointRouteBuilder MapScanEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions)
     {
-        admin.MapPost("/scans", StartScanAsync);
-        admin.MapGet("/scans/{id:int}/events", StreamScanEventsAsync);
-        return admin;
+        folderActions.MapPost("/scans", StartScanAsync);
+        user.MapGet("/scans/{id:int}/events", StreamScanEventsAsync);
+        return user;
     }
 
     public static async Task<IResult> StartScanAsync(ScanRequest request, IScanService scanService, CancellationToken cancellationToken)

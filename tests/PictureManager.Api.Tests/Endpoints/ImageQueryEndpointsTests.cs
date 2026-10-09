@@ -16,6 +16,27 @@ public class ImageQueryEndpointsTests
 {
     private readonly IImageQueryService _service = Substitute.For<IImageQueryService>();
 
+    private static ICurrentUser AdminUser { get; } = NewUser(true);
+
+    private static ICurrentUser NewUser(bool isAdmin)
+    {
+        var u = Substitute.For<ICurrentUser>();
+        u.IsAdmin.Returns(isAdmin);
+        return u;
+    }
+
+    [Fact]
+    public async Task ListAsync_NonAdmin_IgnoresIncludeHidden()
+    {
+        _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>([], null)));
+
+        await ImageQueryEndpoints.ListAsync(5, null, null, null, null, null, null, includeHidden: true, null, null, null, null,
+            _service, NewUser(false), CancellationToken.None);
+
+        await _service.Received(1).ListAsync(Arg.Is<ImageListRequest>(r => !r.IncludeHidden), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task ListAsync_PassesQueryThrough_AndReturnsOk()
     {
@@ -23,7 +44,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(page));
 
-        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, null, null, null, "name", "desc", "c", 50, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(12, "Madeira", "IMG", true, null, null, null, null, "name", "desc", "c", 50, _service, AdminUser, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<PagedResult<ImageListItem>>>().Which.Value.Should().BeSameAs(page);
         await _service.Received(1).ListAsync(
@@ -36,7 +57,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>(Array.Empty<ImageListItem>(), null)));
 
-        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, null, _service, CancellationToken.None);
+        await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, null, _service, AdminUser, CancellationToken.None);
 
         await _service.Received(1).ListAsync(new ImageListRequest(), Arg.Any<CancellationToken>());
     }
@@ -47,7 +68,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result.Invalid("limit", "Must be between 1 and 200."));
 
-        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, 0, _service, CancellationToken.None);
+        var result = await ImageQueryEndpoints.ListAsync(null, null, null, null, null, null, null, null, null, null, null, 0, _service, AdminUser, CancellationToken.None);
 
         result.Result.Should().BeOfType<ValidationProblem>();
     }
@@ -58,7 +79,7 @@ public class ImageQueryEndpointsTests
         _service.ListAsync(Arg.Any<ImageListRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result<PagedResult<ImageListItem>>.Ok(new PagedResult<ImageListItem>(Array.Empty<ImageListItem>(), null)));
 
-        await ImageQueryEndpoints.ListAsync(3, null, null, null, null, null, null, true, null, null, null, null, _service, CancellationToken.None);
+        await ImageQueryEndpoints.ListAsync(3, null, null, null, null, null, null, true, null, null, null, null, _service, AdminUser, CancellationToken.None);
 
         await _service.Received(1).ListAsync(new ImageListRequest(FolderId: 3, IncludeHidden: true), Arg.Any<CancellationToken>());
     }

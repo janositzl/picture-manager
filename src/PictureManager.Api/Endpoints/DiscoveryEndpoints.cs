@@ -10,11 +10,11 @@ namespace PictureManager.Api.Endpoints;
 
 public static class DiscoveryEndpoints
 {
-    public static IEndpointRouteBuilder MapDiscoveryEndpoints(this IEndpointRouteBuilder admin)
+    public static IEndpointRouteBuilder MapDiscoveryEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions)
     {
-        admin.MapPost("/discoveries", StartDiscoveryAsync);
-        admin.MapGet("/discoveries/{id:int}/events", StreamDiscoveryEventsAsync);
-        return admin;
+        folderActions.MapPost("/discoveries", StartDiscoveryAsync);
+        user.MapGet("/discoveries/{id:int}/events", StreamDiscoveryEventsAsync);
+        return user;
     }
 
     public static async Task<IResult> StartDiscoveryAsync(DiscoveryRequest request, IDiscoveryService discoveryService, CancellationToken cancellationToken)

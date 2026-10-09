@@ -9,17 +9,17 @@ namespace PictureManager.Api.Endpoints;
 
 public static class FolderEndpoints
 {
-    public static void MapFolderEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder admin)
+    public static void MapFolderEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions, IEndpointRouteBuilder admin)
     {
         user.MapGet("/folders/roots", GetRootsAsync);
         user.MapGet("/folders/{id:int}/children", GetChildrenAsync);
         user.MapGet("/folders/{id:int}", GetAsync);
 
         admin.MapGet("/folders/removed", GetRemovedAsync);
-        admin.MapDelete("/folders/{id:int}", RemoveAsync);
+        folderActions.MapDelete("/folders/{id:int}", RemoveAsync);
         admin.MapPost("/folders/{id:int}/restore", RestoreAsync);
         admin.MapDelete("/folders/{id:int}/removed", DeleteAsync);
-        admin.MapPut("/folders/{id:int}/exclusion", SetExcludedAsync);
+        folderActions.MapPut("/folders/{id:int}/exclusion", SetExcludedAsync);
     }
 
     public static async Task<Ok<IReadOnlyList<FolderNode>>> GetRootsAsync(IFolderService service, CancellationToken cancellationToken) =>

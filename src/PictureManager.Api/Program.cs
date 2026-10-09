@@ -161,15 +161,15 @@ try
     auth.MapAuthEndpoints();
 
     user.MapImageEndpoints();
-    user.MapImageQueryEndpoints();
-    user.MapFolderEndpoints(admin);
+    user.MapImageQueryEndpoints(admin);
+    user.MapFolderEndpoints(folderActions, admin);
     user.MapAlbumEndpoints();
     user.MapDuplicateEndpoints();
-    user.MapPeopleEndpoints();
-    admin.MapScanEndpoints();
-    admin.MapDiscoveryEndpoints();
-    admin.MapFaceRecognitionEndpoints();
-    admin.MapJobEndpoints();
+    user.MapPeopleEndpoints(admin);
+    user.MapScanEndpoints(folderActions);
+    user.MapDiscoveryEndpoints(folderActions);
+    user.MapFaceRecognitionEndpoints(folderActions, admin);
+    user.MapJobEndpoints(folderActions);
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();
 

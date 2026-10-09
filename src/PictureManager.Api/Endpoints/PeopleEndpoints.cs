@@ -9,29 +9,29 @@ namespace PictureManager.Api.Endpoints;
 
 public static class PeopleEndpoints
 {
-    public static IEndpointRouteBuilder MapPeopleEndpoints(this IEndpointRouteBuilder user)
+    public static IEndpointRouteBuilder MapPeopleEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder admin)
     {
         user.MapGet("/people", GetAllAsync);
         user.MapGet("/people/{id:int}", GetAsync);
-        user.MapPatch("/people/{id:int}", NameAsync);
-        user.MapPut("/people/{id:int}/cover", SetCoverAsync);
-        user.MapDelete("/people/{id:int}", DeleteAsync);
-        user.MapPost("/people/{id:int}/ignore", IgnoreGroupAsync);
-        user.MapPost("/people/{id:int}/assign", AssignGroupAsync);
+        admin.MapPatch("/people/{id:int}", NameAsync);
+        admin.MapPut("/people/{id:int}/cover", SetCoverAsync);
+        admin.MapDelete("/people/{id:int}", DeleteAsync);
+        admin.MapPost("/people/{id:int}/ignore", IgnoreGroupAsync);
+        admin.MapPost("/people/{id:int}/assign", AssignGroupAsync);
         user.MapGet("/faces/{id:int}/thumbnail", GetFaceThumbnailAsync);
 
         user.MapGet("/images/{id:int}/faces", GetImageFacesAsync);
-        user.MapPost("/images/{id:int}/faces/recheck", RecheckFacesAsync);
-        user.MapPost("/images/{id:int}/faces/reanalyze", ReanalyzeImageAsync);
-        user.MapPost("/faces/{id:int}/accept", AcceptAsync);
-        user.MapPost("/faces/{id:int}/reject", RejectAsync);
-        user.MapPost("/faces/{id:int}/unknown", MarkUnknownAsync);
-        user.MapPost("/faces/{id:int}/ignore", IgnoreAsync);
-        user.MapPost("/faces/{id:int}/restore", RestoreAsync);
-        user.MapPost("/faces/{id:int}/assign", AssignAsync);
-        user.MapPost("/people/{id:int}/suggestions/accept", AcceptAllAsync);
-        user.MapPost("/people/{id:int}/images/{imageId:int}/accept", AcceptImageAsync);
-        user.MapPost("/people/{id:int}/images/{imageId:int}/reject", RejectImageAsync);
+        admin.MapPost("/images/{id:int}/faces/recheck", RecheckFacesAsync);
+        admin.MapPost("/images/{id:int}/faces/reanalyze", ReanalyzeImageAsync);
+        admin.MapPost("/faces/{id:int}/accept", AcceptAsync);
+        admin.MapPost("/faces/{id:int}/reject", RejectAsync);
+        admin.MapPost("/faces/{id:int}/unknown", MarkUnknownAsync);
+        admin.MapPost("/faces/{id:int}/ignore", IgnoreAsync);
+        admin.MapPost("/faces/{id:int}/restore", RestoreAsync);
+        admin.MapPost("/faces/{id:int}/assign", AssignAsync);
+        admin.MapPost("/people/{id:int}/suggestions/accept", AcceptAllAsync);
+        admin.MapPost("/people/{id:int}/images/{imageId:int}/accept", AcceptImageAsync);
+        admin.MapPost("/people/{id:int}/images/{imageId:int}/reject", RejectImageAsync);
         return user;
     }
 

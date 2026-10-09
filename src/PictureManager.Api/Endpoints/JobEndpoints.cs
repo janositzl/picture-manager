@@ -7,11 +7,11 @@ namespace PictureManager.Api.Endpoints;
 
 public static class JobEndpoints
 {
-    public static IEndpointRouteBuilder MapJobEndpoints(this IEndpointRouteBuilder admin)
+    public static IEndpointRouteBuilder MapJobEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions)
     {
-        admin.MapGet("/jobs/active", GetActiveJobAsync);
-        admin.MapPost("/jobs/{id:int}/cancel", CancelJobAsync);
-        return admin;
+        user.MapGet("/jobs/active", GetActiveJobAsync);
+        folderActions.MapPost("/jobs/{id:int}/cancel", CancelJobAsync);
+        return user;
     }
 
     public static async Task<IResult> GetActiveJobAsync(IJobRepository jobs, CancellationToken cancellationToken)
