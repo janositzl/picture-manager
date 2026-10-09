@@ -2,7 +2,7 @@
 
 A web app for organizing images that live on a Windows NAS, shared over the network. It indexes folders and files into a catalog, extracts EXIF metadata, and layers albums and favorites on top — **without ever modifying the original files.**
 
-Use this document as the spec for scaffolding and building v1. Where this doc says "v2", skip it — build the seam, not the feature.
+Use this document as the spec for the app. Local-account authentication (see "Authentication") is implemented; the admin UI for managing users and sharing/per-user favorites are planned and not built yet.
 
 ## Stack
 
@@ -57,14 +57,15 @@ Image
   CreatedAt, UpdatedAt
 
 Album
-  Id, Name, Description, OwnerUserId (FK -> AppUser, NON-NULLABLE even in v1 — see "v1 placeholder owner" below),
+  Id, Name, Description, OwnerUserId (FK -> AppUser, NON-NULLABLE — see "Album ownership" below),
   CreatedAt, UpdatedAt
 
 AlbumImage
   AlbumId, ImageId, SortOrder, AddedAt
 
 AppUser
-  Id, ZitadelSubjectId (unique, nullable in v1), DisplayName, Role
+  Id, Username, NormalizedUsername (unique), DisplayName, Role, PasswordHash (nullable), IsActive,
+  MustChangePassword, CanRunFolderActions, SecurityStamp, CreatedAt, LastLoginAt
 ```
 
 Relationships: `Folder 1—* Image`, `Folder 1—* Folder` (parent/children), `Album 1—* AlbumImage *—1 Image`, `AppUser 1—* Album`.
@@ -79,7 +80,7 @@ Relationships: `Folder 1—* Image`, `Folder 1—* Folder` (parent/children), `A
 
 Hash cheaply: `size + first 64KB + last 64KB` via xxHash for identity checks; only full-hash if exact-duplicate detection needs it.
 
-**v1 placeholder owner.** `Album.OwnerUserId` is non-nullable even though v1 has no login. Seed a single system `AppUser` row at migration/startup time and point every album at it. This avoids a nullable FK now and a backfill migration later when v2 auth lands.
+**Album ownership.** `Album.OwnerUserId` is non-nullable. User #1 is the initial `admin` account (seeded by the migration; it was the pre-accounts placeholder owner, so every existing album stays with it). New albums belong to the signed-in user.
 
 ## Folder management
 
@@ -141,7 +142,7 @@ GET /api/images?folder=Vacation&fileName=IMG_4&favoritesOnly=true
 
 ## Authentication
 
-Local accounts (no external IdP). An admin creates users; there is no registration.
+Local accounts (no external IdP); there is no registration. Accounts are managed by an admin; the admin UI for creating users is planned (Phase 2), so for now `admin` is the only account.
 - Cookie session `pm.auth` (HttpOnly, SameSite=Strict, 14-day sliding); Data Protection keys live in Postgres.
 - The initial `admin` account gets its password from `Auth__InitialAdmin__Password` on first start and must change it at first login.
 - Surfaces (route groups in Program.cs, enforced server-side):
@@ -209,8 +210,8 @@ ENTRYPOINT ["dotnet", "PictureManager.Api.dll"]
 - [ ] Lazy thumbnail/preview generation, cached, content-addressed
 - [ ] In-process background scanner (enumerate + enrich phases)
 - [ ] REST API: folders, images, albums, favorites, basic search
-- [ ] No auth yet — but endpoints structured for `RequireAuthorization` later
-- [ ] Seeded placeholder `AppUser` for album ownership
+- [x] Local-account auth: every endpoint behind a `user`/`folderActions`/`admin` policy
+- [x] Seeded initial `admin` `AppUser` (owns albums)
 - [ ] Serilog logging
 
 **Frontend**
@@ -222,4 +223,6 @@ ENTRYPOINT ["dotnet", "PictureManager.Api.dll"]
 - [ ] Basic search bar (folder name, file name, favorites-only)
 - [ ] Settings page: excluded folder names, excluded/included extensions
 
-**Explicitly out of scope for v1:** auth/roles enforcement, per-user favorites, perceptual/visual-similarity duplicate detection, EXIF/date-range search, full-text search engine.
+**Planned, not built yet:** admin UI for creating users (Phase 2), sharing and per-user favorites (Phase 3).
+
+**Explicitly out of scope for v1:** perceptual/visual-similarity duplicate detection, EXIF/date-range search, full-text search engine.

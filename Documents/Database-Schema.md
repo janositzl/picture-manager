@@ -109,11 +109,29 @@ Application user accounts.
 | Property | Type | Description |
 |---|---|---|
 | Id | int (PK) | Row identifier |
-| ZitadelSubjectId | string?(200), unique index | External identity subject id (Zitadel auth) |
+| Username | string(64) | Login name as entered |
+| NormalizedUsername | string(64), unique index | Lower-cased username; the lookup key |
 | DisplayName | string(200) | Display name |
 | Role | enum (User/Admin) | Authorization role |
+| PasswordHash | string?(500) | Password hash; null means the account cannot log in |
+| IsActive | bool | Disabled accounts cannot log in and their sessions stop validating |
+| MustChangePassword | bool | The user must set a new password before using the app |
+| CanRunFolderActions | bool | May run scans, discovery and face recognition and exclude/remove folders (admins always may) |
+| SecurityStamp | Guid | Changes with password, role, active flag or folder-actions permission; invalidates older cookies |
+| CreatedAt | timestamptz | When the account was created |
+| LastLoginAt | timestamptz? | Last successful login |
 
-Seeded with a system user (Id 1, "System") as a v1 placeholder album owner until v2 auth lands.
+Seeded with the initial administrator (Id 1, `admin`, "Administrator", role Admin, no password). The API sets its password at startup from `Auth:InitialAdmin:Password` and requires a change at first login. It was the pre-accounts "System" placeholder album owner, so existing albums stay with it.
+
+## DataProtectionKeys
+
+ASP.NET Core Data Protection key ring (signs the auth cookie); managed by the framework.
+
+| Property | Type | Description |
+|---|---|---|
+| Id | int (PK) | Row identifier |
+| FriendlyName | string? | Key name |
+| Xml | string? | Serialized key material |
 
 ## Jobs
 

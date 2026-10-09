@@ -66,9 +66,13 @@ PictureManager/
    docker compose up -d
    ```
 
-2. Run the API (applies EF Core migrations and starts the background worker in-process):
+2. Apply the EF Core migrations (the API does not apply them; at startup it exits on an un-migrated
+   database because the admin bootstrapper reads the new user columns), then run the API (starts the
+   background worker in-process). The initial `admin` password comes from `Auth__InitialAdmin__Password`;
+   the development value is in `appsettings.Development.json`:
 
    ```bash
+   dotnet ef database update --project src/PictureManager.Infrastructure --startup-project src/PictureManager.Api
    dotnet run --project src/PictureManager.Api
    ```
 
