@@ -40,6 +40,8 @@ services:
       ThumbnailCache__PreviewEnabled: "true"
       ImageRoots__0__Name: ${IMAGE_ROOT_NAME:-library}
       ImageRoots__0__MountPath: /data/images
+      # Initial password for the "admin" account; used only while no admin has a password. Changed at first login.
+      Auth__InitialAdmin__Password: ${PM_ADMIN_PASSWORD:?Set PM_ADMIN_PASSWORD in .env}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:

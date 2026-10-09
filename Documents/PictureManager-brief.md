@@ -137,17 +137,19 @@ GET /api/images?folder=Vacation&fileName=IMG_4&favoritesOnly=true
 - An image can belong to multiple albums; an album cannot contain the same image twice.
 - Images within an album have a user-settable `SortOrder`.
 - Export: a text file, one image per line: `{prefix}{RelativePath}/{FileName}{Extension}` — prefix optional, defaults to empty. Plain UTF-8, `\n` line endings, in the album's own order.
-- Albums are user-owned (`OwnerUserId`) — see "v1 placeholder owner" above for how this works before auth exists.
+- Albums are owned by the signed-in user (`OwnerUserId`).
 
-## Authentication — deferred to v2
+## Authentication
 
-**v1 ships with no login.** Single implicit context; nothing enforces roles. Build endpoints so a `RequireAuthorization` policy layer can be dropped in later without reshaping routes.
-
-v2 target (don't build yet, just leave room):
-- Zitadel as the identity provider — Authorization Code flow + PKCE, via `Microsoft.AspNetCore.Authentication.OpenIdConnect`.
-- Two roles as Zitadel project roles, asserted as token claims: `admin` (folder registrations, rescans, user/album administration) and `user` (browse, favorite, own albums).
-- Enforce at the endpoint level (`.RequireAuthorization("AdminOnly")`), not just by hiding UI.
-- BFF pattern for the SPA: the ASP.NET Core host owns the session cookie; React never sees a Zitadel access token.
+Local accounts (no external IdP). An admin creates users; there is no registration.
+- Cookie session `pm.auth` (HttpOnly, SameSite=Strict, 14-day sliding); Data Protection keys live in Postgres.
+- The initial `admin` account gets its password from `Auth__InitialAdmin__Password` on first start and must change it at first login.
+- Surfaces (route groups in Program.cs, enforced server-side):
+  - `user`: any signed-in user; browse, favorites, own albums, read-only job status.
+  - `folderActions`: scans, discovery, face recognition, folder exclude/remove. Admins, plus users with `CanRunFolderActions`.
+  - `admin`: roots, settings, removed folders, hide/rotate, people/face edits.
+  - `auth`: login/logout/me/password.
+- Design: docs/superpowers/specs/2026-10-09-user-management-design.md
 
 ## Infrastructure & deployment
 
