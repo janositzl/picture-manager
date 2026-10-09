@@ -1,3 +1,5 @@
+using PictureManager.Infrastructure.Users;
+using PictureManager.Application.Users;
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -39,6 +41,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IFaceReviewRepository, FaceReviewRepository>();
         services.AddScoped<IFaceCropService, FaceCropService>();
 
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
         services.AddSingleton<IContentHasher, XxHashContentHasher>();
         services.AddSingleton<IPerceptualHasher, SkiaDHashPerceptualHasher>();
         services.AddSingleton<IExifReader, MetadataExtractorExifReader>();

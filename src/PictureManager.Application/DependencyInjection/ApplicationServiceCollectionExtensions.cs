@@ -1,3 +1,4 @@
+using PictureManager.Application.Users;
 using Microsoft.Extensions.DependencyInjection;
 using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
@@ -24,6 +25,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IDiscoveryService, DiscoveryService>();
         services.AddScoped<IImageRootSeeder, ImageRootSeeder>();
         services.AddScoped<IRootService, RootService>();
+        services.AddScoped<IAdminBootstrapper, AdminBootstrapper>();
         services.AddScoped<IPeopleService, PeopleService>();
         services.AddScoped<IFaceReviewService, FaceReviewService>();
         services.AddScoped<IImageQueryService, ImageQueryService>();
