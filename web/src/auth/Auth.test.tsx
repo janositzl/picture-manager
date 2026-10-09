@@ -2,6 +2,8 @@ import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { queryKeys } from '../api/queries'
+import { meQueryKey } from '../api/auth'
+import { activeJob, scanEvents } from '../test/jobHandlers'
 import { signInAs } from '../test/authHandlers'
 import { adminMe } from '../test/fixtures'
 import { renderApp } from '../test/render'
@@ -79,5 +81,34 @@ describe('authentication', () => {
 
     await screen.findByRole('navigation', { name: 'Folders' })
     expect(queryClient.getQueryData(queryKeys.albums())).toBeUndefined()
+  })
+
+  it("does not carry the previous user's running job into the next session", async () => {
+    server.use(
+      activeJob({ kind: 'Scan', id: 1, folderId: 2, foldersProcessed: 3, filesFound: 40 }),
+      scanEvents(1, [
+        {
+          Id: 1,
+          Status: 'Enumerating',
+          FoldersScanned: 3,
+          FilesFound: 40,
+          FilesEnriched: 0,
+          ErrorMessage: null,
+        },
+      ]),
+    )
+    const { user, queryClient } = renderApp('/folders/1')
+    expect((await screen.findAllByText('Scanning… 3 folders, 40 files')).length).toBeGreaterThan(0)
+
+    // The session ends; the next user has no running job.
+    server.use(http.get('/api/jobs/active', () => new HttpResponse(null, { status: 204 })))
+    signInAs(null)
+    queryClient.setQueryData(meQueryKey, null)
+    await user.type(await screen.findByLabelText('Username'), 'bob')
+    await user.type(screen.getByLabelText('Password'), 'correct-password')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+
+    await screen.findByRole('navigation', { name: 'Folders' })
+    expect(screen.queryByText(/^Scanning…/)).not.toBeInTheDocument()
   })
 })

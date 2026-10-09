@@ -69,6 +69,8 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   // be tracked so the banner shows it and HasActiveJobAsync's 409 isn't a silent surprise.
   const signedInId = useCurrentUser().data?.id ?? null
   useEffect(() => {
+    // Another session's job must not outlive it (logout, 401, or a different user signing in).
+    setJob(null)
     if (signedInId === null) return
     let cancelled = false
     getActiveJob()
