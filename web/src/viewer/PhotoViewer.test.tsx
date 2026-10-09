@@ -4,7 +4,8 @@ import { useMemo } from 'react'
 import { describe, expect, it } from 'vitest'
 import { useImages } from '../api/queries'
 import type { ImageFilter } from '../api/imageFilter'
-import { madeiraImages } from '../test/fixtures'
+import { signInAs } from '../test/authHandlers'
+import { madeiraImages, userMe } from '../test/fixtures'
 import { renderApp, renderRoutes } from '../test/render'
 import { server } from '../test/server'
 import { PhotoViewer } from './PhotoViewer'
@@ -27,6 +28,17 @@ function ViewerHarness({ filter }: { filter: ImageFilter }) {
 }
 
 describe('PhotoViewer', () => {
+  it('hides rotate and face review from a plain user, but keeps Add to album', async () => {
+    signInAs(userMe)
+    const { user } = renderApp('/folders/3')
+    await user.click(await screen.findByRole('button', { name: 'IMG_0001.jpg' }))
+    await viewerImage('IMG_0001.jpg')
+
+    expect(screen.getByRole('button', { name: 'Add to album' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rotate right' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review faces' })).not.toBeInTheDocument()
+  })
+
   it('opens from the grid and steps with the arrow keys', async () => {
     const { user, router } = renderApp('/folders/3')
     await user.click(await screen.findByRole('button', { name: 'IMG_0001.jpg' }))

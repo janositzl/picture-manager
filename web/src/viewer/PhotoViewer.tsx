@@ -24,6 +24,7 @@ import { AlbumPicker } from '../albums/AlbumPicker'
 import { AlbumRemovePicker } from '../albums/AlbumRemovePicker'
 import { readLastUsedAlbum, writeLastUsedAlbum } from '../albums/preferences'
 import { useAlbumAdder } from '../albums/useAlbumAdder'
+import { usePermissions } from '../api/auth'
 import { isNotFound } from '../api/client'
 import { useRemoveImagesFromAlbum } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
@@ -89,6 +90,7 @@ export function PhotoViewer({
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
   const rotate = useRotateThumbnails()
+  const { isAdmin } = usePermissions()
   // Any viewer can switch to face review (for photos no person's grid leads to); opened from a person it starts on.
   const [reviewing, setReviewing] = useState(false)
   const faceReview: { personId: number | null } | undefined =
@@ -212,7 +214,7 @@ export function PhotoViewer({
   }
 
   const rotateRight = () => {
-    if (current !== undefined && canAdd && !rotate.isPending)
+    if (isAdmin && current !== undefined && canAdd && !rotate.isPending)
       rotate.mutate({ imageIds: [current.id], degrees: 90 })
   }
 
@@ -428,7 +430,7 @@ export function PhotoViewer({
                   </IconButton>
                 </Tooltip>
               )}
-              {canAdd && (
+              {canAdd && isAdmin && (
                 <Tooltip title="Rotate right (R)">
                   <IconButton
                     aria-label="Rotate right"
@@ -462,7 +464,7 @@ export function PhotoViewer({
                   </IconButton>
                 </Tooltip>
               )}
-              {openedFor === undefined && (
+              {openedFor === undefined && isAdmin && (
                 <Tooltip title={reviewing ? 'Hide face review' : 'Review faces'}>
                   <IconButton
                     aria-label={reviewing ? 'Hide face review' : 'Review faces'}

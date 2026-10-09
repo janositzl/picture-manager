@@ -1,5 +1,6 @@
 import { Alert, Button, CircularProgress, Link } from '@mui/material'
 import { Link as RouterLink } from 'react-router'
+import { usePermissions } from '../api/auth'
 import { useFolder } from '../api/queries'
 import { useFolderJobs, type ActiveJob } from './FolderJobsContext'
 
@@ -25,6 +26,7 @@ export function progressLabel(activeJob: ActiveJob): string {
 /** App-wide banner for the single discovery/scan job the backend allows at a time. */
 export function JobStatusBanner() {
   const { activeJob, cancelActiveJob } = useFolderJobs()
+  const { canRunFolderActions } = usePermissions()
   const folder = useFolder(activeJob?.folderId ?? null)
 
   if (activeJob === null) return null
@@ -35,7 +37,7 @@ export function JobStatusBanner() {
       icon={<CircularProgress size={16} />}
       sx={{ borderRadius: 0 }}
       action={
-        activeJob.kind === 'face-recognitions' ? (
+        activeJob.kind === 'face-recognitions' && canRunFolderActions ? (
           <Button color="inherit" size="small" onClick={cancelActiveJob}>
             Cancel
           </Button>

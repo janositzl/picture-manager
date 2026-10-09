@@ -1,6 +1,8 @@
 import { fireEvent, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { signInAs } from '../test/authHandlers'
+import { userMe } from '../test/fixtures'
 import { peopleList } from '../test/peopleHandlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
@@ -76,6 +78,19 @@ describe('PeoplePage', () => {
 
     expect(await screen.findByText(/No faces recognized yet/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Recognize faces in all libraries' })).toBeInTheDocument()
+  })
+
+  it('hides Recognize faces from a user without folder actions, and shows it with them', async () => {
+    server.use(peopleList([]))
+    signInAs(userMe)
+    const first = renderApp('/people')
+    expect(await screen.findByText(/No faces recognized yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Recognize faces in all libraries' })).not.toBeInTheDocument()
+    first.unmount()
+
+    signInAs({ ...userMe, canRunFolderActions: true })
+    renderApp('/people')
+    expect(await screen.findByRole('button', { name: 'Recognize faces in all libraries' })).toBeInTheDocument()
   })
 
   it('selecting a person shows their photos next to the list', async () => {

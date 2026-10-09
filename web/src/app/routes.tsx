@@ -13,6 +13,7 @@ import { FolderView } from '../views/FolderView'
 import { RootRedirect } from '../views/RootRedirect'
 import { SearchView } from '../views/SearchView'
 import { AuthGate } from '../auth/AuthGate'
+import { RequireAdmin } from '../auth/RequireAdmin'
 import { AppShell } from './AppShell'
 
 export const appRoutes: RouteObject[] = [
@@ -43,7 +44,11 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: '/admin',
-        element: <AdminLayout />,
+        element: (
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        ),
         children: [
           { index: true, element: <Navigate to="settings" replace /> },
           { path: 'settings', element: <SettingsPage /> },

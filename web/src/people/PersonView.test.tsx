@@ -3,11 +3,27 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { peopleKeys } from '../api/people'
 import { peopleFixture, peopleList, person, type PersonDto } from '../test/peopleHandlers'
-import { image } from '../test/fixtures'
+import { signInAs } from '../test/authHandlers'
+import { image, userMe } from '../test/fixtures'
 import { renderApp } from '../test/render'
 import { server } from '../test/server'
 
 describe('PersonView', () => {
+  it('hides the editing controls from a plain user', async () => {
+    signInAs(userMe)
+    server.use(
+      peopleList(),
+      person(peopleFixture[1]),
+      http.get('/api/images', () => HttpResponse.json({ items: [], nextCursor: null })),
+    )
+    renderApp('/people/2')
+
+    await screen.findByText('No photos for this person.')
+    expect(screen.queryByRole('button', { name: 'Edit person' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Assign to person' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ignore group' })).not.toBeInTheDocument()
+  })
+
   /** Group 2 (unnamed) is open; the PATCH answers with `survivor`. Resolves once the people list is cached. */
   async function openGroup(survivor: PersonDto) {
     const sent: string[] = []

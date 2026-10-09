@@ -20,6 +20,10 @@ import { withParams } from '../routing/urlState'
 
 type Props = {
   showHidden: boolean
+  /** Hidden photos are admin-only. */
+  canShowHidden: boolean
+  /** Re-analysing faces needs the folder-actions permission. */
+  canReanalyse: boolean
   /** False for a folder with no photos of its own: nothing to analyse or add. */
   hasPhotos: boolean
   reanalyseDisabled: boolean
@@ -30,6 +34,8 @@ type Props = {
 /** The folder header's "more" menu; the Show hidden choice lives in ?hidden=1 so it survives reloads. */
 export function FolderMenu({
   showHidden,
+  canShowHidden,
+  canReanalyse,
   hasPhotos,
   reanalyseDisabled,
   onReanalyse,
@@ -42,6 +48,9 @@ export function FolderMenu({
     close()
     action()
   }
+  const showReanalyse = hasPhotos && canReanalyse
+  const showAddToAlbum = hasPhotos
+  if (!canShowHidden && !showReanalyse && !showAddToAlbum) return null
 
   return (
     <>
@@ -77,23 +86,25 @@ export function FolderMenu({
           },
         }}
       >
-        <MenuItem
-          role="menuitemcheckbox"
-          aria-checked={showHidden}
-          onClick={run(() =>
-            setSearchParams(withParams(searchParams, { hidden: showHidden ? null : 1 }), {
-              replace: true,
-            }),
-          )}
-        >
-          <ListItemIcon>
-            <VisibilityOffOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Show hidden photos</ListItemText>
-          {showHidden && <CheckIcon fontSize="small" color="primary" />}
-        </MenuItem>
-        {hasPhotos && <Divider />}
-        {hasPhotos && (
+        {canShowHidden && (
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={showHidden}
+            onClick={run(() =>
+              setSearchParams(withParams(searchParams, { hidden: showHidden ? null : 1 }), {
+                replace: true,
+              }),
+            )}
+          >
+            <ListItemIcon>
+              <VisibilityOffOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Show hidden photos</ListItemText>
+            {showHidden && <CheckIcon fontSize="small" color="primary" />}
+          </MenuItem>
+        )}
+        {canShowHidden && (showReanalyse || showAddToAlbum) && <Divider />}
+        {showReanalyse && (
           <MenuItem disabled={reanalyseDisabled} onClick={run(onReanalyse)}>
             <ListItemIcon>
               <AutorenewIcon fontSize="small" />
@@ -101,7 +112,7 @@ export function FolderMenu({
             <ListItemText>Re-analyse faces…</ListItemText>
           </MenuItem>
         )}
-        {hasPhotos && (
+        {showAddToAlbum && (
           <MenuItem onClick={run(onAddToAlbum)}>
             <ListItemIcon>
               <CreateNewFolderOutlinedIcon fontSize="small" />

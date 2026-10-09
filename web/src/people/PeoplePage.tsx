@@ -4,6 +4,7 @@ import { Box, Button, InputAdornment, TextField, Tooltip, Typography } from '@mu
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
+import { usePermissions } from '../api/auth'
 import { unknownLabels, usePeople, type PersonSummary } from '../api/people'
 import { HEADING_SX } from '../design/accent'
 import { EmptyMessage } from '../shared/EmptyMessage'
@@ -146,6 +147,7 @@ function VirtualPeople({ named, unknown }: { named: RowProps[]; unknown: RowProp
 function PeopleList() {
   const people = usePeople()
   const { activeJob, recognizeFaces } = useFolderJobs()
+  const { canRunFolderActions } = usePermissions()
   const [search, setSearch] = useState('')
   const [needsReviewOnly, setNeedsReviewOnly] = useState(false)
 
@@ -215,16 +217,18 @@ function PeopleList() {
             <span className="tabular-nums opacity-80">{needsReview}</span>
           </button>
         )}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<FaceRetouchingNaturalIcon fontSize="small" />}
-          disabled={activeJob !== null}
-          onClick={() => recognizeFaces(null)}
-          sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 500, py: 1 }}
-        >
-          Recognize faces in all libraries
-        </Button>
+        {canRunFolderActions && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FaceRetouchingNaturalIcon fontSize="small" />}
+            disabled={activeJob !== null}
+            onClick={() => recognizeFaces(null)}
+            sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 500, py: 1 }}
+          >
+            Recognize faces in all libraries
+          </Button>
+        )}
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
         {people.isError && (

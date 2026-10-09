@@ -1,13 +1,11 @@
 import CheckIcon from '@mui/icons-material/Check'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import {
-  CircularProgress,
   IconButton,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
-  Typography,
 } from '@mui/material'
 import { useState, type MouseEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -22,7 +20,6 @@ import { parseId } from '../routing/urlState'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { useFolderJobs } from './FolderJobsContext'
 import type { FaceCoverageState } from './faceCoverage'
-import { progressLabel } from './JobStatusBanner'
 import { ReanalyseFacesConfirm } from './ReanalyseFacesConfirm'
 
 type Props = {
@@ -60,17 +57,6 @@ export function FolderActionsMenu({
   const analysed = faceState === 'completed'
   const excluded = isExcluded || ancestorExcluded
   const scanDisabled = activeJob !== null || excluded
-
-  if (activeJob?.folderId === folderId) {
-    return (
-      <>
-        <CircularProgress size={14} sx={{ ml: 0.5 }} />
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ ml: 0.5 }}>
-          {progressLabel(activeJob)}
-        </Typography>
-      </>
-    )
-  }
 
   const close = () => setAnchorEl(null)
   const runAction = (action: () => void) => {

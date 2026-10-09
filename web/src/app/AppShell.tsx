@@ -17,6 +17,8 @@ import {
 } from 'react'
 import { Link as RouterLink, Outlet, useLocation } from 'react-router'
 import { ACCENT, ACCENT_SOFT, ACCENT_TEXT, HEADING_SX } from '../design/accent'
+import { usePermissions } from '../api/auth'
+import { UserMenu } from '../auth/UserMenu'
 import { SearchBox } from '../search/SearchBox'
 import { readStored, writeStored } from '../shared/storage'
 import { FolderTree } from '../tree/FolderTree'
@@ -52,6 +54,7 @@ function isNavActive(pathname: string, to: string): boolean {
 }
 
 export function AppShell() {
+  const { isAdmin } = usePermissions()
   const [collapsed, setCollapsed] = useState(() => readStored(TREE_COLLAPSED_KEY) === 'true')
   const [treeWidth, setTreeWidth] = useState(readTreeWidth)
   const location = useLocation()
@@ -148,15 +151,18 @@ export function AppShell() {
                 {label}
               </Button>
             ))}
-            <IconButton
-              component={RouterLink}
-              to="/admin"
-              aria-label="Admin"
-              size="small"
-              sx={{ ml: 0.5, color: 'text.secondary' }}
-            >
-              <SettingsOutlinedIcon fontSize="small" />
-            </IconButton>
+            {isAdmin && (
+              <IconButton
+                component={RouterLink}
+                to="/admin"
+                aria-label="Admin"
+                size="small"
+                sx={{ ml: 0.5, color: 'text.secondary' }}
+              >
+                <SettingsOutlinedIcon fontSize="small" />
+              </IconButton>
+            )}
+            <UserMenu />
           </Box>
         </Toolbar>
       </AppBar>

@@ -12,9 +12,11 @@ import {
   ListItemButton,
   ListItemText,
   Tooltip,
+  Typography,
 } from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
+import { usePermissions } from '../api/auth'
 import { useFolderChildren, usePrefetchFolderChildren } from '../api/queries'
 import type { FolderFaceCoverage, FolderNode } from '../api/types'
 import { ACCENT_SOFT, ACCENT_TEXT, SCANNED_BLUE } from '../design/accent'
@@ -22,6 +24,8 @@ import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { FaceStatusIcon } from './FaceStatusIcon'
 import { faceCoverageLabel, faceCoverageState } from './faceCoverage'
 import { FolderActionsMenu } from './FolderActionsMenu'
+import { useFolderJobs } from './FolderJobsContext'
+import { progressLabel } from './JobStatusBanner'
 
 type Props = {
   node: FolderNode
@@ -37,6 +41,20 @@ type Props = {
   faceCoverage: ReadonlyMap<number, FolderFaceCoverage>
 }
 
+/** The running job's caption on its folder's row; shown to everyone, unlike the actions menu. */
+function FolderJobProgress({ folderId }: { folderId: number }) {
+  const { activeJob } = useFolderJobs()
+  if (activeJob?.folderId !== folderId) return null
+  return (
+    <>
+      <CircularProgress size={14} sx={{ ml: 0.5 }} />
+      <Typography variant="caption" color="text.secondary" noWrap sx={{ ml: 0.5 }}>
+        {progressLabel(activeJob)}
+      </Typography>
+    </>
+  )
+}
+
 export function FolderTreeNode({
   node,
   depth,
@@ -48,6 +66,8 @@ export function FolderTreeNode({
   faceCoverage,
 }: Props) {
   const navigate = useNavigate()
+  const { canRunFolderActions } = usePermissions()
+  const { activeJob } = useFolderJobs()
   const expanded = node.hasChildren && isExpanded(node.id)
   const children = useFolderChildren(node.id, expanded)
   const prefetchChildren = usePrefetchFolderChildren()
@@ -161,15 +181,18 @@ export function FolderTreeNode({
         {!excluded && faceState !== 'none' && faceLabel && (
           <FaceStatusIcon state={faceState} label={faceLabel} />
         )}
-        <FolderActionsMenu
-          folderId={node.id}
-          folderName={node.name}
-          isExcluded={node.isExcluded}
-          ancestorExcluded={ancestorExcluded}
-          isRootFolder={depth === 0}
-          parentId={parentId}
-          faceState={faceState}
-        />
+        <FolderJobProgress folderId={node.id} />
+        {canRunFolderActions && activeJob?.folderId !== node.id && (
+          <FolderActionsMenu
+            folderId={node.id}
+            folderName={node.name}
+            isExcluded={node.isExcluded}
+            ancestorExcluded={ancestorExcluded}
+            isRootFolder={depth === 0}
+            parentId={parentId}
+            faceState={faceState}
+          />
+        )}
       </ListItemButton>
       {expanded && children.isError && (
         <QueryErrorAlert

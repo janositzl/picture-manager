@@ -4,6 +4,7 @@ import HideSourceIcon from '@mui/icons-material/HideSource'
 import { Box, Button, IconButton, Tooltip } from '@mui/material'
 import { useState } from 'react'
 import { Link as RouterLink, useLocation, useParams, useSearchParams } from 'react-router'
+import { usePermissions } from '../api/auth'
 import { unknownLabels, usePeople, usePerson, useSetPersonCover } from '../api/people'
 import { useNotify } from '../app/notify'
 import { parseGridParams } from '../routing/urlState'
@@ -34,6 +35,7 @@ type PersonContentProps = { personId: number }
 function PersonContent({ personId }: PersonContentProps) {
   const person = usePerson(personId)
   const people = usePeople()
+  const { isAdmin } = usePermissions()
   const setCover = useSetPersonCover()
   const notify = useNotify()
   const [searchParams] = useSearchParams()
@@ -43,7 +45,9 @@ function PersonContent({ personId }: PersonContentProps) {
   const [stripMode, setStripMode] = useStoredChoice('pm.people.stripMode', FACE_MODES, 'faces')
   const [editing, setEditing] = useState(false)
   const [ignoring, setIgnoring] = useState(false)
-  const [assigning, setAssigning] = useState<{ imageIds?: number[]; clear?: () => void } | null>(null)
+  const [assigning, setAssigning] = useState<{ imageIds?: number[]; clear?: () => void } | null>(
+    null,
+  )
 
   if (person.isError) return <PersonNotFound />
   // The grid's filter depends on whether the person is named, so wait for that.
@@ -53,29 +57,36 @@ function PersonContent({ personId }: PersonContentProps) {
   // An unnamed group has nothing confirmed yet, so its grid is the suggestions themselves.
   const isGroup = person.data.name === null
   const gridState = isGroup ? 'suggested' : 'confirmed'
-  const label = person.data.name ?? unknownLabels(people.data ?? []).get(personId) ?? 'Unknown person'
+  const label =
+    person.data.name ?? unknownLabels(people.data ?? []).get(personId) ?? 'Unknown person'
 
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <ImageBrowser
         filter={{ kind: 'person', personId, state: gridState, sort, order }}
         showFaceCrops={gridMode === 'faces'}
-        faceReview={{ personId }}
-        onAssignSelected={isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined}
-        onSetCoverSelected={(faceId, clearSelection) =>
-          setCover.mutate(
-            { id: personId, faceId },
-            {
-              onSuccess: () => {
-                notify('Cover updated.')
-                clearSelection()
-              },
-              onError: () => notify("Couldn't change the cover."),
-            },
-          )
+        faceReview={isAdmin ? { personId } : undefined}
+        onAssignSelected={
+          isAdmin && isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined
+        }
+        onSetCoverSelected={
+          isAdmin
+            ? (faceId, clearSelection) =>
+                setCover.mutate(
+                  { id: personId, faceId },
+                  {
+                    onSuccess: () => {
+                      notify('Cover updated.')
+                      clearSelection()
+                    },
+                    onError: () => notify("Couldn't change the cover."),
+                  },
+                )
+            : undefined
         }
         viewerEnabled={!openedFromStrip(location.state)}
         banner={
+          isAdmin &&
           !isGroup && (
             <SuggestedStrip
               key={personId}
@@ -94,48 +105,52 @@ function PersonContent({ personId }: PersonContentProps) {
             sort={sort}
             order={order}
             titleAdornment={
-              <>
-                <Tooltip title="Edit person">
-                  <IconButton
-                    size="small"
-                    aria-label="Edit person"
-                    onClick={() => setEditing(true)}
-                    className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-                  >
-                    <EditOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                {isGroup && (
-                  <Tooltip title="Assign to person">
+              isAdmin ? (
+                <>
+                  <Tooltip title="Edit person">
                     <IconButton
                       size="small"
-                      aria-label="Assign to person"
-                      onClick={() => setAssigning({})}
+                      aria-label="Edit person"
+                      onClick={() => setEditing(true)}
                       className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
                     >
-                      <DriveFileMoveOutlinedIcon fontSize="small" />
+                      <EditOutlinedIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                )}
-                {isGroup && (
-                  <Tooltip title="Ignore group">
-                    <IconButton
-                      size="small"
-                      aria-label="Ignore group"
-                      onClick={() => setIgnoring(true)}
-                      className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-                    >
-                      <HideSourceIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </>
+                  {isGroup && (
+                    <Tooltip title="Assign to person">
+                      <IconButton
+                        size="small"
+                        aria-label="Assign to person"
+                        onClick={() => setAssigning({})}
+                        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                      >
+                        <DriveFileMoveOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {isGroup && (
+                    <Tooltip title="Ignore group">
+                      <IconButton
+                        size="small"
+                        aria-label="Ignore group"
+                        onClick={() => setIgnoring(true)}
+                        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                      >
+                        <HideSourceIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </>
+              ) : undefined
             }
             actions={<FaceModeToggle value={gridMode} onChange={setGridMode} label="Grid view" />}
           />
         }
         emptyState={
-          <EmptyMessage>{isGroup ? 'No photos for this person.' : 'No confirmed photos yet.'}</EmptyMessage>
+          <EmptyMessage>
+            {isGroup ? 'No photos for this person.' : 'No confirmed photos yet.'}
+          </EmptyMessage>
         }
       />
       {ignoring && (
@@ -156,7 +171,12 @@ function PersonContent({ personId }: PersonContentProps) {
         />
       )}
       {editing && (
-        <PersonEditDialog key={person.data.id} person={person.data} label={label} onClose={() => setEditing(false)} />
+        <PersonEditDialog
+          key={person.data.id}
+          person={person.data}
+          label={label}
+          onClose={() => setEditing(false)}
+        />
       )}
     </Box>
   )

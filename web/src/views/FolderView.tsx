@@ -4,6 +4,7 @@ import { Link as RouterLink, useParams, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
+import { usePermissions } from '../api/auth'
 import { useFolder } from '../api/queries'
 import { parseFacesParam, parseGridParams, parseHiddenParam, parseId } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
@@ -23,7 +24,9 @@ export function FolderView() {
   const [searchParams] = useSearchParams()
   const { sort, order } = parseGridParams(searchParams)
   const faces = parseFacesParam(searchParams)
-  const showHidden = parseHiddenParam(searchParams)
+  const { isAdmin, canRunFolderActions } = usePermissions()
+  // Hidden photos are admin-only; a pasted ?hidden=1 must not reveal them to anyone else.
+  const showHidden = isAdmin && parseHiddenParam(searchParams)
   const folder = useFolder(folderId)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
   const [confirmingReanalyse, setConfirmingReanalyse] = useState(false)
@@ -75,8 +78,8 @@ export function FolderView() {
   return (
     <>
       <ImageBrowser
-        hideable
-        rotatable
+        hideable={isAdmin}
+        rotatable={isAdmin}
         filter={{
           kind: 'folder',
           folderId,
@@ -102,6 +105,8 @@ export function FolderView() {
               !detail.isMissing ? (
                 <FolderMenu
                   showHidden={showHidden}
+                  canShowHidden={isAdmin}
+                  canReanalyse={canRunFolderActions}
                   hasPhotos={detail.imageCount > 0}
                   reanalyseDisabled={activeJob !== null}
                   onReanalyse={() => setConfirmingReanalyse(true)}
