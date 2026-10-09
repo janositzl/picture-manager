@@ -39,6 +39,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__PictureManagerDb: Host=db;Port=5432;Database=${POSTGRES_DB:-picturemanager};Username=${POSTGRES_USER:-picturemanager};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      # Initial password for the "admin" account (min 8 chars); must be changed at first login.
+      Auth__InitialAdmin__Password: ${PM_ADMIN_PASSWORD:?Set PM_ADMIN_PASSWORD in .env}
       ThumbnailCache__RootPath: /data/thumbnail-cache
       ThumbnailCache__PreviewEnabled: "true"
       ImageRoots__0__Name: ${IMAGE_ROOT_NAME:-library}

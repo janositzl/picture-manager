@@ -68,8 +68,14 @@ deployment, the plain `Dockerfile` is simpler and sufficient.
    | `API_PORT` | Host port the API is published on (container listens on 8080 internally) |
    | `IMAGE_LIBRARY_PATH` | Absolute host path to your photo library, mounted read-only at `/data/images` |
    | `IMAGE_ROOT_NAME` | Display name for this image root |
+   | `PM_ADMIN_PASSWORD` | **Required.** Initial password for the `admin` account (minimum 8 characters) |
 
    `.env` is gitignored — never commit real credentials.
+
+   **Upgrade note (authentication):** PictureManager now requires sign-in. On first start the
+   existing placeholder user becomes the `admin` account with the password from
+   `PM_ADMIN_PASSWORD`; you are forced to change it at first login (minimum 8 characters).
+   If login always fails, check the API log (`docker compose logs api`) for the error.
 
 3. Multiple image roots: `docker-compose.prod.yml` only wires up one root
    (`ImageRoots__0__*`) via `.env`. To add more, either edit the `api` service's
