@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using PictureManager.Api.Auth;
 using PictureManager.Api.Endpoints;
 using PictureManager.Api.Middleware;
 using PictureManager.Application.DependencyInjection;
@@ -8,6 +9,7 @@ using PictureManager.Application.Repositories;
 using PictureManager.Application.Roots;
 using PictureManager.Application.Scanning;
 using PictureManager.Application.Thumbnails;
+using PictureManager.Application.Users;
 using PictureManager.Infrastructure.DependencyInjection;
 using PictureManager.Worker.DependencyInjection;
 using Scalar.AspNetCore;
@@ -38,6 +40,12 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddWorker();
+    var authOptions = new AuthOptions
+    {
+        InitialAdminPassword = builder.Configuration["Auth:InitialAdmin:Password"],
+        LoginAttemptsPerMinute = builder.Configuration.GetValue("Auth:LoginAttemptsPerMinute", 10)
+    };
+    builder.Services.AddPictureManagerAuth(authOptions);
     builder.Services.AddProblemDetails();
     builder.Services.AddOpenApi();
 
@@ -90,6 +98,7 @@ try
     {
         var seeder = scope.ServiceProvider.GetRequiredService<IImageRootSeeder>();
         await seeder.SeedAsync();
+        await scope.ServiceProvider.GetRequiredService<IAdminBootstrapper>().EnsureInitialAdminPasswordAsync();
 
         // Before the server accepts requests, so it can only ever fail jobs a previous process left behind.
         var scanService = scope.ServiceProvider.GetRequiredService<IScanService>();
@@ -138,10 +147,18 @@ try
 
     app.UseMiddleware<ImageCacheControlMiddleware>();
 
-    // Every /api endpoint lives in exactly one of these two groups (ApiSurfaceMetadata). v2 auth seam:
-    // user.RequireAuthorization(); admin.RequireAuthorization("AdminOnly"); with no route changes.
-    var user = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.User));
-    var admin = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.Admin));
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.UseRateLimiter();
+
+    // Every /api endpoint lives in exactly one of these groups (ApiSurfaceMetadata); each carries its policy,
+    // so nothing under /api is reachable anonymously except /api/auth, /api/health and /api/ping.
+    var user = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.User)).RequireAuthorization(AuthPolicies.Active);
+    var folderActions = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.FolderActions)).RequireAuthorization(AuthPolicies.FolderActions);
+    var admin = app.MapGroup("/api").WithMetadata(new ApiSurfaceMetadata(ApiSurface.Admin)).RequireAuthorization(AuthPolicies.AdminOnly);
+    var auth = app.MapGroup("/api/auth").WithMetadata(new ApiSurfaceMetadata(ApiSurface.Auth));
+
+    auth.MapAuthEndpoints();
 
     user.MapImageEndpoints();
     user.MapImageQueryEndpoints();

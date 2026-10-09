@@ -14,7 +14,7 @@ using Xunit;
 
 namespace PictureManager.Api.Tests.Smoke;
 
-public class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
+public partial class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
 {
     private readonly ApiSmokeFixture _fixture;
 

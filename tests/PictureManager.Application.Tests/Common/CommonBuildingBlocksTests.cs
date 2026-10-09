@@ -87,12 +87,4 @@ public class CommonBuildingBlocksTests
 
         act.Should().Throw<System.InvalidOperationException>();
     }
-
-    [Fact]
-    public void AddApplication_RegistersSystemCurrentUser_AsSystemUser()
-    {
-        var provider = new ServiceCollection().AddApplication().BuildServiceProvider();
-
-        provider.GetRequiredService<ICurrentUser>().UserId.Should().Be(AppUser.InitialAdminId);
-    }
 }
