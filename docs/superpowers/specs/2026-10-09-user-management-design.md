@@ -16,6 +16,10 @@ self-registration.
   transfer/delete), **password self-service** (change own password; admin reset forces a change).
 - **Admin-only:** every action that changes the shared library for everyone: hide/unhide, thumbnail
   rotation, all people/face mutations.
+- **Folder actions are a per-user permission:** `CanRunFolderActions`, default **false**. This covers
+  everything in the folder tree's actions menu: Refresh structure, Scan, Recognize/Reanalyse faces,
+  Exclude/Include, Remove folder, and cancelling a running job. Users without it don't see the actions.
+  Admins always have it.
 - Out of scope: per-user root access restrictions.
 
 **Assumptions to confirm on review:**
@@ -43,7 +47,8 @@ self-registration.
   - `PasswordHash?`
   - `IsActive = true`
   - `MustChangePassword`
-  - `SecurityStamp` (Guid, rotated on every password, role or active change)
+  - `CanRunFolderActions = false` (ignored for admins, who always have it)
+  - `SecurityStamp` (Guid, rotated on every password, role, active or folder-actions change)
   - `CreatedAt`, `LastLoginAt?`
 - Drop `ZitadelSubjectId` and its index.
 - Migration updates row #1 to `Username="admin"`, `DisplayName="Administrator"`, `Role=Admin`,
@@ -70,19 +75,34 @@ self-registration.
   existing sessions without a DB hit on every thumbnail.
 - **Data Protection keys persisted to Postgres** (`Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`,
   `DataProtectionKeys` table). Without this, every container restart logs everyone out.
-- Claims: `NameIdentifier`=Id, `Name`=Username, `Role`, `stamp`, `mcp` (must-change-password).
+- Claims: `NameIdentifier`=Id, `Name`=Username, `Role`, `stamp`, `mcp` (must-change-password),
+  `fa` (can run folder actions; issued for admins too).
 
 **Authorization:**
 - `user.RequireAuthorization("Active")` and `admin.RequireAuthorization("AdminOnly")`, exactly the seam
   that is already planned.
-- Both policies also require that `mcp` is absent. A user who must change their password can only
+- A third group, `folderActions`, uses `RequireAuthorization("FolderActions")`: Active plus the `fa`
+  claim. Add `ApiSurface.FolderActions` to `ApiSurface.cs`.
+- All three policies also require that `mcp` is absent. A user who must change their password can only
   reach the `auth` group.
+- **Endpoint regrouping for folder actions:**
+  - **`folderActions`** (mutations, moved from `admin`): `POST /discoveries`, `POST /scans`,
+    `POST /face-recognitions`, `POST /jobs/{id}/cancel`, `PUT /folders/{id}/exclusion`,
+    `DELETE /folders/{id}`.
+  - **`user`** (read-only status, moved from `admin`, which the tree polls for every user): `GET /jobs/active`,
+    `GET /discoveries/{id}/events`, `GET /scans/{id}/events`, `GET /face-recognitions/{id}/events`,
+    `GET /face-recognitions/coverage`. Everyone sees scan progress and face-status icons.
+  - **`admin`** stays as is: removed-folders list, restore and delete, `face-recognitions/failures`,
+    roots, settings.
+  - `MapFolderEndpoints`, `MapScanEndpoints`, `MapDiscoveryEndpoints`, `MapFaceRecognitionEndpoints` and
+    `MapJobEndpoints` take the groups they need, following the existing `MapFolderEndpoints(user, admin)`
+    pattern.
 - A new anonymous `auth` group at `/api/auth`, with `ApiSurface.Auth` added to `ApiSurface.cs`.
 - `/api/health` and `/api/ping` stay anonymous. Static files and the SPA fallback stay anonymous.
 - Login rate limit: `AddRateLimiter` fixed window, 10 per minute per remote IP on `POST /api/auth/login`.
 
 **`ICurrentUser`:**
-- Becomes `{ int UserId; bool IsAdmin; }`.
+- Becomes `{ int UserId; bool IsAdmin; bool CanRunFolderActions; }`.
 - New scoped `HttpCurrentUser` in Api reads the claims. It replaces the singleton `SystemCurrentUser`
   registration in `ApplicationServiceCollectionExtensions.cs:20`.
 - `SystemCurrentUser` is deleted.
@@ -92,7 +112,8 @@ self-registration.
 - `POST /api/auth/login {username,password}` → 200 `Me` and sets the cookie, or 401 with a generic
   message. Updates `LastLoginAt`.
 - `POST /api/auth/logout` → 204.
-- `GET /api/auth/me` → `Me {id, username, displayName, role, mustChangePassword}`, or 401.
+- `GET /api/auth/me` → `Me {id, username, displayName, role, mustChangePassword, canRunFolderActions}`
+  (always true for admins), or 401.
 - `POST /api/auth/password {currentPassword,newPassword}`: requires a signed-in user and works even
   with `mcp` set. Rotates the stamp, clears `mcp` and re-issues the cookie.
 
@@ -119,15 +140,21 @@ self-registration.
   - Face review in `FaceReview`/`PeopleInPhoto`/`PersonAssign`
   - `PersonEditDialog`, `SuggestedStrip` actions, `AssignGroupDialog`
   - "Show hidden" toggle
+- Hide folder actions unless `useCurrentUser().canRunFolderActions`:
+  - Don't render `FolderActionsMenu` in `FolderTreeNode`.
+  - Hide the scan and face-recognition buttons in `FolderView`/`FolderMenu`.
+  - Hide the Cancel button in `JobStatusBanner`. The progress display stays visible to everyone.
 
 ### Phase 2: User administration
 
 **API** (admin group; new `UserEndpoints.cs`, `Application/Users/UserService.cs`, and extend
 `IAppUserRepository`):
-- `GET /api/users`: list with id, username, displayName, role, isActive, lastLoginAt and album count.
-- `POST /api/users {username, displayName, password, role}`: the new user has `MustChangePassword=true`.
-  Returns 409 for a duplicate username.
-- `PATCH /api/users/{id} {displayName?, role?, isActive?}`: role or active changes rotate the stamp.
+- `GET /api/users`: list with id, username, displayName, role, isActive, canRunFolderActions,
+  lastLoginAt and album count.
+- `POST /api/users {username, displayName, password, role, canRunFolderActions = false}`: the new user
+  has `MustChangePassword=true`. Returns 409 for a duplicate username.
+- `PATCH /api/users/{id} {displayName?, role?, isActive?, canRunFolderActions?}`: role, active or
+  folder-actions changes rotate the stamp, so the change takes effect within about 60 s.
 - `POST /api/users/{id}/reset-password {newPassword}`: sets `MustChangePassword=true` and rotates the stamp.
 - `DELETE /api/users/{id}?albums=transfer|delete`:
   - `transfer` reassigns owned albums to the calling admin. On a name clash, append " (from {username})".
@@ -143,6 +170,9 @@ self-registration.
 **Frontend:**
 - `web/src/admin/UsersPage.tsx` plus dialogs: create, edit (name/role/active), reset password, and
   delete (with a transfer/delete albums choice).
+- Create and edit dialogs include a "Can run folder actions (scan, refresh, face recognition)"
+  checkbox, unchecked by default. When the role is Admin it is shown checked and disabled. The list
+  has a matching column.
 - Add the route under `/admin` and a nav entry in `AdminLayout`.
 - `web/src/api/users.ts` holds the query and mutation hooks.
 
@@ -219,12 +249,15 @@ self-registration.
   - Add a logged-in client helper.
   - Every `/api` endpoint except auth/health/ping returns 401 anonymous.
   - Every admin-surface endpoint returns 403 for a `User`.
+  - Every folder-actions endpoint returns 403 for a `User` without `CanRunFolderActions`, and is allowed
+    for one with it and for an admin. The moved read-only status endpoints are allowed for any `User`.
   - A must-change-password user gets 403 everywhere except `/api/auth/*`.
   - The login cookie round-trip works.
 - **Frontend (Vitest + MSW, existing `web/src/test/` handlers):**
   - Login flow, and a 401 bouncing to login.
   - Forced password change.
   - Admin menu and controls hidden for a `User`.
+  - Folder actions menu hidden without `canRunFolderActions`, shown with it, while scan progress stays visible.
   - `UsersPage` CRUD.
   - `ShareDialog`, and a Viewer seeing a read-only `AlbumView`.
 
@@ -239,6 +272,9 @@ self-registration.
    - Must change his password.
    - Sees no Admin menu, no hide/rotate/face controls, and gets 403 when calling those endpoints directly.
    - Has empty favorites.
+   - Sees no folder actions menu, but does see the progress banner while the admin runs a scan.
+   - After the admin enables "Can run folder actions" for bob, he sees the folder actions within
+     about 60 s and can start a scan.
 4. Share an admin album with bob as Viewer: he can see and export it but not edit. Change the share to
    Editor: he can add images, but cannot rename or delete the album.
 5. Disable bob: his open session gets 401 within about 60 s. Delete bob with `transfer`: his albums
