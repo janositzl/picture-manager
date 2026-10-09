@@ -93,6 +93,6 @@ public class CommonBuildingBlocksTests
     {
         var provider = new ServiceCollection().AddApplication().BuildServiceProvider();
 
-        provider.GetRequiredService<ICurrentUser>().UserId.Should().Be(AppUser.SystemUserId);
+        provider.GetRequiredService<ICurrentUser>().UserId.Should().Be(AppUser.InitialAdminId);
     }
 }

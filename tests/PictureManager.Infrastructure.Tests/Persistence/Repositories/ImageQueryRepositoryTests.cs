@@ -446,7 +446,7 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var albums = await new ImageQueryRepository(context).GetAlbumsContainingAsync(image.Id, AppUser.SystemUserId);
+        var albums = await new ImageQueryRepository(context).GetAlbumsContainingAsync(image.Id, AppUser.InitialAdminId);
 
         albums.Should().Equal(new AlbumRef(beach.Id, "beach"), new AlbumRef(zoo.Id, "Zoo"));
     }

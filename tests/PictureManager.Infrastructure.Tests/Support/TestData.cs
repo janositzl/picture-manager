@@ -60,7 +60,7 @@ public static class TestData
         UpdatedAt = Utc
     };
 
-    public static Album Album(string name, int ownerUserId = AppUser.SystemUserId) => new()
+    public static Album Album(string name, int ownerUserId = AppUser.InitialAdminId) => new()
     {
         Name = name,
         OwnerUserId = ownerUserId,

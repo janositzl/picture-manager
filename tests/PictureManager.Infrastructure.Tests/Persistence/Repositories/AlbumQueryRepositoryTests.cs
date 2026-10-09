@@ -32,7 +32,7 @@ public class AlbumQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new AlbumRepository(context).GetSummariesAsync(AppUser.SystemUserId);
+        var rows = await new AlbumRepository(context).GetSummariesAsync(AppUser.InitialAdminId);
 
         rows.Select(r => r.Name).Should().Equal("Beach", "zoo");
         rows[0].ImageCount.Should().Be(0);
@@ -62,7 +62,7 @@ public class AlbumQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new AlbumRepository(context).GetSummariesAsync(AppUser.SystemUserId);
+        var rows = await new AlbumRepository(context).GetSummariesAsync(AppUser.InitialAdminId);
 
         rows.Single(r => r.Name == "picked").CoverImageId.Should().Be(chosen.Id);
         rows.Single(r => r.Name == "picked").CoverContentHash.Should().Be("CHOSEN");
@@ -107,8 +107,8 @@ public class AlbumQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new AlbumRepository(context);
 
-        (await repository.GetOwnedAsync(mine.Id, AppUser.SystemUserId)).Should().NotBeNull();
-        (await repository.GetOwnedAsync(theirs.Id, AppUser.SystemUserId)).Should().BeNull();
+        (await repository.GetOwnedAsync(mine.Id, AppUser.InitialAdminId)).Should().NotBeNull();
+        (await repository.GetOwnedAsync(theirs.Id, AppUser.InitialAdminId)).Should().BeNull();
     }
 
     [Fact]
@@ -122,9 +122,9 @@ public class AlbumQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new AlbumRepository(context);
 
-        (await repository.NameExistsAsync(AppUser.SystemUserId, "holidays", null)).Should().BeTrue();
-        (await repository.NameExistsAsync(AppUser.SystemUserId, "HOLIDAYS", album.Id)).Should().BeFalse();
-        (await repository.NameExistsAsync(AppUser.SystemUserId, "Other", null)).Should().BeFalse();
+        (await repository.NameExistsAsync(AppUser.InitialAdminId, "holidays", null)).Should().BeTrue();
+        (await repository.NameExistsAsync(AppUser.InitialAdminId, "HOLIDAYS", album.Id)).Should().BeFalse();
+        (await repository.NameExistsAsync(AppUser.InitialAdminId, "Other", null)).Should().BeFalse();
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public class AlbumQueryRepositoryTests
         await using (var context = db.CreateContext())
         {
             var repository = new AlbumRepository(context);
-            await repository.DeleteAsync((await repository.GetOwnedAsync(album.Id, AppUser.SystemUserId))!);
+            await repository.DeleteAsync((await repository.GetOwnedAsync(album.Id, AppUser.InitialAdminId))!);
         }
 
         await using var read = db.CreateContext();

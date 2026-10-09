@@ -14,7 +14,7 @@ public class PostgresTestDatabaseTests
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
 
-        (await db.Context.AppUsers.AnyAsync(u => u.Id == AppUserSeed.SystemUserId)).Should().BeTrue();
+        (await db.Context.AppUsers.AnyAsync(u => u.Id == AppUser.InitialAdminId)).Should().BeTrue();
         (await db.Context.Settings.CountAsync()).Should().Be(1);
     }
 
@@ -47,12 +47,5 @@ public class PostgresTestDatabaseTests
 
         await using var other = db.CreateContext();
         (await other.ImageRoots.Select(r => r.Name).ToListAsync()).Should().Contain("shared");
-    }
-
-    // The system user id lives in the Infrastructure configuration today; Task 2 moves the constant
-    // to the Model. Referencing it through this alias keeps this test file stable across that move.
-    private static class AppUserSeed
-    {
-        public const int SystemUserId = PictureManager.Infrastructure.Persistence.Configurations.AppUserConfiguration.SystemUserId;
     }
 }

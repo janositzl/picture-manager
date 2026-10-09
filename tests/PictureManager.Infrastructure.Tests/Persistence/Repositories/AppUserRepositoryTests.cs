@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using FluentAssertions;
 using System.Threading.Tasks;
 using PictureManager.Infrastructure.Persistence;
-using PictureManager.Infrastructure.Persistence.Configurations;
+using PictureManager.Model;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using Xunit;
 
@@ -21,10 +21,10 @@ public class AppUserRepositoryTests
         await context.Database.EnsureCreatedAsync();
 
         var repository = new AppUserRepository(context);
-        var user = await repository.GetByIdAsync(AppUserConfiguration.SystemUserId);
+        var user = await repository.GetByIdAsync(AppUser.InitialAdminId);
 
         user.Should().NotBeNull();
-        user!.DisplayName.Should().Be("System");
+        user!.DisplayName.Should().Be("Administrator");
     }
 
     [Fact]

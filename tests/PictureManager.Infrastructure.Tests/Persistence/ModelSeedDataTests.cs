@@ -20,16 +20,20 @@ public class ModelSeedDataTests
     }
 
     [Fact]
-    public async Task Database_SeedsSystemAppUserAndDefaultAppSettings()
+    public async Task Database_SeedsInitialAdminAndDefaultAppSettings()
     {
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync();
 
         var user = await context.AppUsers.SingleAsync();
-        user.Id.Should().Be(1);
-        user.DisplayName.Should().Be("System");
-        user.Role.Should().Be(UserRole.User);
-        user.ZitadelSubjectId.Should().BeNull();
+        user.Id.Should().Be(AppUser.InitialAdminId);
+        user.Username.Should().Be("admin");
+        user.NormalizedUsername.Should().Be("admin");
+        user.DisplayName.Should().Be("Administrator");
+        user.Role.Should().Be(UserRole.Admin);
+        user.IsActive.Should().BeTrue();
+        user.PasswordHash.Should().BeNull();
+        user.SecurityStamp.Should().NotBe(Guid.Empty);
 
         var settings = await context.Settings.SingleAsync();
         settings.Id.Should().Be(1);
@@ -38,7 +42,7 @@ public class ModelSeedDataTests
     }
 
     [Fact]
-    public void Model_RegistersAllTwelveEntityTypes()
+    public void Model_RegistersAllEntityTypes()
     {
         using var context = CreateContext();
 
@@ -46,7 +50,8 @@ public class ModelSeedDataTests
         {
             typeof(ImageRoot), typeof(Folder), typeof(Image), typeof(Album),
             typeof(AlbumImage), typeof(AppUser), typeof(Job), typeof(AppSettings),
-            typeof(FaceModel), typeof(FaceProcessingState), typeof(Face), typeof(Person)
+            typeof(FaceModel), typeof(FaceProcessingState), typeof(Face), typeof(Person),
+            typeof(Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey)
         });
     }
 }

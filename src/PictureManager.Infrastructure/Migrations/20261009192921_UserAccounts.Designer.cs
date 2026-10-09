@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using PictureManager.Infrastructure.Persistence;
 namespace PictureManager.Infrastructure.Migrations
 {
     [DbContext(typeof(PictureManagerDbContext))]
-    partial class PictureManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009192921_UserAccounts")]
+    partial class UserAccounts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
