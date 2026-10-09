@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { ImageListItem } from '../api/types'
+import { authHandlers } from './authHandlers'
 import { adminHandlers } from './adminHandlers'
 import { albumHandlers, duplicateHandlers } from './albumHandlers'
 import {
@@ -28,6 +29,7 @@ const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { 
  * the generic /:id, which would otherwise treat "removed" as a folder id.
  */
 export const handlers = [
+  ...authHandlers,
   http.get('/api/face-recognitions/coverage', () => HttpResponse.json(faceCoverage)),
   http.get('/api/folders/roots', () => HttpResponse.json(rootFolders)),
   http.get('/api/folders/:id/children', ({ params }) =>
@@ -43,7 +45,8 @@ export const handlers = [
     let items = allImages().map((i) => ({ ...i, isHidden: hiddenIds.has(i.id) }))
     const folderId = query.get('folderId')
     // Like the real API: hidden photos are listed only for one folder with includeHidden=true.
-    if (folderId === null || query.get('includeHidden') !== 'true') items = items.filter((i) => !i.isHidden)
+    if (folderId === null || query.get('includeHidden') !== 'true')
+      items = items.filter((i) => !i.isHidden)
     if (folderId !== null) items = items.filter((i) => i.folderId === Number(folderId))
     if (query.get('favoritesOnly') === 'true') items = items.filter((i) => i.isFavorite)
     const fileName = query.get('fileName')?.toLowerCase()

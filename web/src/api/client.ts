@@ -12,6 +12,17 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+/** AuthGate registers this: any 401 outside /api/auth means the session ended, so show the login page. */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler
+}
+
+function reportUnauthorized(path: string, status: number): void {
+  if (status === 401 && !path.startsWith('/api/auth/')) unauthorizedHandler?.()
+}
+
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404
 }
@@ -27,6 +38,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   })
 
   if (!response.ok) {
+    reportUnauthorized(path, response.status)
     throw new ApiError(response.status, await readProblem(response))
   }
 
@@ -54,6 +66,7 @@ export async function apiFetchText(path: string, init?: RequestInit): Promise<st
     headers: { Accept: 'text/plain', ...init?.headers },
   })
   if (!response.ok) {
+    reportUnauthorized(path, response.status)
     throw new ApiError(response.status, await readProblem(response))
   }
   return response.text()

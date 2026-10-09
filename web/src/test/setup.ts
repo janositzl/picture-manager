@@ -3,6 +3,7 @@ import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { resetAdminStore } from './adminHandlers'
 import { resetAlbumStore } from './albumHandlers'
+import { resetAuthStore } from './authHandlers'
 import { resetHiddenStore } from './handlers'
 import { server } from './server'
 
@@ -13,6 +14,7 @@ configure({ asyncUtilTimeout: 5000 })
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 beforeEach(() => {
+  resetAuthStore()
   resetAlbumStore()
   resetAdminStore()
   resetHiddenStore()

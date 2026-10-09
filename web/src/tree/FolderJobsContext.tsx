@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useCurrentUser } from '../api/auth'
 import {
   cancelJob,
   getActiveJob,
@@ -66,7 +67,9 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   // folderId is null for a whole-instance job (e.g. the startup catch-up re-enriching images an
   // interrupted scan left unenriched, or a scan/discovery of every active root); it still needs to
   // be tracked so the banner shows it and HasActiveJobAsync's 409 isn't a silent surprise.
+  const signedInId = useCurrentUser().data?.id ?? null
   useEffect(() => {
+    if (signedInId === null) return
     let cancelled = false
     getActiveJob()
       .then((active) => {
@@ -85,7 +88,7 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [signedInId])
 
   const progress = useJobEvents(job?.kind ?? 'discoveries', job?.jobId ?? null, (event) => {
     if (event.status === 'Failed') {

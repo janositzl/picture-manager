@@ -173,3 +173,12 @@ export type ScanProgress = {
   filesEnriched: number
   errorMessage: string | null
 }
+
+export type Me = {
+  id: number
+  username: string
+  displayName: string
+  role: 'Admin' | 'User'
+  mustChangePassword: boolean
+  canRunFolderActions: boolean
+}

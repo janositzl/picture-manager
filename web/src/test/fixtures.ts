@@ -1,4 +1,5 @@
 import type {
+  Me,
   DuplicateGroup,
   FolderDetail,
   FolderFaceCoverage,
@@ -190,3 +191,20 @@ export const duplicateGroups: DuplicateGroup[] = [
   { contentHash: 'H20', count: 2, images: [madeiraImages[0]!, holidaysImages[0]!] },
   { contentHash: 'H22', count: 2, images: [madeiraImages[2]!, holidaysImages[1]!] },
 ]
+
+export const adminMe: Me = {
+  id: 1,
+  username: 'admin',
+  displayName: 'Administrator',
+  role: 'Admin',
+  mustChangePassword: false,
+  canRunFolderActions: true,
+}
+export const userMe: Me = {
+  id: 5,
+  username: 'bob',
+  displayName: 'Bob',
+  role: 'User',
+  mustChangePassword: false,
+  canRunFolderActions: false,
+}
