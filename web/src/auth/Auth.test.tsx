@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { act } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { queryKeys } from '../api/queries'
 import { meQueryKey } from '../api/auth'
 import { activeJob, scanEvents } from '../test/jobHandlers'
@@ -30,6 +31,8 @@ describe('authentication', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }))
 
     expect(await screen.findByText('Invalid username or password.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toHaveValue('admin')
+    expect(screen.getByLabelText('Password')).toHaveValue('')
   })
 
   it('forces a password change before showing the app', async () => {
@@ -110,5 +113,40 @@ describe('authentication', () => {
 
     await screen.findByRole('navigation', { name: 'Folders' })
     expect(screen.queryByText(/^Scanning…/)).not.toBeInTheDocument()
+  })
+
+  it('picks up a job another user starts while this one is signed in', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      server.use(
+        scanEvents(1, [
+          {
+            Id: 1,
+            Status: 'Enumerating',
+            FoldersScanned: 3,
+            FilesFound: 40,
+            FilesEnriched: 0,
+            ErrorMessage: null,
+          },
+        ]),
+      )
+      renderApp('/folders/1')
+      await screen.findByRole('navigation', { name: 'Folders' })
+      expect(screen.queryByText(/^Scanning…/)).not.toBeInTheDocument()
+
+      // Someone else starts a scan; nothing was running when this page loaded.
+      server.use(
+        activeJob({ kind: 'Scan', id: 1, folderId: 2, foldersProcessed: 3, filesFound: 40 }),
+      )
+      await act(async () => {
+        vi.advanceTimersByTime(10_000)
+      })
+
+      expect((await screen.findAllByText('Scanning… 3 folders, 40 files')).length).toBeGreaterThan(
+        0,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -13,21 +13,23 @@ function loginErrorMessage(error: unknown): string {
   return "Couldn't reach the server."
 }
 
+type LoginState = { error: string | null; username: string }
+
 export function LoginPage() {
   const login = useLogin()
-  const [error, submit, pending] = useActionState(
-    async (_previous: string | null, form: FormData) => {
+  // React resets the form after every action; the username comes back through the state so a typo
+  // in the password doesn't make the user retype it.
+  const [{ error, username }, submit, pending] = useActionState(
+    async (_previous: LoginState, form: FormData): Promise<LoginState> => {
+      const username = String(form.get('username') ?? '')
       try {
-        await login.mutateAsync({
-          username: String(form.get('username') ?? ''),
-          password: String(form.get('password') ?? ''),
-        })
-        return null
+        await login.mutateAsync({ username, password: String(form.get('password') ?? '') })
+        return { error: null, username }
       } catch (caught) {
-        return loginErrorMessage(caught)
+        return { error: loginErrorMessage(caught), username }
       }
     },
-    null,
+    { error: null, username: '' },
   )
 
   return (
@@ -67,6 +69,7 @@ export function LoginPage() {
           {error !== null && <Alert severity="error">{error}</Alert>}
           <TextField
             name="username"
+            defaultValue={username}
             label="Username"
             autoComplete="username"
             autoFocus

@@ -43,6 +43,8 @@ type FolderJobs = {
   cancelActiveJob: () => void
 }
 
+const ACTIVE_JOB_POLL_MS = 10_000
+
 const FolderJobsContext = createContext<FolderJobs | null>(null)
 
 function startErrorMessage(error: unknown): string {
@@ -68,29 +70,41 @@ export function FolderJobsProvider({ children }: { children: ReactNode }) {
   // interrupted scan left unenriched, or a scan/discovery of every active root); it still needs to
   // be tracked so the banner shows it and HasActiveJobAsync's 409 isn't a silent surprise.
   const signedInId = useCurrentUser().data?.id ?? null
-  useEffect(() => {
-    // Another session's job must not outlive it (logout, 401, or a different user signing in).
+  // Another session's job must not outlive it (logout, 401, or a different user signing in).
+  const [jobOwner, setJobOwner] = useState(signedInId)
+  if (jobOwner !== signedInId) {
+    setJobOwner(signedInId)
     setJob(null)
-    if (signedInId === null) return
+  }
+  const tracking = job !== null
+  // While no job is tracked, keep asking the backend: a job another user starts must show up here
+  // too. A tracked job is driven by its event stream, so polling pauses until it ends.
+  useEffect(() => {
+    if (signedInId === null || tracking) return
     let cancelled = false
-    getActiveJob()
-      .then((active) => {
-        if (cancelled || active === null) return
-        const kind: JobKind =
-          active.kind === 'Discovery'
-            ? 'discoveries'
-            : active.kind === 'Scan'
-              ? 'scans'
-              : 'face-recognitions'
-        setJob({ kind, folderId: active.folderId, jobId: active.id })
-      })
-      .catch(() => {
-        // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.
-      })
+    const restore = () => {
+      getActiveJob()
+        .then((active) => {
+          if (cancelled || active === null) return
+          const kind: JobKind =
+            active.kind === 'Discovery'
+              ? 'discoveries'
+              : active.kind === 'Scan'
+                ? 'scans'
+                : 'face-recognitions'
+          setJob((current) => current ?? { kind, folderId: active.folderId, jobId: active.id })
+        })
+        .catch(() => {
+          // No harm leaving the UI unaware of an active job it couldn't confirm; it'll surface via a 409 if the user tries to start one.
+        })
+    }
+    restore()
+    const timer = setInterval(restore, ACTIVE_JOB_POLL_MS)
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
-  }, [signedInId])
+  }, [signedInId, tracking])
 
   const progress = useJobEvents(job?.kind ?? 'discoveries', job?.jobId ?? null, (event) => {
     if (event.status === 'Failed') {
