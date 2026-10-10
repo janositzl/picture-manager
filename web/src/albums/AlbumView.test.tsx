@@ -120,4 +120,46 @@ describe('AlbumView', () => {
     expect(await screen.findByRole('img', { name: 'IMG_0001.jpg' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next photo' })).not.toBeInTheDocument()
   })
+
+  it('a viewer can browse and export a shared album but not change it', async () => {
+    albumStore.addShared({ id: 7, name: 'Bob trip', permission: 'Viewer', imageIds: [20, 21] })
+    renderApp('/albums/7')
+    expect(await screen.findByRole('heading', { name: 'Bob trip' })).toBeInTheDocument()
+    expect(screen.getByText('Shared by Bob B')).toBeInTheDocument()
+    expect(screen.getByText('Can view')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export…' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Leave…' })).toBeInTheDocument()
+    for (const name of ['Sort by…', 'Edit…', 'Delete…', 'Share…'])
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+  })
+
+  it('an editor can sort a shared album but not rename, delete or share it', async () => {
+    albumStore.addShared({ id: 8, name: 'Bob edits', permission: 'Editor', imageIds: [20, 21] })
+    renderApp('/albums/8')
+    expect(await screen.findByRole('button', { name: 'Sort by…' })).toBeEnabled()
+    expect(screen.getByText('Can edit')).toBeInTheDocument()
+    for (const name of ['Edit…', 'Delete…', 'Share…'])
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+  })
+
+  it('Shift+D in a view-only album explains and removes nothing', async () => {
+    albumStore.addShared({ id: 7, name: 'Bob trip', permission: 'Viewer', imageIds: [20, 21] })
+    const { user } = renderApp('/albums/7?image=20')
+    expect(await screen.findByRole('img', { name: 'IMG_0001.jpg' })).toBeInTheDocument()
+    await user.keyboard('{Shift>}D{/Shift}')
+    expect(await screen.findByText('You can only view this album.')).toBeInTheDocument()
+    expect(albumStore.get(7)!.imageIds).toEqual([20, 21])
+  })
+
+  it('leaving a shared album confirms, returns to Albums and drops it', async () => {
+    albumStore.addShared({ id: 7, name: 'Bob trip', permission: 'Viewer' })
+    const { user, router } = renderApp('/albums/7')
+    await user.click(await screen.findByRole('button', { name: 'Leave…' }))
+    expect(
+      screen.getByText('Leave Bob trip? It disappears from your albums until Bob B shares it again.'),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Leave' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/albums'))
+    expect(albumStore.get(7)!.shares).toEqual([])
+  })
 })

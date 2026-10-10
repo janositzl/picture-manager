@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   FormControlLabel,
   Link,
   Menu,
@@ -20,6 +21,8 @@ import {
   type AddTarget,
   type AlbumSort,
 } from '../api/albums'
+import { useRemoveAlbumShare } from '../api/albumShares'
+import { useCurrentUser } from '../api/auth'
 import { isNotFound } from '../api/client'
 import { useSetFavorite } from '../api/favorites'
 import { useAlbum, useAlbumImages } from '../api/queries'
@@ -30,10 +33,12 @@ import { TileSizeToggle } from '../grid/TileSizeToggle'
 import { useSelection } from '../grid/useSelection'
 import { parseGridParams, parseId, withParams } from '../routing/urlState'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
+import { UserAvatar } from '../shared/UserAvatar'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { PhotoViewer } from '../viewer/PhotoViewer'
 import { GridSkeleton } from '../views/GridSkeleton'
+import { canEdit, isOwner, PERMISSION_LABEL } from './access'
 import { AlbumFormDialog } from './AlbumFormDialog'
 import { ExportDialog } from './ExportDialog'
 import { AlbumGrid } from './AlbumGrid'
@@ -41,6 +46,7 @@ import { AlbumPicker } from './AlbumPicker'
 import { photoCount } from './messages'
 import { readShowFolders, writeShowFolders } from './preferences'
 import { planMove } from './reorder'
+import { ShareDialog } from './ShareDialog'
 
 const LARGE_ALBUM = 2000
 
@@ -55,7 +61,7 @@ const HEADER_BUTTON_SX = {
   '&:hover': { bgcolor: 'action.hover', borderColor: BORDER },
 }
 
-type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | 'sort' | null
+type OpenDialog = 'edit' | 'delete' | 'remove' | 'export' | 'sort' | 'share' | 'leave' | null
 
 const SORT_OPTIONS: { by: AlbumSort; label: string }[] = [
   { by: 'dateAsc', label: 'Date taken (oldest first)' },
@@ -79,6 +85,8 @@ export function AlbumView() {
   const deleteAlbum = useDeleteAlbum(albumId ?? 0)
   const sortAlbum = useSortAlbum(albumId ?? 0)
   const setCover = useSetAlbumCover(albumId ?? 0)
+  const me = useCurrentUser().data
+  const leave = useRemoveAlbumShare(albumId ?? 0)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
   const selection = useSelection(ids, `album-${albumId}`)
@@ -112,6 +120,8 @@ export function AlbumView() {
   }
 
   const detail = album.data
+  const editable = canEdit(detail)
+  const owner = isOwner(detail)
   const selectedIds = ids.filter((id) => selection.selected.has(id))
 
   const open = (id: number) =>
@@ -150,6 +160,10 @@ export function AlbumView() {
 
   // The viewer's Shift+D: no confirmation, like Shift+A adding without one.
   const removeFromViewer = async (imageId: number): Promise<boolean> => {
+    if (!editable) {
+      notify('You can only view this album.')
+      return false
+    }
     try {
       await removeImages.mutateAsync({ imageIds: [imageId] })
       notify(`Removed 1 photo from ${detail.name}.`)
@@ -178,6 +192,18 @@ export function AlbumView() {
       notify("Couldn't sort the album.")
     }
     setDialog(null)
+  }
+
+  const confirmLeave = async () => {
+    if (me === undefined || me === null) return
+    try {
+      await leave.mutateAsync(me.id)
+      notify(`Left ${detail.name}.`)
+      void navigate('/albums')
+    } catch {
+      notify("Couldn't leave the album.")
+      setDialog(null)
+    }
   }
 
   const confirmDelete = async () => {
@@ -222,6 +248,7 @@ export function AlbumView() {
           onToggleFavorite={(item) =>
             setFavorite.mutate({ id: item.id, isFavorite: !item.isFavorite })
           }
+          reorderable={editable}
           onMove={(activeId, overId) => {
             const plan = planMove(ids, activeId, overId)
             if (plan !== null) moveImage.mutate({ imageId: activeId, ...plan })
@@ -235,9 +262,11 @@ export function AlbumView() {
     <SelectionBar
       count={selection.count}
       onAddToAlbum={addSelection}
-      onRemove={() => setDialog('remove')}
+      onRemove={editable ? () => setDialog('remove') : undefined}
       onSetCover={
-        selectedIds.length === 1 ? () => void confirmSetCover(selectedIds[0]!) : undefined
+        editable && selectedIds.length === 1
+          ? () => void confirmSetCover(selectedIds[0]!)
+          : undefined
       }
       onClear={selection.clear}
     />
@@ -267,6 +296,20 @@ export function AlbumView() {
             {detail.description}
           </Typography>
         )}
+        {!owner && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+            <UserAvatar displayName={detail.ownerDisplayName} size={24} />
+            <Typography variant="body2" color="text.secondary" noWrap>
+              Shared by {detail.ownerDisplayName}
+            </Typography>
+            <Chip
+              size="small"
+              variant="outlined"
+              label={PERMISSION_LABEL[detail.access === 'Editor' ? 'Editor' : 'Viewer']}
+              sx={{ height: 22, fontWeight: 500 }}
+            />
+          </Box>
+        )}
       </Box>
       <Box sx={{ flex: 1 }} />
       <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
@@ -277,37 +320,54 @@ export function AlbumView() {
         label="Show folders"
       />
       <TileSizeToggle />
-      <Button
-        size="small"
-        disabled={items.length < 2}
-        onClick={(event) => setSortAnchor(event.currentTarget)}
-        sx={HEADER_BUTTON_SX}
-      >
-        Sort by…
-      </Button>
-      <Menu anchorEl={sortAnchor} open={sortAnchor !== null} onClose={() => setSortAnchor(null)}>
-        {SORT_OPTIONS.map(({ by, label }) => (
-          <MenuItem
-            key={by}
-            onClick={() => {
-              setSortAnchor(null)
-              setSortBy(by)
-              setDialog('sort')
-            }}
+      {editable && (
+        <>
+          <Button
+            size="small"
+            disabled={items.length < 2}
+            onClick={(event) => setSortAnchor(event.currentTarget)}
+            sx={HEADER_BUTTON_SX}
           >
-            {label}
-          </MenuItem>
-        ))}
-      </Menu>
-      <Button size="small" onClick={() => setDialog('edit')} sx={HEADER_BUTTON_SX}>
-        Edit…
-      </Button>
+            Sort by…
+          </Button>
+          <Menu anchorEl={sortAnchor} open={sortAnchor !== null} onClose={() => setSortAnchor(null)}>
+            {SORT_OPTIONS.map(({ by, label }) => (
+              <MenuItem
+                key={by}
+                onClick={() => {
+                  setSortAnchor(null)
+                  setSortBy(by)
+                  setDialog('sort')
+                }}
+              >
+                {label}
+              </MenuItem>
+            ))}
+          </Menu>
+        </>
+      )}
+      {owner && (
+        <>
+          <Button size="small" onClick={() => setDialog('share')} sx={HEADER_BUTTON_SX}>
+            Share…
+          </Button>
+          <Button size="small" onClick={() => setDialog('edit')} sx={HEADER_BUTTON_SX}>
+            Edit…
+          </Button>
+        </>
+      )}
       <Button size="small" onClick={() => setDialog('export')} sx={HEADER_BUTTON_SX}>
         Export…
       </Button>
-      <Button size="small" color="error" onClick={() => setDialog('delete')} sx={HEADER_BUTTON_SX}>
-        Delete…
-      </Button>
+      {owner ? (
+        <Button size="small" color="error" onClick={() => setDialog('delete')} sx={HEADER_BUTTON_SX}>
+          Delete…
+        </Button>
+      ) : (
+        <Button size="small" onClick={() => setDialog('leave')} sx={HEADER_BUTTON_SX}>
+          Leave…
+        </Button>
+      )}
     </Box>
   )
 
@@ -339,6 +399,17 @@ export function AlbumView() {
           album={detail}
           onClose={() => setDialog(null)}
           onSaved={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'share' && <ShareDialog album={detail} onClose={() => setDialog(null)} />}
+      {dialog === 'leave' && (
+        <ConfirmDialog
+          title="Leave album"
+          message={`Leave ${detail.name}? It disappears from your albums until ${detail.ownerDisplayName} shares it again.`}
+          confirmLabel="Leave"
+          busy={leave.isPending}
+          onConfirm={() => void confirmLeave()}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog === 'export' && (

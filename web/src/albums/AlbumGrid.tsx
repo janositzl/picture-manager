@@ -28,6 +28,8 @@ type Props = {
   onOpen: (id: number) => void
   onToggleFavorite: (item: AlbumImageItem) => void
   onMove: (activeId: number, overId: number) => void
+  /** Viewers can't reorder, so dragging is off for them. */
+  reorderable: boolean
 }
 
 /** The whole album in one plain grid (not virtualized), so any tile can be dragged anywhere. */
@@ -38,6 +40,7 @@ export function AlbumGrid({
   onOpen,
   onToggleFavorite,
   onMove,
+  reorderable,
 }: Props) {
   const [width, setWidth] = useState(0)
   const [tileSizeKey] = useTileSize()
@@ -87,7 +90,7 @@ export function AlbumGrid({
           <SortableContext
             items={ids}
             strategy={rectSortingStrategy}
-            disabled={selection.isSelecting}
+            disabled={selection.isSelecting || !reorderable}
           >
             <div
               style={{
