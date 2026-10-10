@@ -18,7 +18,7 @@ public class AlbumQueryRepositoryTests
     public async Task GetSummariesAsync_OwnerScoped_OrderedByName_WithCountAndCoverFromFirstHashedImage()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
-        var other = new AppUser { DisplayName = "Other", Role = UserRole.User };
+        var other = TestData.User("other");
         db.Context.AppUsers.Add(other);
         await db.Context.SaveChangesAsync();
 
@@ -93,10 +93,10 @@ public class AlbumQueryRepositoryTests
     }
 
     [Fact]
-    public async Task GetOwnedAsync_OtherOwnersAlbum_ReturnsNull()
+    public async Task GetAccessibleAsync_OtherOwnersUnsharedAlbum_ReturnsNull()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
-        var other = new AppUser { DisplayName = "Other", Role = UserRole.User };
+        var other = TestData.User("other");
         db.Context.AppUsers.Add(other);
         await db.Context.SaveChangesAsync();
         var mine = TestData.Album("mine");
@@ -107,8 +107,8 @@ public class AlbumQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new AlbumRepository(context);
 
-        (await repository.GetOwnedAsync(mine.Id, AppUser.InitialAdminId)).Should().NotBeNull();
-        (await repository.GetOwnedAsync(theirs.Id, AppUser.InitialAdminId)).Should().BeNull();
+        (await repository.GetAccessibleAsync(mine.Id, AppUser.InitialAdminId))!.Access.Should().Be(AlbumAccess.Owner);
+        (await repository.GetAccessibleAsync(theirs.Id, AppUser.InitialAdminId)).Should().BeNull();
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public class AlbumQueryRepositoryTests
         await using (var context = db.CreateContext())
         {
             var repository = new AlbumRepository(context);
-            await repository.DeleteAsync((await repository.GetOwnedAsync(album.Id, AppUser.InitialAdminId))!);
+            await repository.DeleteAsync((await repository.GetAccessibleAsync(album.Id, AppUser.InitialAdminId))!.Album);
         }
 
         await using var read = db.CreateContext();

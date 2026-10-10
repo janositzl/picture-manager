@@ -432,7 +432,7 @@ public class ImageQueryRepositoryTests
     public async Task GetAlbumsContainingAsync_IsScopedToOwner_AndOrderedByName()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
-        var other = new AppUser { DisplayName = "Other", Role = UserRole.User };
+        var other = TestData.User("other");
         db.Context.AppUsers.Add(other);
         await db.Context.SaveChangesAsync();
 
@@ -450,7 +450,7 @@ public class ImageQueryRepositoryTests
         await using var context = db.CreateContext();
         var albums = await new ImageQueryRepository(context).GetAlbumsContainingAsync(image.Id, AppUser.InitialAdminId);
 
-        albums.Should().Equal(new AlbumRef(beach.Id, "beach"), new AlbumRef(zoo.Id, "Zoo"));
+        albums.Should().Equal(new AlbumRefRow(beach.Id, "beach", true, false), new AlbumRefRow(zoo.Id, "Zoo", true, false));
     }
 
     [Fact]

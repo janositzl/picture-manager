@@ -17,7 +17,8 @@ public interface IImageQueryRepository
 
     Task<ImageDetailRow?> GetVisibleDetailAsync(int id, int userId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<AlbumRef>> GetAlbumsContainingAsync(int imageId, int ownerUserId, CancellationToken cancellationToken = default);
+    /// <summary>Albums containing the image that <paramref name="userId"/> owns or has been shared, ordered by name.</summary>
+    Task<IReadOnlyList<AlbumRefRow>> GetAlbumsContainingAsync(int imageId, int userId, CancellationToken cancellationToken = default);
 
     /// <summary>Sets IsHidden on every existing image in `ids`; unknown or missing ids are skipped. Returns the rows changed.</summary>
     Task<int> SetHiddenAsync(IReadOnlyCollection<int> ids, bool isHidden, DateTime updatedAtUtc, CancellationToken cancellationToken = default);

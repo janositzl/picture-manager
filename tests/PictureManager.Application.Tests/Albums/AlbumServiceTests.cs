@@ -28,7 +28,7 @@ public class AlbumServiceTests
     {
         _currentUser.UserId.Returns(Owner);
         _clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        _albums.GetOwnedAsync(7, Owner, Arg.Any<CancellationToken>()).Returns(_album);
+        _albums.GetAccessibleAsync(7, Owner, Arg.Any<CancellationToken>()).Returns(new AccessibleAlbum(_album, AlbumAccess.Owner, "Administrator"));
         _albums.GetOrderedImageIdsAsync(7, Arg.Any<CancellationToken>()).Returns(new List<int>());
         _albums.AddAsync(Arg.Any<Album>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
@@ -79,7 +79,7 @@ public class AlbumServiceTests
     [Fact]
     public async Task GetAsync_NotOwned_ReturnsNotFound()
     {
-        _albums.GetOwnedAsync(8, Owner, Arg.Any<CancellationToken>()).Returns((Album?)null);
+        _albums.GetAccessibleAsync(8, Owner, Arg.Any<CancellationToken>()).Returns((AccessibleAlbum?)null);
 
         (await CreateService().GetAsync(8)).Status.Should().Be(ResultStatus.NotFound);
     }
@@ -113,8 +113,8 @@ public class AlbumServiceTests
         var updatedAt = _clock.UtcNow;
         _albums.GetSummariesAsync(Owner, Arg.Any<CancellationToken>()).Returns(new[]
         {
-            new AlbumSummaryRow(1, "A", null, 3, 11, "HASH", updatedAt),
-            new AlbumSummaryRow(2, "B", null, 0, null, null, updatedAt)
+            new AlbumSummaryRow(1, "A", null, 3, 11, "HASH", updatedAt, true, false, "Administrator", 0),
+            new AlbumSummaryRow(2, "B", null, 0, null, null, updatedAt, true, false, "Administrator", 0)
         });
 
         var all = await CreateService().GetAllAsync();
@@ -346,7 +346,7 @@ public class AlbumServiceTests
     [Fact]
     public async Task DeleteAsync_NotOwned_ReturnsNotFound()
     {
-        _albums.GetOwnedAsync(8, Owner, Arg.Any<CancellationToken>()).Returns((Album?)null);
+        _albums.GetAccessibleAsync(8, Owner, Arg.Any<CancellationToken>()).Returns((AccessibleAlbum?)null);
 
         (await CreateService().DeleteAsync(8)).Status.Should().Be(ResultStatus.NotFound);
     }

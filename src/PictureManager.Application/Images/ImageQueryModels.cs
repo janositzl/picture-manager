@@ -68,4 +68,7 @@ public sealed record ImageDetailRow(
     string RootName,
     string RelativePath);
 
-public sealed record AlbumRef(int Id, string Name);
+/// <summary>An album containing an image, as the caller sees it. Access is "Owner", "Editor" or "Viewer".</summary>
+public sealed record AlbumRef(int Id, string Name, string Access);
+
+public sealed record AlbumRefRow(int Id, string Name, bool IsOwner, bool IsEditor);

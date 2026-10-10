@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
 using PictureManager.Model;
@@ -114,7 +115,9 @@ public sealed class ImageQueryService : IImageQueryService
         if (row is null)
             return Result.NotFound();
 
-        var albums = await _images.GetAlbumsContainingAsync(id, _currentUser.UserId, cancellationToken);
+        var albums = (await _images.GetAlbumsContainingAsync(id, _currentUser.UserId, cancellationToken))
+            .Select(a => new AlbumRef(a.Id, a.Name, AlbumAccessRules.From(a.IsOwner, a.IsEditor).ToString()))
+            .ToList();
         var image = row.Image;
         return Result<ImageDetail>.Ok(new ImageDetail(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,

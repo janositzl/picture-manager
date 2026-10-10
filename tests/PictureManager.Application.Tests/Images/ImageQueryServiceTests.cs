@@ -210,13 +210,13 @@ public class ImageQueryServiceTests
         _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1, hash: "ABC"), 2048, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), 6,
             "Canon", "R6", null, 32.6, -16.9, """{"Exif IFD0.Make":"Canon"}""", "nas", "Holidays/Madeira"));
-        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new[] { new AlbumRef(3, "Best of") });
+        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new[] { new AlbumRefRow(3, "Best of", true, false) });
 
         var detail = (await CreateService().GetDetailAsync(1)).Value!;
 
         detail.FolderPath.Should().Be("nas/Holidays/Madeira");
         detail.RawMetadata!.Value.GetProperty("Exif IFD0.Make").GetString().Should().Be("Canon");
-        detail.Albums.Should().Equal(new AlbumRef(3, "Best of"));
+        detail.Albums.Should().Equal(new AlbumRef(3, "Best of", "Owner"));
         detail.ThumbnailUrl.Should().Be("/api/images/1/thumbnail?v=ABC");
         detail.IsInvalid.Should().BeFalse();
     }
@@ -227,7 +227,7 @@ public class ImageQueryServiceTests
         _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1) with { IndexState = IndexState.Invalid }, 2048, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), 6,
             "Canon", "R6", null, 32.6, -16.9, """{"Exif IFD0.Make":"Canon"}""", "nas", "Holidays/Madeira"));
-        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRef>());
+        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRefRow>());
 
         var detail = (await CreateService().GetDetailAsync(1)).Value!;
 
@@ -239,7 +239,7 @@ public class ImageQueryServiceTests
     {
         _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1), 1, DateTime.UtcNow, null, null, null, null, null, null, "{not json", "nas", ""));
-        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRef>());
+        _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRefRow>());
 
         (await CreateService().GetDetailAsync(1)).Value!.RawMetadata.Should().BeNull();
     }

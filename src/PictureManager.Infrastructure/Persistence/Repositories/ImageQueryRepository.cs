@@ -109,12 +109,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AlbumRef>> GetAlbumsContainingAsync(int imageId, int ownerUserId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AlbumRefRow>> GetAlbumsContainingAsync(int imageId, int userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.AlbumImages.AsNoTracking()
-            .Where(ai => ai.ImageId == imageId && ai.Album!.OwnerUserId == ownerUserId)
+            .Where(ai => ai.ImageId == imageId
+                         && (ai.Album!.OwnerUserId == userId || ai.Album.Shares.Any(s => s.UserId == userId)))
             .OrderBy(ai => ai.Album!.Name.ToLower()).ThenBy(ai => ai.AlbumId)
-            .Select(ai => new AlbumRef(ai.AlbumId, ai.Album!.Name))
+            .Select(ai => new AlbumRefRow(
+                ai.AlbumId,
+                ai.Album!.Name,
+                ai.Album.OwnerUserId == userId,
+                ai.Album.Shares.Any(s => s.UserId == userId && s.Permission == SharePermission.Editor)))
             .ToListAsync(cancellationToken);
     }
 

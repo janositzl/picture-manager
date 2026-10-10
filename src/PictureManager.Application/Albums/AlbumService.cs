@@ -33,7 +33,7 @@ public sealed class AlbumService : IAlbumService
     public async Task<IReadOnlyList<AlbumSummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var rows = await _albums.GetSummariesAsync(_currentUser.UserId, cancellationToken);
-        return rows.Select(r => new AlbumSummary(
+        return rows.Where(r => r.IsOwner).Select(r => new AlbumSummary(
             r.Id, r.Name, r.Description, r.ImageCount,
             r.CoverImageId is int coverId && r.CoverContentHash is { } hash ? ImageUrls.Thumbnail(coverId, hash) : null,
             r.UpdatedAt)).ToList();
@@ -67,7 +67,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumDetail>> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);
+        var album = await OwnedAsync(id, cancellationToken);
         if (album is null)
             return Result.NotFound();
 
@@ -76,7 +76,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumDetail>> UpdateAsync(int id, AlbumUpdate input, CancellationToken cancellationToken = default)
     {
-        var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);
+        var album = await OwnedAsync(id, cancellationToken);
         if (album is null)
             return Result.NotFound();
 
@@ -105,7 +105,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);
+        var album = await OwnedAsync(id, cancellationToken);
         if (album is null)
             return Result.NotFound();
 
@@ -115,7 +115,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<PagedResult<AlbumImageItem>>> ListImagesAsync(int id, string? cursor, int? limit, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
 
         var take = limit ?? DefaultLimit;
@@ -141,7 +141,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumAddResult>> AddImagesAsync(int id, AlbumAddImages input, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
 
         if ((input.ImageIds is null) == (input.FolderId is null))
@@ -180,7 +180,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> RemoveImagesAsync(int id, IReadOnlyList<int>? imageIds, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
         if (imageIds is null || imageIds.Count == 0)
             return Result.Invalid("imageIds", "Must contain at least one id.");
@@ -192,7 +192,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> MoveImageAsync(int id, int imageId, int? afterImageId, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
 
         var order = (await _albums.GetOrderedImageIdsAsync(id, cancellationToken)).ToList();
@@ -214,7 +214,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> SortAsync(int id, string? by, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
 
         AlbumSortKey? key = by switch
@@ -235,7 +235,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> SetCoverAsync(int id, int? imageId, CancellationToken cancellationToken = default)
     {
-        if (await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken) is null)
+        if (await OwnedAsync(id, cancellationToken) is null)
             return Result.NotFound();
 
         if (imageId is not int coverId || !(await _albums.GetOrderedImageIdsAsync(id, cancellationToken)).Contains(coverId))
@@ -248,7 +248,7 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default)
     {
-        var album = await _albums.GetOwnedAsync(id, _currentUser.UserId, cancellationToken);
+        var album = await OwnedAsync(id, cancellationToken);
         if (album is null)
             return Result.NotFound();
 
@@ -256,6 +256,10 @@ public sealed class AlbumService : IAlbumService
         return Result<AlbumExport>.Ok(new AlbumExport(
             AlbumExportFormatter.FileName(album.Name), AlbumExportFormatter.Format(prefix, rows)));
     }
+
+    // Owner-only until the access matrix lands (Task 3).
+    private async Task<Album?> OwnedAsync(int id, CancellationToken cancellationToken) =>
+        await _albums.GetAccessibleAsync(id, _currentUser.UserId, cancellationToken) is { Access: AlbumAccess.Owner } owned ? owned.Album : null;
 
     private static string? ValidateName(string? name)
     {

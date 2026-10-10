@@ -18,4 +18,5 @@ public class Album
 
     public AppUser? OwnerUser { get; set; }
     public ICollection<AlbumImage> AlbumImages { get; set; } = new List<AlbumImage>();
+    public ICollection<AlbumShare> Shares { get; set; } = new List<AlbumShare>();
 }

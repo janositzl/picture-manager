@@ -10,7 +10,11 @@ public sealed record AlbumSummaryRow(
     int ImageCount,
     int? CoverImageId,
     string? CoverContentHash,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    bool IsOwner,
+    bool IsEditor,
+    string OwnerDisplayName,
+    int ShareCount);
 
 /// <summary>IsMissing = the image is not visible (missing on disk, or its folder/root is inactive).</summary>
 public sealed record AlbumImageRow(ImageRow Image, int SortOrder, bool IsMissing);
