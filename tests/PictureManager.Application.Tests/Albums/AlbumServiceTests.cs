@@ -126,7 +126,7 @@ public class AlbumServiceTests
     [Fact]
     public async Task ListImagesAsync_MissingImage_HasNullUrls_AndPagingProducesCursor()
     {
-        _albums.ListImagesAsync(7, null, null, 3, Arg.Any<CancellationToken>()).Returns(new[]
+        _albums.ListImagesAsync(7, Owner, null, null, 3, Arg.Any<CancellationToken>()).Returns(new[]
         {
             new AlbumImageRow(Row(1), 0, false),
             new AlbumImageRow(Row(2), 1, true),
@@ -147,7 +147,7 @@ public class AlbumServiceTests
     public async Task ListImagesAsync_ItemsCarryFolderPath_RootNameAloneForTheTopFolder()
     {
         var nested = new ImageRow(4, 3, "img4", ".jpg", null, null, null, false, "H", DateTime.UtcNow, "img4", "nas", "Holidays/Madeira");
-        _albums.ListImagesAsync(7, null, null, 101, Arg.Any<CancellationToken>()).Returns(new[]
+        _albums.ListImagesAsync(7, Owner, null, null, 101, Arg.Any<CancellationToken>()).Returns(new[]
         {
             new AlbumImageRow(Row(1), 0, false),
             new AlbumImageRow(nested, 1, false)

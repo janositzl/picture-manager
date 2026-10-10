@@ -49,7 +49,7 @@ public class ModelSeedDataTests
         context.Model.GetEntityTypes().Select(e => e.ClrType).Should().BeEquivalentTo(new[]
         {
             typeof(ImageRoot), typeof(Folder), typeof(Image), typeof(Album),
-            typeof(AlbumImage), typeof(AppUser), typeof(Job), typeof(AppSettings),
+            typeof(AlbumImage), typeof(UserFavorite), typeof(AppUser), typeof(Job), typeof(AppSettings),
             typeof(FaceModel), typeof(FaceProcessingState), typeof(Face), typeof(Person),
             typeof(Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey)
         });

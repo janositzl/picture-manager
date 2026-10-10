@@ -91,7 +91,7 @@ public sealed class ImageQueryService : IImageQueryService
         }
 
         var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces, request.IncludeHidden);
-        var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
+        var rows = await _images.ListAsync(_currentUser.UserId, filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();
         string? nextCursor = null;
@@ -110,7 +110,7 @@ public sealed class ImageQueryService : IImageQueryService
 
     public async Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default)
     {
-        var row = await _images.GetVisibleDetailAsync(id, cancellationToken);
+        var row = await _images.GetVisibleDetailAsync(id, _currentUser.UserId, cancellationToken);
         if (row is null)
             return Result.NotFound();
 
@@ -152,7 +152,7 @@ public sealed class ImageQueryService : IImageQueryService
 
     public async Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default)
     {
-        return await _images.SetFavoriteAsync(id, isFavorite, _clock.UtcNow, cancellationToken)
+        return await _images.SetFavoriteAsync(id, _currentUser.UserId, isFavorite, _clock.UtcNow, cancellationToken)
             ? Result.Ok()
             : Result.NotFound();
     }

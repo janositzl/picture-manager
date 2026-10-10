@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +23,7 @@ public class ImageQueryRepositoryTests
         ImageKeyset? after = null;
         for (var guard = 0; guard < 100; guard++)
         {
-            var page = await repository.ListAsync(filter, sort, direction, after, pageSize);
+            var page = await repository.ListAsync(AppUser.InitialAdminId, filter, sort, direction, after, pageSize);
             all.AddRange(page);
             if (page.Count < pageSize)
                 return all;
@@ -51,7 +52,7 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Select(r => r.Id).Should().Equal(visible.Id);
     }
@@ -67,7 +68,7 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Select(r => r.Id).Should().Equal(shown.Id);
     }
@@ -86,7 +87,7 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var filter = new ImageListFilter(folder.Id, null, null, false, IncludeHidden: true);
-        var rows = await new ImageQueryRepository(context).ListAsync(filter, ImageSort.Name, SortDirection.Asc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, filter, ImageSort.Name, SortDirection.Asc, null, 50);
 
         rows.Select(r => (r.Id, r.IsHidden)).Should().Equal((hidden.Id, true), (shown.Id, false));
     }
@@ -103,7 +104,7 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var filter = new ImageListFilter(null, null, null, false, IncludeHidden: true);
-        var rows = await new ImageQueryRepository(context).ListAsync(filter, ImageSort.Date, SortDirection.Desc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, filter, ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Select(r => r.Id).Should().Equal(shown.Id);
     }
@@ -124,10 +125,10 @@ public class ImageQueryRepositoryTests
         var repository = new ImageQueryRepository(context);
 
         (await repository.SetHiddenAsync(new[] { a.Id, missing.Id, 999_999 }, true, TestData.Utc)).Should().Be(1);
-        (await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Select(r => r.Id).Should().Equal(b.Id);
+        (await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Select(r => r.Id).Should().Equal(b.Id);
 
         (await repository.SetHiddenAsync(new[] { a.Id }, false, TestData.Utc)).Should().Be(1);
-        (await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Should().HaveCount(2);
+        (await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Name, SortDirection.Asc, null, 50)).Should().HaveCount(2);
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var detail = await new ImageQueryRepository(context).GetVisibleDetailAsync(hidden.Id);
+        var detail = await new ImageQueryRepository(context).GetVisibleDetailAsync(hidden.Id, AppUser.InitialAdminId);
 
         detail.Should().NotBeNull();
         detail!.Image.IsHidden.Should().BeTrue();
@@ -163,8 +164,8 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
-        var with = await repository.ListAsync(new ImageListFilter(null, null, null, false, HasFaces: true), ImageSort.Name, SortDirection.Asc, null, 50);
-        var without = await repository.ListAsync(new ImageListFilter(null, null, null, false, HasFaces: false), ImageSort.Name, SortDirection.Asc, null, 50);
+        var with = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, null, false, HasFaces: true), ImageSort.Name, SortDirection.Asc, null, 50);
+        var without = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, null, false, HasFaces: false), ImageSort.Name, SortDirection.Asc, null, 50);
 
         with.Select(r => r.Id).Should().Equal(withFace.Id);
         without.Select(r => r.Id).Should().BeEquivalentTo(new[] { onlyIgnored.Id, none.Id });
@@ -183,7 +184,7 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var rows = await new ImageQueryRepository(context)
-            .ListAsync(new ImageListFilter(parent.Id, null, null, false), ImageSort.Date, SortDirection.Desc, null, 50);
+            .ListAsync(AppUser.InitialAdminId, new ImageListFilter(parent.Id, null, null, false), ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Select(r => r.Id).Should().Equal(direct.Id);
     }
@@ -201,9 +202,9 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
-        var first = await repository.ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 2);
+        var first = await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Date, SortDirection.Desc, null, 2);
         var last = first[^1];
-        var second = await repository.ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc,
+        var second = await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Date, SortDirection.Desc,
             new ImageKeyset(last.SortDate, last.SortName, last.Id), 2);
 
         first.Select(r => r.Id).Should().Equal(newest.Id, undated.Id);
@@ -223,9 +224,9 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
-        var first = await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 2);
+        var first = await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Name, SortDirection.Asc, null, 2);
         var last = first[^1];
-        var second = await repository.ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc,
+        var second = await repository.ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Name, SortDirection.Asc,
             new ImageKeyset(last.SortDate, last.SortName, last.Id), 2);
 
         first.Select(r => r.Id).Should().Equal(a.Id, b.Id);
@@ -248,8 +249,8 @@ public class ImageQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
 
-        var byFile = await repository.ListAsync(new ImageListFilter(null, null, "img_44", false), ImageSort.Name, SortDirection.Asc, null, 50);
-        var byFolder = await repository.ListAsync(new ImageListFilter(null, "madeira", null, false), ImageSort.Name, SortDirection.Asc, null, 50);
+        var byFile = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, "img_44", false), ImageSort.Name, SortDirection.Asc, null, 50);
+        var byFolder = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, "madeira", null, false), ImageSort.Name, SortDirection.Asc, null, 50);
 
         byFile.Select(r => r.Id).Should().Equal(inMadeira.Id);
         byFolder.Select(r => r.Id).Should().Equal(inMadeira.Id);
@@ -268,9 +269,9 @@ public class ImageQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
 
-        (await repository.ListAsync(new ImageListFilter(null, null, "_", false), ImageSort.Name, SortDirection.Asc, null, 50))
+        (await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, "_", false), ImageSort.Name, SortDirection.Asc, null, 50))
             .Select(r => r.Id).Should().Equal(underscore.Id);
-        (await repository.ListAsync(new ImageListFilter(null, null, "%", false), ImageSort.Name, SortDirection.Asc, null, 50))
+        (await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, "%", false), ImageSort.Name, SortDirection.Asc, null, 50))
             .Select(r => r.Id).Should().Equal(percent.Id);
     }
 
@@ -279,13 +280,14 @@ public class ImageQueryRepositoryTests
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
         var folder = TestData.Folder(TestData.Root("r"), "");
-        var favorite = TestData.Image(folder, "fav", isFavorite: true);
+        var favorite = TestData.Image(folder, "fav");
         db.Context.Images.AddRange(favorite, TestData.Image(folder, "plain"));
+        db.Context.UserFavorites.Add(TestData.Favorite(AppUser.InitialAdminId, favorite));
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
         var rows = await new ImageQueryRepository(context)
-            .ListAsync(new ImageListFilter(null, null, null, true), ImageSort.Date, SortDirection.Desc, null, 50);
+            .ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, null, true), ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Select(r => r.Id).Should().Equal(favorite.Id);
     }
@@ -339,7 +341,7 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Date, SortDirection.Desc, null, 50);
 
         rows.Single().IndexState.Should().Be(IndexState.Invalid);
     }
@@ -360,7 +362,7 @@ public class ImageQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
-        var detail = await repository.GetVisibleDetailAsync(image.Id);
+        var detail = await repository.GetVisibleDetailAsync(image.Id, AppUser.InitialAdminId);
 
         detail.Should().NotBeNull();
         detail!.RootName.Should().Be("nas");
@@ -368,7 +370,7 @@ public class ImageQueryRepositoryTests
         detail.CameraMake.Should().Be("Canon");
         detail.RawMetadata.Should().Contain("Canon");
         detail.Image.IndexState.Should().Be(IndexState.Indexed);
-        (await repository.GetVisibleDetailAsync(missing.Id)).Should().BeNull();
+        (await repository.GetVisibleDetailAsync(missing.Id, AppUser.InitialAdminId)).Should().BeNull();
     }
 
     [Fact]
@@ -385,13 +387,13 @@ public class ImageQueryRepositoryTests
         var repository = new ImageQueryRepository(context);
         var favoritesOnly = new ImageListFilter(null, null, null, true);
 
-        (await repository.SetFavoriteAsync(image.Id, true, TestData.Utc)).Should().BeTrue();
-        (await repository.ListAsync(favoritesOnly, ImageSort.Date, SortDirection.Desc, null, 5))
+        (await repository.SetFavoriteAsync(image.Id, AppUser.InitialAdminId, true, TestData.Utc)).Should().BeTrue();
+        (await repository.ListAsync(AppUser.InitialAdminId, favoritesOnly, ImageSort.Date, SortDirection.Desc, null, 5))
             .Select(r => r.Id).Should().Equal(image.Id);
-        (await repository.SetFavoriteAsync(image.Id, false, TestData.Utc)).Should().BeTrue();
-        (await repository.ListAsync(favoritesOnly, ImageSort.Date, SortDirection.Desc, null, 5)).Should().BeEmpty();
-        (await repository.SetFavoriteAsync(missing.Id, true, TestData.Utc)).Should().BeFalse();
-        (await repository.SetFavoriteAsync(999_999, true, TestData.Utc)).Should().BeFalse();
+        (await repository.SetFavoriteAsync(image.Id, AppUser.InitialAdminId, false, TestData.Utc)).Should().BeTrue();
+        (await repository.ListAsync(AppUser.InitialAdminId, favoritesOnly, ImageSort.Date, SortDirection.Desc, null, 5)).Should().BeEmpty();
+        (await repository.SetFavoriteAsync(missing.Id, AppUser.InitialAdminId, true, TestData.Utc)).Should().BeFalse();
+        (await repository.SetFavoriteAsync(999_999, AppUser.InitialAdminId, true, TestData.Utc)).Should().BeFalse();
     }
 
     [Fact]
@@ -464,10 +466,66 @@ public class ImageQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new ImageQueryRepository(context).ListAsync(NoFilter, ImageSort.Name, SortDirection.Asc, null, 50);
+        var rows = await new ImageQueryRepository(context).ListAsync(AppUser.InitialAdminId, NoFilter, ImageSort.Name, SortDirection.Asc, null, 50);
 
         rows.Select(r => (r.Id, r.RootName, r.RelativePath)).Should().Equal(
             (atTop.Id, "nas", ""),
             (nested.Id, "nas", "Holidays/Madeira"));
+    }
+
+    [Fact]
+    public async Task Favorites_ArePerUser_InTheFilter_TheRowFlag_TheDetail_AndAlbumEntries()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var bob = TestData.User("bob");
+        var folder = TestData.Folder(TestData.Root("r"), "");
+        var mine = TestData.Image(folder, "mine");
+        var his = TestData.Image(folder, "his");
+        var album = TestData.Album("both");
+        db.Context.AppUsers.Add(bob);
+        db.Context.AlbumImages.AddRange(TestData.AlbumImage(album, mine, 0), TestData.AlbumImage(album, his, 1));
+        await db.Context.SaveChangesAsync();
+        db.Context.UserFavorites.AddRange(TestData.Favorite(AppUser.InitialAdminId, mine), TestData.Favorite(bob.Id, his));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var repository = new ImageQueryRepository(context);
+        var favoritesOnly = new ImageListFilter(null, null, null, true);
+
+        (await repository.ListAsync(AppUser.InitialAdminId, favoritesOnly, ImageSort.Name, SortDirection.Asc, null, 10))
+            .Select(r => r.Id).Should().Equal(mine.Id);
+        (await repository.ListAsync(bob.Id, favoritesOnly, ImageSort.Name, SortDirection.Asc, null, 10))
+            .Select(r => r.Id).Should().Equal(his.Id);
+        (await repository.ListAsync(bob.Id, NoFilter, ImageSort.Name, SortDirection.Asc, null, 10))
+            .ToDictionary(r => r.Id, r => r.IsFavorite)
+            .Should().Equal(new Dictionary<int, bool> { [his.Id] = true, [mine.Id] = false });
+        (await repository.GetVisibleDetailAsync(mine.Id, bob.Id))!.Image.IsFavorite.Should().BeFalse();
+        (await repository.GetVisibleDetailAsync(mine.Id, AppUser.InitialAdminId))!.Image.IsFavorite.Should().BeTrue();
+        (await new AlbumRepository(context).ListImagesAsync(album.Id, bob.Id, null, null, 10))
+            .Select(r => r.Image.IsFavorite).Should().Equal(false, true);
+    }
+
+    [Fact]
+    public async Task SetFavoriteAsync_ChangesOnlyTheCallersFavorite_IsIdempotent_AndRefusesUnknownImages()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var bob = TestData.User("bob");
+        var image = TestData.Image(TestData.Folder(TestData.Root("r"), ""), "pic");
+        db.Context.AppUsers.Add(bob);
+        db.Context.UserFavorites.Add(TestData.Favorite(AppUser.InitialAdminId, image));
+        await db.Context.SaveChangesAsync();
+
+        await using var context = db.CreateContext();
+        var repository = new ImageQueryRepository(context);
+
+        (await repository.SetFavoriteAsync(image.Id, bob.Id, true, TestData.Utc)).Should().BeTrue();
+        (await repository.SetFavoriteAsync(image.Id, bob.Id, true, TestData.Utc)).Should().BeTrue();
+        (await context.UserFavorites.CountAsync(f => f.ImageId == image.Id)).Should().Be(2);
+
+        (await repository.SetFavoriteAsync(image.Id, bob.Id, false, TestData.Utc)).Should().BeTrue();
+        (await context.UserFavorites.Where(f => f.ImageId == image.Id).Select(f => f.UserId).ToListAsync())
+            .Should().Equal(AppUser.InitialAdminId);
+
+        (await repository.SetFavoriteAsync(999_999, bob.Id, true, TestData.Utc)).Should().BeFalse();
     }
 }

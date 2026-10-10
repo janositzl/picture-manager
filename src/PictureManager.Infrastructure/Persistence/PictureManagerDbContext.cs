@@ -17,6 +17,7 @@ public sealed class PictureManagerDbContext : DbContext, IDataProtectionKeyConte
     public DbSet<Image> Images => Set<Image>();
     public DbSet<Album> Albums => Set<Album>();
     public DbSet<AlbumImage> AlbumImages => Set<AlbumImage>();
+    public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AppSettings> Settings => Set<AppSettings>();

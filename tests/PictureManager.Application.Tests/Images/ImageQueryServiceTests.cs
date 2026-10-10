@@ -35,7 +35,7 @@ public class ImageQueryServiceTests
             new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(-id), name.ToLowerInvariant(), "nas", "");
 
     private void StubRows(IReadOnlyList<ImageRow> rows) =>
-        _images.ListAsync(Arg.Any<ImageListFilter>(), Arg.Any<ImageSort>(), Arg.Any<SortDirection>(),
+        _images.ListAsync(1, Arg.Any<ImageListFilter>(), Arg.Any<ImageSort>(), Arg.Any<SortDirection>(),
                 Arg.Any<ImageKeyset?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(rows);
 
@@ -45,7 +45,7 @@ public class ImageQueryServiceTests
         var result = await CreateService().ListAsync(new ImageListRequest());
 
         result.IsSuccess.Should().BeTrue();
-        await _images.Received(1).ListAsync(new ImageListFilter(null, null, null, false),
+        await _images.Received(1).ListAsync(1, new ImageListFilter(null, null, null, false),
             ImageSort.Date, SortDirection.Desc, null, 101, Arg.Any<CancellationToken>());
     }
 
@@ -57,7 +57,7 @@ public class ImageQueryServiceTests
         await CreateService().ListAsync(new ImageListRequest(Faces: faces));
 
         await _images.Received(1).ListAsync(
-            Arg.Is<ImageListFilter>(f => f.HasFaces == expected),
+             1, Arg.Is<ImageListFilter>(f => f.HasFaces == expected),
             Arg.Any<ImageSort>(), Arg.Any<SortDirection>(), null, 101, Arg.Any<CancellationToken>());
     }
 
@@ -67,7 +67,7 @@ public class ImageQueryServiceTests
         var result = await CreateService().ListAsync(new ImageListRequest(Faces: "some"));
 
         result.Status.Should().Be(ResultStatus.Invalid);
-        await _images.DidNotReceiveWithAnyArgs().ListAsync(default!, default, default, default, default);
+        await _images.DidNotReceiveWithAnyArgs().ListAsync(default, default!, default, default, default, default);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class ImageQueryServiceTests
     {
         await CreateService().ListAsync(new ImageListRequest(Sort: "name"));
 
-        await _images.Received(1).ListAsync(Arg.Any<ImageListFilter>(),
+        await _images.Received(1).ListAsync(1, Arg.Any<ImageListFilter>(),
             ImageSort.Name, SortDirection.Asc, null, 101, Arg.Any<CancellationToken>());
     }
 
@@ -126,7 +126,7 @@ public class ImageQueryServiceTests
         await service.ListAsync(new ImageListRequest(Limit: 2, Cursor: first.Value.NextCursor));
 
         var expectedAfter = new ImageKeyset(Row(2).SortDate, null, 2);
-        await _images.Received(1).ListAsync(Arg.Any<ImageListFilter>(), ImageSort.Date, SortDirection.Desc,
+        await _images.Received(1).ListAsync(1, Arg.Any<ImageListFilter>(), ImageSort.Date, SortDirection.Desc,
             expectedAfter, 3, Arg.Any<CancellationToken>());
     }
 
@@ -139,7 +139,7 @@ public class ImageQueryServiceTests
         var first = await service.ListAsync(new ImageListRequest(Sort: "name", Limit: 2));
         await service.ListAsync(new ImageListRequest(Sort: "name", Limit: 2, Cursor: first.Value!.NextCursor));
 
-        await _images.Received(1).ListAsync(Arg.Any<ImageListFilter>(), ImageSort.Name, SortDirection.Asc,
+        await _images.Received(1).ListAsync(1, Arg.Any<ImageListFilter>(), ImageSort.Name, SortDirection.Asc,
             new ImageKeyset(null, "beta", 2), 3, Arg.Any<CancellationToken>());
     }
 
@@ -199,7 +199,7 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task GetDetailAsync_NotVisible_ReturnsNotFound()
     {
-        _images.GetVisibleDetailAsync(5, Arg.Any<CancellationToken>()).Returns((ImageDetailRow?)null);
+        _images.GetVisibleDetailAsync(5, 1, Arg.Any<CancellationToken>()).Returns((ImageDetailRow?)null);
 
         (await CreateService().GetDetailAsync(5)).Status.Should().Be(ResultStatus.NotFound);
     }
@@ -207,7 +207,7 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task GetDetailAsync_MapsFolderPathRawMetadataAndAlbums()
     {
-        _images.GetVisibleDetailAsync(1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
+        _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1, hash: "ABC"), 2048, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), 6,
             "Canon", "R6", null, 32.6, -16.9, """{"Exif IFD0.Make":"Canon"}""", "nas", "Holidays/Madeira"));
         _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new[] { new AlbumRef(3, "Best of") });
@@ -224,7 +224,7 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task GetDetailAsync_InvalidIndexState_MapsToIsInvalidTrue()
     {
-        _images.GetVisibleDetailAsync(1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
+        _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1) with { IndexState = IndexState.Invalid }, 2048, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), 6,
             "Canon", "R6", null, 32.6, -16.9, """{"Exif IFD0.Make":"Canon"}""", "nas", "Holidays/Madeira"));
         _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRef>());
@@ -237,7 +237,7 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task GetDetailAsync_UnparseableRawMetadata_BecomesNull()
     {
-        _images.GetVisibleDetailAsync(1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
+        _images.GetVisibleDetailAsync(1, 1, Arg.Any<CancellationToken>()).Returns(new ImageDetailRow(
             Row(1), 1, DateTime.UtcNow, null, null, null, null, null, null, "{not json", "nas", ""));
         _images.GetAlbumsContainingAsync(1, 1, Arg.Any<CancellationToken>()).Returns(Array.Empty<AlbumRef>());
 
@@ -299,7 +299,7 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task SetFavoriteAsync_NoVisibleImage_ReturnsNotFound()
     {
-        _images.SetFavoriteAsync(9, true, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
+        _images.SetFavoriteAsync(9, 1, true, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
 
         (await CreateService().SetFavoriteAsync(9, true)).Status.Should().Be(ResultStatus.NotFound);
     }
@@ -307,10 +307,10 @@ public class ImageQueryServiceTests
     [Fact]
     public async Task SetFavoriteAsync_Success_ReturnsOk_AndStampsTheClock()
     {
-        _images.SetFavoriteAsync(9, false, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        _images.SetFavoriteAsync(9, 1, false, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
 
         (await CreateService().SetFavoriteAsync(9, false)).IsSuccess.Should().BeTrue();
-        await _images.Received(1).SetFavoriteAsync(9, false, _clock.UtcNow, Arg.Any<CancellationToken>());
+        await _images.Received(1).SetFavoriteAsync(9, 1, false, _clock.UtcNow, Arg.Any<CancellationToken>());
     }
 
     [Fact]

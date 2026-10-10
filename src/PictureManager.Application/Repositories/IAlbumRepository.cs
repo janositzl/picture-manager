@@ -30,8 +30,8 @@ public interface IAlbumRepository
 
     Task DeleteAsync(Album album, CancellationToken cancellationToken = default);
 
-    /// <summary>Album entries in (SortOrder, ImageId) order, after the given keyset when provided.</summary>
-    Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(int albumId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default);
+    /// <summary>Album entries in (SortOrder, ImageId) order, after the given keyset when provided. IsFavorite is <paramref name="userId"/>'s own favorite.</summary>
+    Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(int albumId, int userId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<int>> GetOrderedImageIdsAsync(int albumId, CancellationToken cancellationToken = default);
 

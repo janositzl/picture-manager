@@ -126,7 +126,7 @@ public sealed class AlbumService : IAlbumService
         if (cursor is not null && !CursorCodec.TryDecode(cursor, out after))
             return Result.Invalid("cursor", "The cursor is malformed.");
 
-        var rows = await _albums.ListImagesAsync(id, after?.SortOrder, after?.ImageId, take + 1, cancellationToken);
+        var rows = await _albums.ListImagesAsync(id, _currentUser.UserId, after?.SortOrder, after?.ImageId, take + 1, cancellationToken);
         var page = rows.Take(take).ToList();
         string? nextCursor = null;
         if (rows.Count > take)

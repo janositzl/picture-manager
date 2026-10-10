@@ -88,7 +88,7 @@ public sealed class AlbumRepository : IAlbumRepository
     }
 
     public async Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(
-        int albumId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default)
+        int albumId, int userId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.AlbumImages.AsNoTracking().Where(ai => ai.AlbumId == albumId);
         if (afterSortOrder is int sortOrder && afterImageId is int imageId)
@@ -99,7 +99,7 @@ public sealed class AlbumRepository : IAlbumRepository
             .Take(take)
             .Select(ai => new AlbumImageRow(
                 new ImageRow(ai.Image!.Id, ai.Image.FolderId, ai.Image.FileName, ai.Image.Extension, ai.Image.Width,
-                    ai.Image.Height, ai.Image.DateTaken, ai.Image.IsFavorite, ai.Image.ContentHash, ai.Image.SortDate,
+                    ai.Image.Height, ai.Image.DateTaken, ai.Image.Favorites.Any(f => f.UserId == userId), ai.Image.ContentHash, ai.Image.SortDate,
                     ai.Image.FileName.ToLower(), ai.Image.Folder!.Root!.Name, ai.Image.Folder.RelativePath, IndexState.Indexed, null, false, ai.Image.ThumbnailRotation),
                 ai.SortOrder,
                 ai.Image.IsHidden || ai.Image.MissingSinceUtc != null || !ai.Image.Folder!.IsActive || ai.Image.Folder.MissingSinceUtc != null || !ai.Image.Folder.Root!.IsActive))

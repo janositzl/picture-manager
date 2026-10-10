@@ -22,7 +22,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
     }
 
     public async Task<IReadOnlyList<ImageRow>> ListAsync(
-        ImageListFilter filter, ImageSort sort, SortDirection direction, ImageKeyset? after, int take,
+        int userId, ImageListFilter filter, ImageSort sort, SortDirection direction, ImageKeyset? after, int take,
         CancellationToken cancellationToken = default)
     {
         // Hidden images are listed only for one folder's "Show hidden" view.
@@ -46,7 +46,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         }
 
         if (filter.FavoritesOnly)
-            query = query.Where(i => i.IsFavorite);
+            query = query.Where(i => i.Favorites.Any(f => f.UserId == userId));
 
         if (filter.PersonId is int personId)
         {
@@ -73,7 +73,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         query = ApplyKeyset(query, sort, direction, after);
         query = ApplyOrder(query, sort, direction);
 
-        var rows = await query.Take(take).Select(ImageProjections.ToRow).ToListAsync(cancellationToken);
+        var rows = await query.Take(take).Select(ImageProjections.ToRow(userId)).ToListAsync(cancellationToken);
         if (filter.PersonId is int forPerson && rows.Count > 0)
             rows = await WithFaceIdsAsync(rows, forPerson, filter.PersonState, cancellationToken);
         return rows;
@@ -97,12 +97,12 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         return rows.Select(r => best.TryGetValue(r.Id, out var faceId) ? r with { FaceId = faceId } : r).ToList();
     }
 
-    public async Task<ImageDetailRow?> GetVisibleDetailAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<ImageDetailRow?> GetVisibleDetailAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Images.AsNoTracking().WhereExisting()
             .Where(i => i.Id == id)
             .Select(i => new ImageDetailRow(
-                new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
+                new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.Favorites.Any(f => f.UserId == userId),
                     i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden, i.ThumbnailRotation),
                 i.FileSize, i.FileModified, i.Orientation, i.CameraMake, i.CameraModel, i.LensModel,
                 i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath))
@@ -140,15 +140,25 @@ public sealed class ImageQueryRepository : IImageQueryRepository
                 cancellationToken);
     }
 
-    public async Task<bool> SetFavoriteAsync(int id, bool isFavorite, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
+    public async Task<bool> SetFavoriteAsync(int id, int userId, bool isFavorite, DateTime nowUtc, CancellationToken cancellationToken = default)
     {
-        var updated = await _dbContext.Images.WhereVisible()
-            .Where(i => i.Id == id)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(i => i.IsFavorite, isFavorite)
-                .SetProperty(i => i.UpdatedAt, updatedAtUtc),
-                cancellationToken);
-        return updated > 0;
+        if (!await _dbContext.Images.WhereVisible().AnyAsync(i => i.Id == id, cancellationToken))
+            return false;
+
+        if (isFavorite)
+        {
+            // ON CONFLICT: a double click or a second tab must not fail on the primary key.
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "UserFavorites" ("UserId", "ImageId", "CreatedAt") VALUES ({userId}, {id}, {nowUtc})
+                ON CONFLICT DO NOTHING
+                """, cancellationToken);
+        }
+        else
+        {
+            await _dbContext.UserFavorites.Where(f => f.UserId == userId && f.ImageId == id).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        return true;
     }
 
     public async Task<IReadOnlyList<int>> GetVisibleIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
@@ -191,12 +201,12 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DuplicateMemberRow>> GetDuplicateMembersAsync(IReadOnlyCollection<string> contentHashes, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DuplicateMemberRow>> GetDuplicateMembersAsync(IReadOnlyCollection<string> contentHashes, int userId, CancellationToken cancellationToken = default)
     {
         var hashes = contentHashes.ToList();
         return await _dbContext.Images.AsNoTracking().WhereVisible()
             .Where(i => hashes.Contains(i.ContentHash))
-            .Select(MemberProjection)
+            .Select(MemberProjection(userId))
             .ToListAsync(cancellationToken);
     }
 
@@ -206,17 +216,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             .Select(i => new PerceptualHashRow(i.Id, i.PerceptualHash!))
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<DuplicateMemberRow>> GetMembersByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DuplicateMemberRow>> GetMembersByIdsAsync(IReadOnlyCollection<int> ids, int userId, CancellationToken cancellationToken = default)
     {
         var idList = ids.ToList();
         return await _dbContext.Images.AsNoTracking().WhereVisible()
             .Where(i => idList.Contains(i.Id))
-            .Select(MemberProjection)
+            .Select(MemberProjection(userId))
             .ToListAsync(cancellationToken);
     }
 
-    private static readonly System.Linq.Expressions.Expression<Func<Image, DuplicateMemberRow>> MemberProjection = i => new DuplicateMemberRow(
-        new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.IsFavorite,
+    private static System.Linq.Expressions.Expression<Func<Image, DuplicateMemberRow>> MemberProjection(int userId) => i => new DuplicateMemberRow(
+        new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.Favorites.Any(f => f.UserId == userId),
             i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden, i.ThumbnailRotation),
         i.Folder!.Root!.Name,
         i.Folder.RelativePath,

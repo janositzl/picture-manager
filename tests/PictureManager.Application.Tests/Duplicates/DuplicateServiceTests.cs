@@ -17,7 +17,9 @@ public class DuplicateServiceTests
 {
     private readonly IImageQueryRepository _images = Substitute.For<IImageQueryRepository>();
 
-    private DuplicateService CreateService() => new(_images);
+    private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
+
+    private DuplicateService CreateService() => new(_images, _currentUser);
 
     private static DuplicateMemberRow Member(int id, string hash, string name, string relativePath, int? width = null, int? height = null, long fileSize = 0) =>
         new(new ImageRow(id, 1, name, ".jpg", width, height, null, false, hash, DateTime.UtcNow, name.ToLowerInvariant(), "nas", relativePath), "nas", relativePath, fileSize);
@@ -43,7 +45,7 @@ public class DuplicateServiceTests
         {
             new DuplicateGroupKey("AAA", 2), new DuplicateGroupKey("BBB", 2)
         });
-        _images.GetDuplicateMembersAsync(Arg.Is<IReadOnlyCollection<string>>(h => h.SequenceEqual(new[] { "AAA" })), Arg.Any<CancellationToken>())
+        _images.GetDuplicateMembersAsync(Arg.Is<IReadOnlyCollection<string>>(h => h.SequenceEqual(new[] { "AAA" })), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new[] { Member(2, "AAA", "b", "Trip"), Member(1, "AAA", "a", "") });
 
         var page = (await CreateService().ListAsync(null, 1)).Value!;
@@ -69,7 +71,7 @@ public class DuplicateServiceTests
         page.Items.Should().BeEmpty();
         page.NextCursor.Should().BeNull();
         await _images.Received(1).GetDuplicateGroupsAsync(new DuplicateGroupKey("XYZ", 3), 51, Arg.Any<CancellationToken>());
-        await _images.DidNotReceive().GetDuplicateMembersAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>());
+        await _images.DidNotReceive().GetDuplicateMembersAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -97,7 +99,7 @@ public class DuplicateServiceTests
             new PerceptualHashRow(7, "AAAAAAAAAAAAAAAA"),
             new PerceptualHashRow(8, "not-a-hash")
         });
-        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new[]
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new[]
         {
             Member(5, "H5", "small", "", 800, 600, 10),
             Member(3, "H3", "big", "", 4000, 3000, 30),
@@ -125,7 +127,7 @@ public class DuplicateServiceTests
             new PerceptualHashRow(3, "AAAAAAAAAAAAAAAA"), new PerceptualHashRow(4, "AAAAAAAAAAAAAAA8"),
             new PerceptualHashRow(5, "3C3C3C3C3C3C3C3C"), new PerceptualHashRow(6, "3C3C3C3C3C3C3C3D")
         });
-        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>())
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<IReadOnlyCollection<int>>().Select(id => Member(id, "H" + id, "n" + id, "")).ToList());
 
         var first = (await CreateService().ListSimilarAsync(null, null, 2)).Value!;
@@ -145,7 +147,7 @@ public class DuplicateServiceTests
         {
             new PerceptualHashRow(1, "0F0F0F0F0F0F0F0F"), new PerceptualHashRow(2, "0F0F0F0F0F0F0F0E")
         });
-        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new[]
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new[]
         {
             Member(1, "H1", "png-original", "", null, null, 999),
             Member(2, "H2", "jpeg-copy", "", 400, 300, 1)
@@ -165,7 +167,7 @@ public class DuplicateServiceTests
             new PerceptualHashRow(4, "AAAAAAAAAAAAAAAA"), new PerceptualHashRow(5, "AAAAAAAAAAAAAAA8")
         });
         // Image 3 vanished from the first cluster; image 5 vanished from the second, leaving it with one member.
-        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new[]
+        _images.GetMembersByIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new[]
         {
             Member(1, "H1", "a", ""), Member(2, "H2", "b", ""), Member(4, "H4", "d", "")
         });

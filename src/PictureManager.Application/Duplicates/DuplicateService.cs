@@ -15,10 +15,12 @@ public sealed class DuplicateService : IDuplicateService
     public const int DefaultSimilarThreshold = 6;
 
     private readonly IImageQueryRepository _images;
+    private readonly ICurrentUser _currentUser;
 
-    public DuplicateService(IImageQueryRepository images)
+    public DuplicateService(IImageQueryRepository images, ICurrentUser currentUser)
     {
         _images = images;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<PagedResult<DuplicateGroup>>> ListAsync(string? cursor, int? limit, CancellationToken cancellationToken = default)
@@ -40,7 +42,7 @@ public sealed class DuplicateService : IDuplicateService
 
         var members = pageKeys.Count == 0
             ? Array.Empty<DuplicateMemberRow>()
-            : await _images.GetDuplicateMembersAsync(pageKeys.Select(k => k.ContentHash).ToList(), cancellationToken);
+            : await _images.GetDuplicateMembersAsync(pageKeys.Select(k => k.ContentHash).ToList(), _currentUser.UserId, cancellationToken);
 
         var byHash = members
             .GroupBy(m => m.Image.ContentHash)
@@ -97,7 +99,7 @@ public sealed class DuplicateService : IDuplicateService
 
         var members = pageClusters.Count == 0
             ? Array.Empty<DuplicateMemberRow>()
-            : await _images.GetMembersByIdsAsync(pageClusters.SelectMany(c => c).ToList(), cancellationToken);
+            : await _images.GetMembersByIdsAsync(pageClusters.SelectMany(c => c).ToList(), _currentUser.UserId, cancellationToken);
         var byId = members.ToDictionary(m => m.Image.Id);
 
         var groups = new List<SimilarGroup>(pageClusters.Count);

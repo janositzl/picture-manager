@@ -39,7 +39,6 @@ public static class TestData
         DateTime? dateTaken = null,
         DateTime? fileModified = null,
         string? contentHash = null,
-        bool isFavorite = false,
         DateTime? missingSinceUtc = null,
         IndexState indexState = IndexState.Indexed,
         bool isHidden = false) => new()
@@ -51,7 +50,6 @@ public static class TestData
         FileSize = 1234,
         FileModified = fileModified ?? Utc,
         DateTaken = dateTaken,
-        IsFavorite = isFavorite,
         IndexState = indexState,
         IsHidden = isHidden,
         FirstSeenUtc = Utc,
@@ -74,5 +72,23 @@ public static class TestData
         Image = image,
         SortOrder = sortOrder,
         AddedAt = Utc
+    };
+
+    /// <summary>An account with a unique username; display name = username.</summary>
+    public static AppUser User(string username, UserRole role = UserRole.User, bool isActive = true) => new()
+    {
+        Username = username,
+        NormalizedUsername = username.ToLowerInvariant(),
+        DisplayName = username,
+        Role = role,
+        IsActive = isActive,
+        CreatedAt = Utc
+    };
+
+    public static UserFavorite Favorite(int userId, Image image) => new()
+    {
+        UserId = userId,
+        Image = image,
+        CreatedAt = Utc
     };
 }
