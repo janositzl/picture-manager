@@ -179,6 +179,7 @@ try
     user.MapJobEndpoints(folderActions);
     admin.MapRootEndpoints();
     admin.MapSettingsEndpoints();
+    admin.MapUserEndpoints(user);
 
     // The built web frontend, when present (the Docker image copies web/dist into
     // wwwroot). Not present in local dev/test, where the frontend runs via its own
