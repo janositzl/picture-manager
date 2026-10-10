@@ -6,6 +6,7 @@ import { resetAlbumStore } from './albumHandlers'
 import { resetAuthStore } from './authHandlers'
 import { resetHiddenStore } from './handlers'
 import { server } from './server'
+import { resetUserStore } from './userHandlers'
 
 // Default findBy* timeout (1000ms) is tight when several test files run in parallel on a loaded
 // machine; a query that would resolve in well under a second in isolation can be pushed past it
@@ -17,6 +18,7 @@ beforeEach(() => {
   resetAuthStore()
   resetAlbumStore()
   resetAdminStore()
+  resetUserStore()
   resetHiddenStore()
 })
 afterEach(() => {

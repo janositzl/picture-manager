@@ -3,6 +3,7 @@ import { AdminLayout } from '../admin/AdminLayout'
 import { RemovedFoldersPage } from '../admin/RemovedFoldersPage'
 import { RootsPage } from '../admin/RootsPage'
 import { SettingsPage } from '../admin/SettingsPage'
+import { UsersPage } from '../admin/UsersPage'
 import { AlbumsPage } from '../albums/AlbumsPage'
 import { AlbumView } from '../albums/AlbumView'
 import { NoPersonSelected, PeoplePage } from '../people/PeoplePage'
@@ -53,6 +54,7 @@ export const appRoutes: RouteObject[] = [
           { index: true, element: <Navigate to="settings" replace /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'roots', element: <RootsPage /> },
+          { path: 'users', element: <UsersPage /> },
           { path: 'removed-folders', element: <RemovedFoldersPage /> },
         ],
       },

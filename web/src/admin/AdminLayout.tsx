@@ -7,6 +7,7 @@ import { JobStatusBanner } from '../tree/JobStatusBanner'
 const TABS = [
   { to: '/admin/settings', label: 'Settings' },
   { to: '/admin/roots', label: 'Roots' },
+  { to: '/admin/users', label: 'Users' },
   { to: '/admin/removed-folders', label: 'Removed folders' },
 ]
 

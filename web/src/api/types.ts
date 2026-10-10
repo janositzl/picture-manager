@@ -182,3 +182,16 @@ export type Me = {
   mustChangePassword: boolean
   canRunFolderActions: boolean
 }
+
+export type UserSummary = {
+  id: number
+  username: string
+  displayName: string
+  role: 'Admin' | 'User'
+  isActive: boolean
+  canRunFolderActions: boolean
+  mustChangePassword: boolean
+  createdAt: string
+  lastLoginAt: string | null
+  albumCount: number
+}

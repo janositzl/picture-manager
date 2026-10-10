@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import type { ImageListItem } from '../api/types'
 import { authHandlers } from './authHandlers'
 import { adminHandlers } from './adminHandlers'
+import { userHandlers } from './userHandlers'
 import { albumHandlers, duplicateHandlers } from './albumHandlers'
 import {
   childrenById,
@@ -36,6 +37,7 @@ export const handlers = [
     HttpResponse.json(childrenById[Number(params.id)] ?? []),
   ),
   ...adminHandlers,
+  ...userHandlers,
   http.get('/api/folders/:id', ({ params }) => {
     const detail = folderDetails[Number(params.id)]
     return detail ? HttpResponse.json(detail) : notFound()

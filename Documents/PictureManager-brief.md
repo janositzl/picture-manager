@@ -142,7 +142,7 @@ GET /api/images?folder=Vacation&fileName=IMG_4&favoritesOnly=true
 
 ## Authentication
 
-Local accounts (no external IdP); there is no registration. Accounts are managed by an admin; the admin UI for creating users is planned (Phase 2), so for now `admin` is the only account.
+Local accounts (no external IdP); there is no registration. Accounts are managed by an admin.
 - Cookie session `pm.auth` (HttpOnly, SameSite=Strict, 14-day sliding); Data Protection keys live in Postgres.
 - The initial `admin` account gets its password from `Auth__InitialAdmin__Password` on first start and must change it at first login.
 - Surfaces (route groups in Program.cs, enforced server-side):
@@ -150,6 +150,7 @@ Local accounts (no external IdP); there is no registration. Accounts are managed
   - `folderActions`: scans, discovery, face recognition, folder exclude/remove. Admins, plus users with `CanRunFolderActions`.
   - `admin`: roots, settings, removed folders, hide/rotate, people/face edits.
   - `auth`: login/logout/me/password.
+- User administration: admins manage accounts at Admin → Users (create, edit name/role/active/folder-actions, reset password, delete with album transfer or delete). A new or reset account must change its password at first login. Disabling, resetting or deleting a user ends their sessions immediately. The last active admin and your own account are protected from being disabled, demoted or deleted. `GET /api/users/directory` lists active users for sharing (used from Phase 3).
 - Design: docs/superpowers/specs/2026-10-09-user-management-design.md
 
 ## Infrastructure & deployment
