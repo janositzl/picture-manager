@@ -1,23 +1,33 @@
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import LockResetOutlinedIcon from '@mui/icons-material/LockResetOutlined'
 import {
   Box,
   Button,
   Chip,
+  IconButton,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import { useState } from 'react'
+import { useCurrentUser } from '../api/auth'
 import { useUsers } from '../api/users'
 import type { UserSummary } from '../api/types'
 import { ACCENT, HEADING_SX } from '../design/accent'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { ACCENT_CHIP_SX, CARD_SX, PRIMARY_BUTTON_SX } from './adminStyles'
+import { DeleteUserDialog } from './DeleteUserDialog'
+import { ResetPasswordDialog } from './ResetPasswordDialog'
 import { UserAvatar } from './UserAvatar'
 import { UserCreateDialog } from './UserCreateDialog'
+import { UserEditDialog } from './UserEditDialog'
 
 const HEAD_CELL_SX = {
   color: 'text.secondary',
@@ -34,8 +44,22 @@ function lastLogin(value: string | null): string {
   return value === null ? 'Never' : new Date(value).toLocaleString()
 }
 
-function UserRow({ user }: { user: UserSummary }) {
+const ACTION_SX = {
+  color: 'text.secondary',
+  transition: 'all 200ms ease-in-out',
+  '&:hover': { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) },
+} as const
+
+const DELETE_ACTION_SX = {
+  color: 'text.secondary',
+  transition: 'all 200ms ease-in-out',
+  '&:hover': { color: 'error.main', bgcolor: (theme: { palette: { error: { main: string } } }) => alpha(theme.palette.error.main, 0.1) },
+} as const
+
+function UserRow({ user, isSelf }: { user: UserSummary; isSelf: boolean }) {
   const dimmed = !user.isActive
+  const [dialog, setDialog] = useState<'edit' | 'reset' | 'delete' | null>(null)
+  const close = () => setDialog(null)
   return (
     <TableRow
       hover
@@ -91,13 +115,37 @@ function UserRow({ user }: { user: UserSummary }) {
       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
         {user.albumCount}
       </TableCell>
-      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} />
+      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+          <Tooltip title={`Edit ${user.username}`}>
+            <IconButton size="small" aria-label={`Edit ${user.username}`} onClick={() => setDialog('edit')} sx={ACTION_SX}>
+              <EditOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={`Reset password for ${user.username}`}>
+            <IconButton size="small" aria-label={`Reset password for ${user.username}`} onClick={() => setDialog('reset')} sx={ACTION_SX}>
+              <LockResetOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={isSelf ? "You can't delete your own account" : `Delete ${user.username}`}>
+            <span>
+              <IconButton size="small" aria-label={`Delete ${user.username}`} disabled={isSelf} onClick={() => setDialog('delete')} sx={DELETE_ACTION_SX}>
+                <DeleteOutlinedIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+        {dialog === 'edit' && <UserEditDialog user={user} isSelf={isSelf} onClose={close} />}
+        {dialog === 'reset' && <ResetPasswordDialog user={user} onClose={close} />}
+        {dialog === 'delete' && <DeleteUserDialog user={user} onClose={close} />}
+      </TableCell>
     </TableRow>
   )
 }
 
 export function UsersPage() {
   const users = useUsers()
+  const selfId = useCurrentUser().data?.id
   const [creating, setCreating] = useState(false)
 
   if (users.isPending) return null
@@ -145,7 +193,7 @@ export function UsersPage() {
             </TableHead>
             <TableBody>
               {users.data.map((user) => (
-                <UserRow key={user.id} user={user} />
+                <UserRow key={user.id} user={user} isSelf={user.id === selfId} />
               ))}
             </TableBody>
           </Table>
