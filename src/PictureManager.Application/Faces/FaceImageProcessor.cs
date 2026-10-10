@@ -51,7 +51,7 @@ public sealed class FaceImageProcessor : IFaceImageProcessor
         FaceAnalysisResult? analysis;
         try
         {
-            analysis = await _analyzer.AnalyzeAsync(path, image.Orientation, preset, cancellationToken);
+            analysis = await _analyzer.AnalyzeAsync(path, image.Orientation, preset, cancellationToken, image.ThumbnailRotation);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not FaceModelUnavailableException)
         {

@@ -9,7 +9,7 @@ namespace PictureManager.Application.Repositories;
 public sealed record PersonSummary(int Id, string? Name, int ConfirmedImageCount, int SuggestedImageCount, int? CoverFaceId);
 
 public sealed record FaceCropSource(
-    int FaceId, string ContentHash, string MountPath, string RelativePath, string FileName, string Extension, int? Orientation,
+    int FaceId, string ContentHash, string MountPath, string RelativePath, string FileName, string Extension, int? Orientation, int ThumbnailRotation,
     float X, float Y, float Width, float Height);
 
 public interface IPeopleRepository

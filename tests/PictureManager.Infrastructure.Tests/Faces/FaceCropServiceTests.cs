@@ -35,7 +35,7 @@ public class FaceCropServiceTests : IDisposable
             await File.WriteAllBytesAsync(previewPath, data.ToArray());
         }
         _people.GetFaceCropSourceAsync(7, Arg.Any<CancellationToken>())
-            .Returns(new FaceCropSource(7, "hash", "/mnt", "", "a", ".jpg", null, 0.25f, 0.25f, 0.5f, 0.5f));
+            .Returns(new FaceCropSource(7, "hash", "/mnt", "", "a", ".jpg", null, 0, 0.25f, 0.25f, 0.5f, 0.5f));
         _thumbnails.GetOrCreateDerivativePathAsync(default!, default!, default, default, default)
             .ReturnsForAnyArgs(previewPath);
         var service = Create();
@@ -55,7 +55,31 @@ public class FaceCropServiceTests : IDisposable
         var again = await service.GetOrCreateCropPathAsync(7);
 
         again.Should().Be(path);
-        await _people.Received(1).GetFaceCropSourceAsync(7, Arg.Any<CancellationToken>());
+        // The preview is only built once; the face row is re-read each time because the cached file name carries its rotation.
+        await _thumbnails.Received(1).GetOrCreateDerivativePathAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<DerivativeSize>(), Arg.Any<CancellationToken>(), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task GetOrCreateCropPathAsync_RotatedImage_CutsFromRotatedPreviewUnderItsOwnFile()
+    {
+        var previewPath = Path.Combine(_dir, "preview.png");
+        using (var bitmap = new SKBitmap(300, 400))
+        {
+            bitmap.Erase(SKColors.Orange);
+            using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+            await File.WriteAllBytesAsync(previewPath, data.ToArray());
+        }
+        _people.GetFaceCropSourceAsync(7, Arg.Any<CancellationToken>())
+            .Returns(new FaceCropSource(7, "hash", "/mnt", "", "a", ".jpg", null, 90, 0.25f, 0.25f, 0.5f, 0.5f));
+        _thumbnails.GetOrCreateDerivativePathAsync(default!, default!, default, default, default, default)
+            .ReturnsForAnyArgs(previewPath);
+
+        var path = await Create().GetOrCreateCropPathAsync(7);
+
+        Path.GetFileName(path).Should().Be("7r90.jpg");
+        await _thumbnails.Received(1).GetOrCreateDerivativePathAsync(
+            "hash", Arg.Any<string>(), null, DerivativeSize.Preview, Arg.Any<CancellationToken>(), 90);
     }
 
     [Fact]
@@ -69,7 +93,7 @@ public class FaceCropServiceTests : IDisposable
             await File.WriteAllBytesAsync(previewPath, data.ToArray());
         }
         _people.GetFaceCropSourceAsync(11, Arg.Any<CancellationToken>())
-            .Returns(new FaceCropSource(11, "hash", "/mnt", "", "a", ".jpg", null, 0.25f, 0.25f, 0.5f, 0.5f));
+            .Returns(new FaceCropSource(11, "hash", "/mnt", "", "a", ".jpg", null, 0, 0.25f, 0.25f, 0.5f, 0.5f));
         _thumbnails.GetOrCreateDerivativePathAsync(default!, default!, default, default, default)
             .ReturnsForAnyArgs(previewPath);
         var relativeRoot = Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(_dir, "relcache"));

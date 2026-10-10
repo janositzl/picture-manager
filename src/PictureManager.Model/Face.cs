@@ -3,7 +3,7 @@ using Pgvector;
 
 namespace PictureManager.Model;
 
-/// <summary>A detected face. The box is normalized (0-1) against the orientation-corrected image.</summary>
+/// <summary>A detected face. The box is normalized (0-1) against the displayed image (EXIF-corrected, then turned by Image.ThumbnailRotation).</summary>
 public class Face
 {
     public int Id { get; set; }

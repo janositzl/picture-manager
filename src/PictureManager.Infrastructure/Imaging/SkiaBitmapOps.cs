@@ -58,6 +58,9 @@ internal static class SkiaBitmapOps
         }
     }
 
+    /// <summary>Clockwise 90/180/270 equal EXIF orientations 6/3/8; anything else is no extra rotation.</summary>
+    internal static int OrientationForRotation(int rotation) => rotation switch { 90 => 6, 180 => 3, 270 => 8, _ => 1 };
+
     /// <summary>
     /// Applies EXIF-orientation correction using plain canvas transforms (Translate/Scale/RotateDegrees)
     /// rather than raw SKMatrix composition, since SkiaSharp's matrix-concatenation API has shifted across

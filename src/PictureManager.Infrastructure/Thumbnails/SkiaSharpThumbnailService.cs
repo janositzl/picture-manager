@@ -83,14 +83,8 @@ public sealed class SkiaSharpThumbnailService : IThumbnailService
 
         var normalizedOrientation = ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(sourcePath, orientation));
         using var exifOrientedBitmap = SkiaBitmapOps.ApplyOrientation(sourceBitmap, normalizedOrientation);
-        // Clockwise 90/180/270 equal EXIF orientations 6/3/8, so the extra user rotation reuses the same transform.
-        using var orientedBitmap = rotation switch
-        {
-            90 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 6),
-            180 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 3),
-            270 => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 8),
-            _ => SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, 1),
-        };
+        // The extra user rotation reuses the EXIF transform.
+        using var orientedBitmap = SkiaBitmapOps.ApplyOrientation(exifOrientedBitmap, SkiaBitmapOps.OrientationForRotation(rotation));
 
         var (targetWidth, targetHeight) = ThumbnailResizeCalculator.CalculateTargetDimensions(
             orientedBitmap.Width, orientedBitmap.Height, (int)size);

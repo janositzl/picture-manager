@@ -11,8 +11,9 @@ using SkiaSharp;
 namespace PictureManager.Infrastructure.Faces;
 
 /// <summary>
-/// Face crops cut from the cached preview derivative (already orientation-corrected, like the face box) into the
-/// thumbnail cache. Face ids are never reused, so a crop never goes stale.
+/// Face crops cut from the cached preview derivative (already orientation-corrected and rotated, like the face box) into the
+/// thumbnail cache. Face ids are never reused; the file name carries the rotation the box was cut for, because rotating an
+/// image moves its boxes.
 /// </summary>
 public sealed class FaceCropService : IFaceCropService
 {
@@ -34,17 +35,18 @@ public sealed class FaceCropService : IFaceCropService
     {
         var cacheRoot = _cacheOptions.RootPath ?? Path.Combine(Path.GetTempPath(), "picturemanager-cache");
         // Absolute: Results.File treats a relative path as a virtual path under the web root, which breaks relative cache roots.
-        var cropPath = Path.GetFullPath(Path.Combine(cacheRoot, "faces", $"{faceId}.jpg"));
-        if (File.Exists(cropPath))
-            return cropPath;
-
         var source = await _people.GetFaceCropSourceAsync(faceId, cancellationToken);
         if (source is null)
             return null;
 
+        var suffix = source.ThumbnailRotation == 0 ? "" : $"r{source.ThumbnailRotation}";
+        var cropPath = Path.GetFullPath(Path.Combine(cacheRoot, "faces", $"{faceId}{suffix}.jpg"));
+        if (File.Exists(cropPath))
+            return cropPath;
+
         var physical = ImagePathResolver.ResolvePhysicalPath(source.MountPath, source.RelativePath, source.FileName, source.Extension);
         var previewPath = await _thumbnails.GetOrCreateDerivativePathAsync(
-            source.ContentHash, physical, source.Orientation, DerivativeSize.Preview, cancellationToken);
+            source.ContentHash, physical, source.Orientation, DerivativeSize.Preview, cancellationToken, source.ThumbnailRotation);
         if (previewPath is null)
             return null;
 

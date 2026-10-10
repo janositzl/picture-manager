@@ -43,7 +43,7 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
     public FaceModelDescriptor Model => GetSessions().Descriptor;
 
     public async Task<FaceAnalysisResult?> AnalyzeAsync(
-        string imagePath, int? orientation, FaceDetectionPreset preset = FaceDetectionPreset.Fast, CancellationToken cancellationToken = default)
+        string imagePath, int? orientation, FaceDetectionPreset preset = FaceDetectionPreset.Fast, CancellationToken cancellationToken = default, int rotation = 0)
     {
         var sessions = GetSessions();
         var settings = _options.For(preset);
@@ -53,7 +53,9 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         using var decoded = SkiaBitmapOps.DecodeDownsampled(imagePath, MaxDecodeSide);
         if (decoded is null)
             return null;
-        using var image = SkiaBitmapOps.ApplyOrientation(decoded, ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(imagePath, orientation)));
+        using var exifOriented = SkiaBitmapOps.ApplyOrientation(decoded, ThumbnailResizeCalculator.NormalizeOrientation(HeicDecoder.EffectiveOrientation(imagePath, orientation)));
+        // Boxes are stored against the displayed image, so the user's rotation is applied here as well (same mapping as the thumbnails).
+        using var image = SkiaBitmapOps.ApplyOrientation(exifOriented, SkiaBitmapOps.OrientationForRotation(rotation));
 
         await _inference.WaitAsync(cancellationToken);
         try

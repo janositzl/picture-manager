@@ -137,13 +137,36 @@ public sealed class ImageQueryRepository : IImageQueryRepository
     public async Task<int> RotateThumbnailsAsync(IReadOnlyCollection<int> ids, int degrees, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
     {
         var idList = ids.Distinct().ToList();
-        return await _dbContext.Images.WhereExisting()
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var existing = await _dbContext.Images.WhereExisting()
             .Where(i => idList.Contains(i.Id))
+            .Select(i => i.Id)
+            .ToListAsync(cancellationToken);
+
+        // Face boxes are normalized against the displayed image, so they turn with it (clockwise, about the image centre).
+        await RotateFaceBoxesAsync(existing, degrees, cancellationToken);
+        var affected = await _dbContext.Images
+            .Where(i => existing.Contains(i.Id))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(i => i.ThumbnailRotation, i => (i.ThumbnailRotation + degrees) % 360)
                 .SetProperty(i => i.UpdatedAt, updatedAtUtc),
                 cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return affected;
     }
+
+    private Task<int> RotateFaceBoxesAsync(List<int> imageIds, int degrees, CancellationToken cancellationToken) => degrees switch
+    {
+        90 => _dbContext.Faces.Where(f => imageIds.Contains(f.ImageId)).ExecuteUpdateAsync(s => s
+            .SetProperty(f => f.X, f => 1f - f.Y - f.Height).SetProperty(f => f.Y, f => f.X)
+            .SetProperty(f => f.Width, f => f.Height).SetProperty(f => f.Height, f => f.Width), cancellationToken),
+        180 => _dbContext.Faces.Where(f => imageIds.Contains(f.ImageId)).ExecuteUpdateAsync(s => s
+            .SetProperty(f => f.X, f => 1f - f.X - f.Width).SetProperty(f => f.Y, f => 1f - f.Y - f.Height), cancellationToken),
+        270 => _dbContext.Faces.Where(f => imageIds.Contains(f.ImageId)).ExecuteUpdateAsync(s => s
+            .SetProperty(f => f.X, f => f.Y).SetProperty(f => f.Y, f => 1f - f.X - f.Width)
+            .SetProperty(f => f.Width, f => f.Height).SetProperty(f => f.Height, f => f.Width), cancellationToken),
+        _ => Task.FromResult(0),
+    };
 
     public async Task<bool> SetFavoriteAsync(int id, int userId, bool isFavorite, DateTime nowUtc, CancellationToken cancellationToken = default)
     {

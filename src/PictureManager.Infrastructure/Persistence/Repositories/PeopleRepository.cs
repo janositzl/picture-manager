@@ -161,6 +161,6 @@ public sealed class PeopleRepository : IPeopleRepository
             .Where(f => f.Id == faceId)
             .Select(f => new FaceCropSource(
                 f.Id, f.Image!.ContentHash, f.Image.Folder!.Root!.MountPath, f.Image.Folder.RelativePath,
-                f.Image.FileName, f.Image.Extension, f.Image.Orientation, f.X, f.Y, f.Width, f.Height))
+                f.Image.FileName, f.Image.Extension, f.Image.Orientation, f.Image.ThumbnailRotation, f.X, f.Y, f.Width, f.Height))
             .FirstOrDefaultAsync(cancellationToken);
 }
