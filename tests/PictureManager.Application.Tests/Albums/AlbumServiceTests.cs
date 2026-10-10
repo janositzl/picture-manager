@@ -20,6 +20,7 @@ public class AlbumServiceTests
     private readonly IAlbumRepository _albums = Substitute.For<IAlbumRepository>();
     private readonly IImageQueryRepository _images = Substitute.For<IImageQueryRepository>();
     private readonly IFolderRepository _folders = Substitute.For<IFolderRepository>();
+    private readonly IAppUserRepository _users = Substitute.For<IAppUserRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly Album _album = new() { Id = 7, Name = "Holidays", OwnerUserId = Owner };
@@ -27,6 +28,7 @@ public class AlbumServiceTests
     public AlbumServiceTests()
     {
         _currentUser.UserId.Returns(Owner);
+        _users.GetByIdAsync(Owner, Arg.Any<CancellationToken>()).Returns(new AppUser { Id = Owner, DisplayName = "Administrator", IsActive = true });
         _clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         _albums.GetAccessibleAsync(7, Owner, Arg.Any<CancellationToken>()).Returns(new AccessibleAlbum(_album, AlbumAccess.Owner, "Administrator"));
         _albums.GetOrderedImageIdsAsync(7, Arg.Any<CancellationToken>()).Returns(new List<int>());
@@ -38,7 +40,7 @@ public class AlbumServiceTests
         });
     }
 
-    private AlbumService CreateService() => new(_albums, _images, _folders, _currentUser, _clock);
+    private AlbumService CreateService() => new(_albums, _images, _folders, _users, _currentUser, _clock);
 
     private static ImageRow Row(int id, string hash = "H") =>
         new(id, 3, $"img{id}", ".jpg", null, null, null, false, hash, DateTime.UtcNow, $"img{id}", "nas", "");
@@ -72,7 +74,7 @@ public class AlbumServiceTests
     {
         var result = await CreateService().CreateAsync(new AlbumCreate("  Summer  ", "  sun  "));
 
-        result.Value.Should().Be(new AlbumDetail(42, "Summer", "sun", 0, _clock.UtcNow, _clock.UtcNow));
+        result.Value.Should().Be(new AlbumDetail(42, "Summer", "sun", 0, _clock.UtcNow, _clock.UtcNow, "Owner", "Administrator"));
         await _albums.Received(1).AddAsync(Arg.Is<Album>(a => a.Name == "Summer" && a.OwnerUserId == Owner), Arg.Any<CancellationToken>());
     }
 
@@ -349,5 +351,140 @@ public class AlbumServiceTests
         _albums.GetAccessibleAsync(8, Owner, Arg.Any<CancellationToken>()).Returns((AccessibleAlbum?)null);
 
         (await CreateService().DeleteAsync(8)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    private void GrantAccess(AlbumAccess access) =>
+        _albums.GetAccessibleAsync(7, Owner, Arg.Any<CancellationToken>())
+            .Returns(new AccessibleAlbum(_album, access, "Bob B"));
+
+    [Theory]
+    [InlineData("get", AlbumAccess.Viewer, true)]
+    [InlineData("listImages", AlbumAccess.Viewer, true)]
+    [InlineData("export", AlbumAccess.Viewer, true)]
+    [InlineData("add", AlbumAccess.Viewer, false)]
+    [InlineData("add", AlbumAccess.Editor, true)]
+    [InlineData("remove", AlbumAccess.Viewer, false)]
+    [InlineData("remove", AlbumAccess.Editor, true)]
+    [InlineData("move", AlbumAccess.Viewer, false)]
+    [InlineData("move", AlbumAccess.Editor, true)]
+    [InlineData("sort", AlbumAccess.Viewer, false)]
+    [InlineData("sort", AlbumAccess.Editor, true)]
+    [InlineData("cover", AlbumAccess.Viewer, false)]
+    [InlineData("cover", AlbumAccess.Editor, true)]
+    [InlineData("rename", AlbumAccess.Editor, false)]
+    [InlineData("rename", AlbumAccess.Owner, true)]
+    [InlineData("delete", AlbumAccess.Editor, false)]
+    [InlineData("delete", AlbumAccess.Owner, true)]
+    [InlineData("shares", AlbumAccess.Editor, false)]
+    [InlineData("shares", AlbumAccess.Owner, true)]
+    [InlineData("share", AlbumAccess.Editor, false)]
+    public async Task EachOperation_NeedsItsAccessLevel(string operation, AlbumAccess access, bool allowed)
+    {
+        GrantAccess(access);
+        _albums.ListImagesAsync(7, Owner, Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<AlbumImageRow>());
+        _albums.GetExportRowsAsync(7, Arg.Any<CancellationToken>()).Returns(new List<AlbumExportRow>());
+        _albums.GetSharesAsync(7, Arg.Any<CancellationToken>()).Returns(new List<AlbumShareRow>());
+        _albums.GetImageIdsSortedAsync(7, Arg.Any<AlbumSortKey>(), Arg.Any<CancellationToken>()).Returns(new List<int>());
+        _images.GetVisibleIdsAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new List<int> { 1 });
+        var service = CreateService();
+
+        var status = operation switch
+        {
+            "get" => (await service.GetAsync(7)).Status,
+            "listImages" => (await service.ListImagesAsync(7, null, null)).Status,
+            "export" => (await service.ExportAsync(7, null)).Status,
+            "add" => (await service.AddImagesAsync(7, new AlbumAddImages(new[] { 1 }, null))).Status,
+            "remove" => (await service.RemoveImagesAsync(7, new[] { 1 })).Status,
+            "move" => (await service.MoveImageAsync(7, 1, null)).Status,
+            "sort" => (await service.SortAsync(7, "name")).Status,
+            "cover" => (await service.SetCoverAsync(7, 1)).Status,
+            "rename" => (await service.UpdateAsync(7, new AlbumUpdate("Renamed", false, null))).Status,
+            "delete" => (await service.DeleteAsync(7)).Status,
+            "shares" => (await service.GetSharesAsync(7)).Status,
+            "share" => (await service.SetShareAsync(7, 5, "Viewer")).Status,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+
+        // "Allowed" means the access check passed; the operation may still reject its input (e.g. move of an image not in the album).
+        if (allowed)
+            status.Should().NotBe(ResultStatus.Forbidden).And.NotBe(ResultStatus.NotFound);
+        else
+            status.Should().Be(ResultStatus.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetAsync_SharedAlbum_ReportsAccessAndOwner()
+    {
+        GrantAccess(AlbumAccess.Editor);
+
+        var detail = (await CreateService().GetAsync(7)).Value!;
+
+        detail.Access.Should().Be("Editor");
+        detail.OwnerDisplayName.Should().Be("Bob B");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_MapsAccess_AndShowsTheShareCountOnlyToTheOwner()
+    {
+        _albums.GetSummariesAsync(Owner, Arg.Any<CancellationToken>()).Returns(new List<AlbumSummaryRow>
+        {
+            new(1, "Mine", null, 0, null, null, DateTime.UtcNow, true, false, "Administrator", 3),
+            new(2, "Theirs", null, 0, null, null, DateTime.UtcNow, false, true, "Bob B", 4)
+        });
+
+        var albums = await CreateService().GetAllAsync();
+
+        albums.Select(a => (a.Access, a.OwnerDisplayName, a.ShareCount))
+            .Should().Equal(("Owner", "Administrator", 3), ("Editor", "Bob B", 0));
+    }
+
+    [Theory]
+    [InlineData(Owner, "Viewer", "userId")]      // yourself
+    [InlineData(5, "Viewer", "userId")]          // inactive
+    [InlineData(6, "Viewer", "userId")]          // unknown
+    [InlineData(9, "Admin", "permission")]
+    [InlineData(9, "1", "permission")]
+    [InlineData(9, null, "permission")]
+    public async Task SetShareAsync_RejectsBadTargetsAndPermissions_WithoutStoring(int userId, string? permission, string field)
+    {
+        _users.GetByIdAsync(5, Arg.Any<CancellationToken>()).Returns(new AppUser { Id = 5, DisplayName = "Off", IsActive = false });
+        _users.GetByIdAsync(9, Arg.Any<CancellationToken>()).Returns(new AppUser { Id = 9, DisplayName = "Carol", IsActive = true });
+
+        var result = await CreateService().SetShareAsync(7, userId, permission);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.Errors!.Keys.Should().Contain(field);
+        await _albums.DidNotReceive().SetShareAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<SharePermission>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SetShareAsync_Valid_StoresAndReturnsTheShare()
+    {
+        _users.GetByIdAsync(9, Arg.Any<CancellationToken>()).Returns(new AppUser { Id = 9, DisplayName = "Carol", IsActive = true });
+
+        var result = await CreateService().SetShareAsync(7, 9, "editor");
+
+        result.Value.Should().Be(new AlbumShareDto(9, "Carol", "Editor"));
+        await _albums.Received(1).SetShareAsync(7, 9, SharePermission.Editor, _clock.UtcNow, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoveShareAsync_ANonOwnerMayRemoveOnlyThemselves()
+    {
+        GrantAccess(AlbumAccess.Viewer);
+        _albums.RemoveShareAsync(7, Owner, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().RemoveShareAsync(7, 9)).Status.Should().Be(ResultStatus.Forbidden);
+        (await CreateService().RemoveShareAsync(7, Owner)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RemoveShareAsync_OwnerRemovesAnyone_UnknownShareIsNotFound()
+    {
+        _albums.RemoveShareAsync(7, 9, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await CreateService().RemoveShareAsync(7, 9)).IsSuccess.Should().BeTrue();
+        (await CreateService().RemoveShareAsync(7, 10)).Status.Should().Be(ResultStatus.NotFound);
     }
 }

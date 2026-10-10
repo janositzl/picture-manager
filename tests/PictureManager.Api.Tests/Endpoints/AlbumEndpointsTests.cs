@@ -19,7 +19,7 @@ namespace PictureManager.Api.Tests.Endpoints;
 public class AlbumEndpointsTests
 {
     private readonly IAlbumService _service = Substitute.For<IAlbumService>();
-    private static readonly AlbumDetail Detail = new(42, "Summer", null, 0, DateTime.UtcNow, DateTime.UtcNow);
+    private static readonly AlbumDetail Detail = new(42, "Summer", null, 0, DateTime.UtcNow, DateTime.UtcNow, "Owner", "Administrator");
 
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement;
 

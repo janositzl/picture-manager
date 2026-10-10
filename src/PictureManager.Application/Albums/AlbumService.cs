@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,14 +19,16 @@ public sealed class AlbumService : IAlbumService
     private readonly IAlbumRepository _albums;
     private readonly IImageQueryRepository _images;
     private readonly IFolderRepository _folders;
+    private readonly IAppUserRepository _users;
     private readonly ICurrentUser _currentUser;
     private readonly IClock _clock;
 
-    public AlbumService(IAlbumRepository albums, IImageQueryRepository images, IFolderRepository folders, ICurrentUser currentUser, IClock clock)
+    public AlbumService(IAlbumRepository albums, IImageQueryRepository images, IFolderRepository folders, IAppUserRepository users, ICurrentUser currentUser, IClock clock)
     {
         _albums = albums;
         _images = images;
         _folders = folders;
+        _users = users;
         _currentUser = currentUser;
         _clock = clock;
     }
@@ -33,10 +36,14 @@ public sealed class AlbumService : IAlbumService
     public async Task<IReadOnlyList<AlbumSummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var rows = await _albums.GetSummariesAsync(_currentUser.UserId, cancellationToken);
-        return rows.Where(r => r.IsOwner).Select(r => new AlbumSummary(
-            r.Id, r.Name, r.Description, r.ImageCount,
-            r.CoverImageId is int coverId && r.CoverContentHash is { } hash ? ImageUrls.Thumbnail(coverId, hash) : null,
-            r.UpdatedAt)).ToList();
+        return rows.Select(r =>
+        {
+            var access = AlbumAccessRules.From(r.IsOwner, r.IsEditor);
+            return new AlbumSummary(
+                r.Id, r.Name, r.Description, r.ImageCount,
+                r.CoverImageId is int coverId && r.CoverContentHash is { } hash ? ImageUrls.Thumbnail(coverId, hash) : null,
+                r.UpdatedAt, access.ToString(), r.OwnerDisplayName, access == AlbumAccess.Owner ? r.ShareCount : 0);
+        }).ToList();
     }
 
     public async Task<Result<AlbumDetail>> CreateAsync(AlbumCreate input, CancellationToken cancellationToken = default)
@@ -62,23 +69,26 @@ public sealed class AlbumService : IAlbumService
             UpdatedAt = now
         }, cancellationToken);
 
-        return Result<AlbumDetail>.Ok(ToDetail(album, 0));
+        var ownerName = (await _users.GetByIdAsync(_currentUser.UserId, cancellationToken))?.DisplayName ?? string.Empty;
+        return Result<AlbumDetail>.Ok(ToDetail(album, 0, AlbumAccess.Owner, ownerName));
     }
 
     public async Task<Result<AlbumDetail>> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        var album = await OwnedAsync(id, cancellationToken);
-        if (album is null)
-            return Result.NotFound();
+        var (accessible, failure) = await RequireAsync(id, AlbumAccess.Viewer, cancellationToken);
+        if (failure is not null)
+            return failure;
 
-        return Result<AlbumDetail>.Ok(ToDetail(album, await _albums.CountImagesAsync(id, cancellationToken)));
+        return Result<AlbumDetail>.Ok(ToDetail(
+            accessible!.Album, await _albums.CountImagesAsync(id, cancellationToken), accessible.Access, accessible.OwnerDisplayName));
     }
 
     public async Task<Result<AlbumDetail>> UpdateAsync(int id, AlbumUpdate input, CancellationToken cancellationToken = default)
     {
-        var album = await OwnedAsync(id, cancellationToken);
-        if (album is null)
-            return Result.NotFound();
+        var (accessible, failure) = await RequireAsync(id, AlbumAccess.Owner, cancellationToken);
+        if (failure is not null)
+            return failure;
+        var album = accessible!.Album;
 
         if (input.Name is not null)
         {
@@ -100,23 +110,24 @@ public sealed class AlbumService : IAlbumService
 
         album.UpdatedAt = _clock.UtcNow;
         await _albums.UpdateAsync(album, cancellationToken);
-        return Result<AlbumDetail>.Ok(ToDetail(album, await _albums.CountImagesAsync(id, cancellationToken)));
+        return Result<AlbumDetail>.Ok(ToDetail(album, await _albums.CountImagesAsync(id, cancellationToken), AlbumAccess.Owner, accessible.OwnerDisplayName));
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var album = await OwnedAsync(id, cancellationToken);
-        if (album is null)
-            return Result.NotFound();
+        var (accessible, failure) = await RequireAsync(id, AlbumAccess.Owner, cancellationToken);
+        if (failure is not null)
+            return failure;
 
-        await _albums.DeleteAsync(album, cancellationToken);
+        await _albums.DeleteAsync(accessible!.Album, cancellationToken);
         return Result.Ok();
     }
 
     public async Task<Result<PagedResult<AlbumImageItem>>> ListImagesAsync(int id, string? cursor, int? limit, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Viewer, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         var take = limit ?? DefaultLimit;
         if (take is < 1 or > MaxLimit)
@@ -141,8 +152,9 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumAddResult>> AddImagesAsync(int id, AlbumAddImages input, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Editor, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         if ((input.ImageIds is null) == (input.FolderId is null))
             return Result.Invalid("body", "Provide either imageIds or folderId, not both.");
@@ -180,8 +192,9 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> RemoveImagesAsync(int id, IReadOnlyList<int>? imageIds, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Editor, cancellationToken);
+        if (failure is not null)
+            return failure;
         if (imageIds is null || imageIds.Count == 0)
             return Result.Invalid("imageIds", "Must contain at least one id.");
 
@@ -192,8 +205,9 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> MoveImageAsync(int id, int imageId, int? afterImageId, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Editor, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         var order = (await _albums.GetOrderedImageIdsAsync(id, cancellationToken)).ToList();
         if (!order.Contains(imageId))
@@ -214,8 +228,9 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> SortAsync(int id, string? by, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Editor, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         AlbumSortKey? key = by switch
         {
@@ -235,8 +250,9 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result> SetCoverAsync(int id, int? imageId, CancellationToken cancellationToken = default)
     {
-        if (await OwnedAsync(id, cancellationToken) is null)
-            return Result.NotFound();
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Editor, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         if (imageId is not int coverId || !(await _albums.GetOrderedImageIdsAsync(id, cancellationToken)).Contains(coverId))
             return Result.Invalid("imageId", "Choose a photo from this album.");
@@ -248,18 +264,72 @@ public sealed class AlbumService : IAlbumService
 
     public async Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default)
     {
-        var album = await OwnedAsync(id, cancellationToken);
-        if (album is null)
-            return Result.NotFound();
+        var (accessible, failure) = await RequireAsync(id, AlbumAccess.Viewer, cancellationToken);
+        if (failure is not null)
+            return failure;
 
         var rows = await _albums.GetExportRowsAsync(id, cancellationToken);
         return Result<AlbumExport>.Ok(new AlbumExport(
-            AlbumExportFormatter.FileName(album.Name), AlbumExportFormatter.Format(prefix, rows)));
+            AlbumExportFormatter.FileName(accessible!.Album.Name), AlbumExportFormatter.Format(prefix, rows)));
     }
 
-    // Owner-only until the access matrix lands (Task 3).
-    private async Task<Album?> OwnedAsync(int id, CancellationToken cancellationToken) =>
-        await _albums.GetAccessibleAsync(id, _currentUser.UserId, cancellationToken) is { Access: AlbumAccess.Owner } owned ? owned.Album : null;
+    public async Task<Result<IReadOnlyList<AlbumShareDto>>> GetSharesAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Owner, cancellationToken);
+        if (failure is not null)
+            return failure;
+
+        var rows = await _albums.GetSharesAsync(id, cancellationToken);
+        return Result<IReadOnlyList<AlbumShareDto>>.Ok(
+            rows.Select(r => new AlbumShareDto(r.UserId, r.DisplayName, r.Permission.ToString())).ToList());
+    }
+
+    public async Task<Result<AlbumShareDto>> SetShareAsync(int id, int userId, string? permission, CancellationToken cancellationToken = default)
+    {
+        var (_, failure) = await RequireAsync(id, AlbumAccess.Owner, cancellationToken);
+        if (failure is not null)
+            return failure;
+        if (ParsePermission(permission) is not { } parsed)
+            return Result.Invalid("permission", "Must be Viewer or Editor.");
+        if (userId == _currentUser.UserId)
+            return Result.Invalid("userId", "You can't share an album with yourself.");
+        var target = await _users.GetByIdAsync(userId, cancellationToken);
+        if (target is not { IsActive: true })
+            return Result.Invalid("userId", "Choose an active user.");
+
+        await _albums.SetShareAsync(id, userId, parsed, _clock.UtcNow, cancellationToken);
+        return Result<AlbumShareDto>.Ok(new AlbumShareDto(target.Id, target.DisplayName, parsed.ToString()));
+    }
+
+    public async Task<Result> RemoveShareAsync(int id, int userId, CancellationToken cancellationToken = default)
+    {
+        var (accessible, failure) = await RequireAsync(id, AlbumAccess.Viewer, cancellationToken);
+        if (failure is not null)
+            return failure;
+        if (accessible!.Access != AlbumAccess.Owner && userId != _currentUser.UserId)
+            return Result.Forbidden("Only the album's owner can do this.");
+
+        return await _albums.RemoveShareAsync(id, userId, cancellationToken) ? Result.Ok() : Result.NotFound();
+    }
+
+    /// <summary>The album when the caller has at least <paramref name="needed"/>; otherwise NotFound (no access at all) or Forbidden.</summary>
+    private async Task<(AccessibleAlbum? Album, Result? Failure)> RequireAsync(int id, AlbumAccess needed, CancellationToken cancellationToken)
+    {
+        var accessible = await _albums.GetAccessibleAsync(id, _currentUser.UserId, cancellationToken);
+        if (accessible is null)
+            return (null, Result.NotFound());
+        if (accessible.Access < needed)
+            return (null, Result.Forbidden(needed == AlbumAccess.Owner
+                ? "Only the album's owner can do this."
+                : "You can only view this album."));
+        return (accessible, null);
+    }
+
+    private static SharePermission? ParsePermission(string? raw) =>
+        // Enum.TryParse also accepts numbers ("1"); only the names are valid here.
+        raw is not null && !int.TryParse(raw, out _) && Enum.TryParse(raw, ignoreCase: true, out SharePermission parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : null;
 
     private static string? ValidateName(string? name)
     {
@@ -273,6 +343,6 @@ public sealed class AlbumService : IAlbumService
     private static string? NormalizeDescription(string? description) =>
         string.IsNullOrWhiteSpace(description) ? null : description.Trim();
 
-    private static AlbumDetail ToDetail(Album album, int imageCount) =>
-        new(album.Id, album.Name, album.Description, imageCount, album.CreatedAt, album.UpdatedAt);
+    private static AlbumDetail ToDetail(Album album, int imageCount, AlbumAccess access, string ownerDisplayName) =>
+        new(album.Id, album.Name, album.Description, imageCount, album.CreatedAt, album.UpdatedAt, access.ToString(), ownerDisplayName);
 }

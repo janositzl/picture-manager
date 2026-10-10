@@ -33,4 +33,13 @@ public interface IAlbumService
     Task<Result> SetCoverAsync(int id, int? imageId, CancellationToken cancellationToken = default);
 
     Task<Result<AlbumExport>> ExportAsync(int id, string? prefix, CancellationToken cancellationToken = default);
+
+    /// <summary>Owner only.</summary>
+    Task<Result<IReadOnlyList<AlbumShareDto>>> GetSharesAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Owner only. Adds the share or changes its permission. Invalid for yourself, an inactive or unknown user, or a permission other than Viewer/Editor.</summary>
+    Task<Result<AlbumShareDto>> SetShareAsync(int id, int userId, string? permission, CancellationToken cancellationToken = default);
+
+    /// <summary>The owner may remove anyone's share; anyone else only their own (leaving the album).</summary>
+    Task<Result> RemoveShareAsync(int id, int userId, CancellationToken cancellationToken = default);
 }

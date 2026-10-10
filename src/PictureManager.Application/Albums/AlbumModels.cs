@@ -5,9 +5,17 @@ using PictureManager.Application.Common;
 
 namespace PictureManager.Application.Albums;
 
-public sealed record AlbumSummary(int Id, string Name, string? Description, int ImageCount, string? CoverThumbnailUrl, DateTime UpdatedAt);
+/// <summary>Access is "Owner", "Editor" or "Viewer". ShareCount is how many people the caller shared it with (0 unless the caller owns it).</summary>
+public sealed record AlbumSummary(
+    int Id, string Name, string? Description, int ImageCount, string? CoverThumbnailUrl, DateTime UpdatedAt,
+    string Access, string OwnerDisplayName, int ShareCount);
 
-public sealed record AlbumDetail(int Id, string Name, string? Description, int ImageCount, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record AlbumDetail(
+    int Id, string Name, string? Description, int ImageCount, DateTime CreatedAt, DateTime UpdatedAt,
+    string Access, string OwnerDisplayName);
+
+/// <summary>Permission is "Viewer" or "Editor".</summary>
+public sealed record AlbumShareDto(int UserId, string DisplayName, string Permission);
 
 /// <summary>The ImageListItem shape plus IsMissing. Missing entries stay listed with null URLs.</summary>
 public sealed record AlbumImageItem(
