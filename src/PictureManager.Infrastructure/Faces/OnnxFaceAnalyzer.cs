@@ -60,7 +60,7 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         await _inference.WaitAsync(cancellationToken);
         try
         {
-            var detections = Detect(sessions.Detector, image, settings.DetectorInputSize)
+            var detections = DetectMultiScale(sessions.Detector, image, settings.DetectorInputSize)
                 .Where(d => Math.Min(d.X2 - d.X1, d.Y2 - d.Y1) >= settings.MinFaceSizePx)
                 .ToList();
             if (detections.Count == 0)
@@ -93,6 +93,21 @@ public sealed class OnnxFaceAnalyzer : IFaceAnalyzer, IDisposable
         {
             _inference.Release();
         }
+    }
+
+    /// <summary>
+    /// A larger detector input finds smaller faces but sees big ones (or upscaled small photos) less reliably, so a
+    /// larger preset also runs the Fast size and merges: it can add faces to a Fast scan, never lose them.
+    /// </summary>
+    private List<RawDetection> DetectMultiScale(InferenceSession detector, SKBitmap image, int size)
+    {
+        var fastSize = _options.FastDetectorInputSize;
+        if (size <= fastSize)
+            return Detect(detector, image, size);
+
+        var merged = Detect(detector, image, fastSize);
+        merged.AddRange(Detect(detector, image, size));
+        return ScrfdDecoder.NonMaxSuppression(merged, NmsThreshold);
     }
 
     private List<RawDetection> Detect(InferenceSession detector, SKBitmap image, int size)

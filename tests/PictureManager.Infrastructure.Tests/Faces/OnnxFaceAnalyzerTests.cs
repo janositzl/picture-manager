@@ -91,4 +91,22 @@ public class OnnxFaceAnalyzerTests
             File.Delete(garbage);
         }
     }
+
+    [Fact]
+    public async Task Analyze_Detailed_FindsEveryFaceFastFinds()
+    {
+        if (Models is null || Fixtures is null) return;
+        using var analyzer = new OnnxFaceAnalyzer(new FaceRecognitionOptions { ModelDirectory = Models });
+
+        foreach (var file in new[] { "person-a-1.jpg", "person-a-2.jpg", "person-b.jpg" })
+        {
+            var path = Path.Combine(Fixtures, file);
+            var fast = (await analyzer.AnalyzeAsync(path, 1, FaceDetectionPreset.Fast))!.Faces;
+            var detailed = (await analyzer.AnalyzeAsync(path, 1, FaceDetectionPreset.Detailed))!.Faces;
+
+            foreach (var face in fast)
+                detailed.Should().Contain(d => FaceMatching.IoU(new FaceBox(d.X, d.Y, d.Width, d.Height), new FaceBox(face.X, face.Y, face.Width, face.Height)) >= 0.5,
+                    "a re-scan with the Detailed preset must not lose a face the Fast scan found ({0})", file);
+        }
+    }
 }
