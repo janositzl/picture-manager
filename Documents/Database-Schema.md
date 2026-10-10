@@ -64,7 +64,6 @@ Individual image files with metadata.
 | Latitude | double? | GPS latitude |
 | Longitude | double? | GPS longitude |
 | RawMetadata | jsonb? | Raw extracted metadata |
-| IsFavorite | bool, indexed | User favorite flag |
 | IsHidden | bool, default false | User-hidden: out of every view and out of face recognition; only the folder view's Show hidden lists it. Never written by the scanner. |
 | IndexState | enum (Pending/Indexed) | Whether metadata indexing is done |
 | FirstSeenUtc | timestamptz | When the image was first discovered |
@@ -72,7 +71,7 @@ Individual image files with metadata.
 | CreatedAt | timestamptz | Row creation time |
 | UpdatedAt | timestamptz | Row last-modified time |
 
-Indexes: FolderId, ContentHash, IsFavorite, composite (FolderId, SortDate, Id) for folder-grid date sorting. Additional expression/partial indexes (lower(FileName), favorites) exist as raw SQL in a migration, not via fluent API. Deleting a folder cascades to its images.
+Indexes: FolderId, ContentHash, composite (FolderId, SortDate, Id) for folder-grid date sorting. An additional expression index (lower(FileName)) exists as raw SQL in a migration, not via fluent API. Deleting a folder cascades to its images.
 
 ## Albums
 
@@ -101,6 +100,31 @@ Join table linking albums to images, with ordering.
 | AddedAt | timestamptz | When the image was added to the album |
 
 Composite primary key (AlbumId, ImageId). Deleting either the album or the image cascades.
+
+## AlbumShares
+
+An album its owner shared with another user.
+
+| Property | Type | Description |
+|---|---|---|
+| AlbumId | int (PK part, FK → Albums) | Shared album |
+| UserId | int (PK part, FK → AppUsers), indexed | User it is shared with |
+| Permission | enum (Viewer/Editor) | Viewers browse and export; editors also add, remove, reorder and set the cover |
+| CreatedAt | timestamptz | When it was shared |
+
+Composite primary key (AlbumId, UserId). Deleting either the album or the user cascades.
+
+## UserFavorites
+
+A user's favorite photos. Favorites are per user; the image row carries no flag.
+
+| Property | Type | Description |
+|---|---|---|
+| UserId | int (PK part, FK → AppUsers) | Owner of the favorite |
+| ImageId | int (PK part, FK → Images), indexed | Favorite image |
+| CreatedAt | timestamptz | When it was marked |
+
+Composite primary key (UserId, ImageId). Deleting either the user or the image cascades. The migration that introduced the table copied the old global favorites to the initial administrator (or the first active admin if that account no longer existed).
 
 ## AppUsers
 

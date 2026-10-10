@@ -1,3 +1,4 @@
+using PictureManager.Model;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -65,7 +66,7 @@ public class DuplicateQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var members = await new ImageQueryRepository(context).GetDuplicateMembersAsync(new[] { "AAA" });
+        var members = await new ImageQueryRepository(context).GetDuplicateMembersAsync(new[] { "AAA" }, AppUser.InitialAdminId);
 
         members.Select(m => (m.Image.Id, m.RootName, m.RelativePath)).Should().BeEquivalentTo(new[]
         {
@@ -105,7 +106,7 @@ public class DuplicateQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var members = await new ImageQueryRepository(context).GetMembersByIdsAsync(new[] { a.Id, gone.Id });
+        var members = await new ImageQueryRepository(context).GetMembersByIdsAsync(new[] { a.Id, gone.Id }, AppUser.InitialAdminId);
 
         members.Select(m => (m.Image.Id, m.FileSize)).Should().Equal((a.Id, 1234L));
     }

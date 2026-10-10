@@ -22,6 +22,8 @@ public sealed record AlbumSortRequest(string? By);
 
 public sealed record AlbumCoverRequest(int? ImageId);
 
+public sealed record AlbumShareRequest(string? Permission);
+
 public static class AlbumEndpoints
 {
     public static IEndpointRouteBuilder MapAlbumEndpoints(this IEndpointRouteBuilder user)
@@ -38,6 +40,9 @@ public static class AlbumEndpoints
         user.MapPost("/albums/{id:int}/sort", SortAsync);
         user.MapPut("/albums/{id:int}/cover", SetCoverAsync);
         user.MapGet("/albums/{id:int}/export", ExportAsync);
+        user.MapGet("/albums/{id:int}/shares", GetSharesAsync);
+        user.MapPut("/albums/{id:int}/shares/{userId:int}", SetShareAsync);
+        user.MapDelete("/albums/{id:int}/shares/{userId:int}", RemoveShareAsync);
         return user;
     }
 
@@ -56,11 +61,11 @@ public static class AlbumEndpoints
         };
     }
 
-    public static async Task<Results<Ok<AlbumDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetAsync(
+    public static async Task<Results<Ok<AlbumDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> GetAsync(
         int id, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.GetAsync(id, cancellationToken)).ToOk();
+        (await service.GetAsync(id, cancellationToken)).ToOkOrForbidden();
 
-    public static async Task<Results<Ok<AlbumDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> UpdateAsync(
+    public static async Task<Results<Ok<AlbumDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> UpdateAsync(
         int id, JsonElement body, IAlbumService service, CancellationToken cancellationToken)
     {
         if (body.ValueKind != JsonValueKind.Object)
@@ -70,36 +75,36 @@ public static class AlbumEndpoints
         if (!PatchJson.TryReadString(body, "description", out var descriptionPresent, out var description))
             return ResultHttpExtensions.Invalid("description", "Must be a string or null.");
 
-        return (await service.UpdateAsync(id, new AlbumUpdate(name, descriptionPresent, description), cancellationToken)).ToOk();
+        return (await service.UpdateAsync(id, new AlbumUpdate(name, descriptionPresent, description), cancellationToken)).ToOkOrForbidden();
     }
 
-    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> DeleteAsync(
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> DeleteAsync(
         int id, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.DeleteAsync(id, cancellationToken)).ToNoContent();
+        (await service.DeleteAsync(id, cancellationToken)).ToNoContentOrForbidden();
 
-    public static async Task<Results<Ok<PagedResult<AlbumImageItem>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListImagesAsync(
+    public static async Task<Results<Ok<PagedResult<AlbumImageItem>>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> ListImagesAsync(
         int id, string? cursor, int? limit, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.ListImagesAsync(id, cursor, limit, cancellationToken)).ToOk();
+        (await service.ListImagesAsync(id, cursor, limit, cancellationToken)).ToOkOrForbidden();
 
-    public static async Task<Results<Ok<AlbumAddResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AddImagesAsync(
+    public static async Task<Results<Ok<AlbumAddResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> AddImagesAsync(
         int id, AlbumAddImagesRequest body, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.AddImagesAsync(id, new AlbumAddImages(body.ImageIds, body.FolderId), cancellationToken)).ToOk();
+        (await service.AddImagesAsync(id, new AlbumAddImages(body.ImageIds, body.FolderId), cancellationToken)).ToOkOrForbidden();
 
-    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> RemoveImagesAsync(
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> RemoveImagesAsync(
         int id, AlbumRemoveImagesRequest body, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.RemoveImagesAsync(id, body.ImageIds, cancellationToken)).ToNoContent();
+        (await service.RemoveImagesAsync(id, body.ImageIds, cancellationToken)).ToNoContentOrForbidden();
 
-    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> MoveImageAsync(
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> MoveImageAsync(
         int id, int imageId, AlbumMoveRequest body, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.MoveImageAsync(id, imageId, body.AfterImageId, cancellationToken)).ToNoContent();
+        (await service.MoveImageAsync(id, imageId, body.AfterImageId, cancellationToken)).ToNoContentOrForbidden();
 
-    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SortAsync(
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> SortAsync(
         int id, AlbumSortRequest body, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.SortAsync(id, body.By, cancellationToken)).ToNoContent();
+        (await service.SortAsync(id, body.By, cancellationToken)).ToNoContentOrForbidden();
 
-    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetCoverAsync(
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> SetCoverAsync(
         int id, AlbumCoverRequest body, IAlbumService service, CancellationToken cancellationToken) =>
-        (await service.SetCoverAsync(id, body.ImageId, cancellationToken)).ToNoContent();
+        (await service.SetCoverAsync(id, body.ImageId, cancellationToken)).ToNoContentOrForbidden();
 
     public static async Task<Results<FileContentHttpResult, NotFound>> ExportAsync(
         int id, string? prefix, IAlbumService service, CancellationToken cancellationToken)
@@ -112,4 +117,16 @@ public static class AlbumEndpoints
         // both filename= and the RFC 5987 filename*= form, so non-ASCII album names survive.
         return TypedResults.File(Encoding.UTF8.GetBytes(result.Value!.Content), "text/plain; charset=utf-8", result.Value.FileName);
     }
+
+    public static async Task<Results<Ok<IReadOnlyList<AlbumShareDto>>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> GetSharesAsync(
+        int id, IAlbumService service, CancellationToken cancellationToken) =>
+        (await service.GetSharesAsync(id, cancellationToken)).ToOkOrForbidden();
+
+    public static async Task<Results<Ok<AlbumShareDto>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> SetShareAsync(
+        int id, int userId, AlbumShareRequest body, IAlbumService service, CancellationToken cancellationToken) =>
+        (await service.SetShareAsync(id, userId, body.Permission, cancellationToken)).ToOkOrForbidden();
+
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> RemoveShareAsync(
+        int id, int userId, IAlbumService service, CancellationToken cancellationToken) =>
+        (await service.RemoveShareAsync(id, userId, cancellationToken)).ToNoContentOrForbidden();
 }

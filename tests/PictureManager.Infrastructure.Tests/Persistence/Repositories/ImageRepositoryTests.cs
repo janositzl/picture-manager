@@ -235,9 +235,9 @@ public class ImageRepositoryTests
         await context.SaveChangesAsync();
 
         var repository = new ImageRepository(context);
-        image.IsFavorite = true;
+        image.FileName = "IMG002";
         await repository.UpdateAsync(image);
-        (await repository.GetByIdAsync(image.Id))!.IsFavorite.Should().BeTrue();
+        (await repository.GetByIdAsync(image.Id))!.FileName.Should().Be("IMG002");
 
         await repository.DeleteAsync(image);
         (await repository.GetByIdAsync(image.Id)).Should().BeNull();

@@ -1,3 +1,4 @@
+using PictureManager.Model;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -53,24 +54,25 @@ public class MissingFolderTests
         var top = TestData.Folder(root, "");
         var trip = TestData.Folder(root, "Trip", top, missingSinceUtc: Now);
         var tripItaly = TestData.Folder(root, "Trip-Italy", top);
-        var hidden = TestData.Image(trip, "IMG_0001", contentHash: "AAAA", isFavorite: true);
-        var shown = TestData.Image(tripItaly, "IMG_0001", contentHash: "AAAA", isFavorite: true);
+        var hidden = TestData.Image(trip, "IMG_0001", contentHash: "AAAA");
+        var shown = TestData.Image(tripItaly, "IMG_0001", contentHash: "AAAA");
         db.Context.Images.AddRange(hidden, shown);
+        db.Context.UserFavorites.AddRange(TestData.Favorite(AppUser.InitialAdminId, hidden), TestData.Favorite(AppUser.InitialAdminId, shown));
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
         var repository = new ImageQueryRepository(context);
 
-        var byName = await repository.ListAsync(new ImageListFilter(null, null, "IMG_0001", false), ImageSort.Name, SortDirection.Asc, null, 10);
+        var byName = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, "IMG_0001", false), ImageSort.Name, SortDirection.Asc, null, 10);
         byName.Select(r => r.Id).Should().Equal(shown.Id);
 
-        var favorites = await repository.ListAsync(new ImageListFilter(null, null, null, true), ImageSort.Date, SortDirection.Desc, null, 10);
+        var favorites = await repository.ListAsync(AppUser.InitialAdminId, new ImageListFilter(null, null, null, true), ImageSort.Date, SortDirection.Desc, null, 10);
         favorites.Select(r => r.Id).Should().Equal(shown.Id);
 
         // One visible member left, so no duplicate group: a renamed folder no longer doubles every photo.
         (await repository.GetDuplicateGroupsAsync(null, 10)).Should().BeEmpty();
-        (await repository.GetVisibleDetailAsync(hidden.Id)).Should().BeNull();
-        (await repository.SetFavoriteAsync(hidden.Id, false, Now)).Should().BeFalse();
+        (await repository.GetVisibleDetailAsync(hidden.Id, AppUser.InitialAdminId)).Should().BeNull();
+        (await repository.SetFavoriteAsync(hidden.Id, AppUser.InitialAdminId, false, Now)).Should().BeFalse();
     }
 
     [Fact]
@@ -113,7 +115,7 @@ public class MissingFolderTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, null, null, 10);
+        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, AppUser.InitialAdminId, null, null, 10);
 
         rows.Should().ContainSingle().Which.IsMissing.Should().BeTrue();
     }

@@ -30,7 +30,6 @@ public class Image
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public string? RawMetadata { get; set; }
-    public bool IsFavorite { get; set; }
 
     /// <summary>User-hidden: out of every view and out of face recognition; only the folder view's "Show hidden" lists it.</summary>
     public bool IsHidden { get; set; }
@@ -46,4 +45,5 @@ public class Image
 
     public Folder? Folder { get; set; }
     public ICollection<AlbumImage> AlbumImages { get; set; } = new List<AlbumImage>();
+    public ICollection<UserFavorite> Favorites { get; set; } = new List<UserFavorite>();
 }

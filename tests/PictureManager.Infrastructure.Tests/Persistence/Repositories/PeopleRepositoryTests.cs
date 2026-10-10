@@ -364,7 +364,7 @@ public class PeopleRepositoryTests
         await FaceTestData.AddFaceAsync(db.Context, rejected.Id, model, FaceTestData.Embedding(1), anna.Id, FaceAssignmentState.Ignored);
         var repository = new ImageQueryRepository(db.CreateContext());
 
-        var rows = await repository.ListAsync(
+        var rows = await repository.ListAsync(AppUser.InitialAdminId, 
             new PictureManager.Application.Images.ImageListFilter(null, null, null, false, anna.Id),
             PictureManager.Application.Images.ImageSort.Name, PictureManager.Application.Images.SortDirection.Asc, null, 10);
 
@@ -389,7 +389,7 @@ public class PeopleRepositoryTests
         await FaceTestData.AddFaceAsync(db.Context, both.Id, model, FaceTestData.Embedding(3), anna.Id, FaceAssignmentState.Suggested);
 
         async Task<int[]> ListAsync(PictureManager.Application.Images.PersonFaceState state) =>
-            (await new ImageQueryRepository(db.CreateContext()).ListAsync(
+            (await new ImageQueryRepository(db.CreateContext()).ListAsync(AppUser.InitialAdminId, 
                 new PictureManager.Application.Images.ImageListFilter(null, null, null, false, anna.Id, state),
                 PictureManager.Application.Images.ImageSort.Name, PictureManager.Application.Images.SortDirection.Asc, null, 10))
             .Select(r => r.Id).ToArray();
@@ -398,7 +398,7 @@ public class PeopleRepositoryTests
         (await ListAsync(PictureManager.Application.Images.PersonFaceState.Suggested)).Should().Equal(suggested.Id);
 
         // Each photo carries the person's face for the listed state, so a face crop can replace the thumbnail.
-        var rows = await new ImageQueryRepository(db.CreateContext()).ListAsync(
+        var rows = await new ImageQueryRepository(db.CreateContext()).ListAsync(AppUser.InitialAdminId, 
             new PictureManager.Application.Images.ImageListFilter(null, null, null, false, anna.Id, PictureManager.Application.Images.PersonFaceState.Confirmed),
             PictureManager.Application.Images.ImageSort.Name, PictureManager.Application.Images.SortDirection.Asc, null, 10);
         rows.ToDictionary(r => r.Id, r => r.FaceId).Should().BeEquivalentTo(

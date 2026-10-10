@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using PictureManager.Infrastructure.Persistence;
 namespace PictureManager.Infrastructure.Migrations
 {
     [DbContext(typeof(PictureManagerDbContext))]
-    partial class PictureManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010093718_UserFavorites")]
+    partial class UserFavorites
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -98,27 +101,6 @@ namespace PictureManager.Infrastructure.Migrations
                     b.HasIndex("ImageId");
 
                     b.ToTable("AlbumImages", (string)null);
-                });
-
-            modelBuilder.Entity("PictureManager.Model.AlbumShare", b =>
-                {
-                    b.Property<int>("AlbumId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Permission")
-                        .HasColumnType("integer");
-
-                    b.HasKey("AlbumId", "UserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("AlbumShares", (string)null);
                 });
 
             modelBuilder.Entity("PictureManager.Model.AppSettings", b =>
@@ -702,25 +684,6 @@ namespace PictureManager.Infrastructure.Migrations
                     b.Navigation("Image");
                 });
 
-            modelBuilder.Entity("PictureManager.Model.AlbumShare", b =>
-                {
-                    b.HasOne("PictureManager.Model.Album", "Album")
-                        .WithMany("Shares")
-                        .HasForeignKey("AlbumId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PictureManager.Model.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Album");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("PictureManager.Model.Face", b =>
                 {
                     b.HasOne("PictureManager.Model.FaceModel", "FaceModel")
@@ -827,8 +790,6 @@ namespace PictureManager.Infrastructure.Migrations
             modelBuilder.Entity("PictureManager.Model.Album", b =>
                 {
                     b.Navigation("AlbumImages");
-
-                    b.Navigation("Shares");
                 });
 
             modelBuilder.Entity("PictureManager.Model.AppUser", b =>

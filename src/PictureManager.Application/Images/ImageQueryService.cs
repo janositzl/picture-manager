@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PictureManager.Application.Albums;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
 using PictureManager.Model;
@@ -91,7 +92,7 @@ public sealed class ImageQueryService : IImageQueryService
         }
 
         var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces, request.IncludeHidden);
-        var rows = await _images.ListAsync(filter, sort, direction, after, limit + 1, cancellationToken);
+        var rows = await _images.ListAsync(_currentUser.UserId, filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();
         string? nextCursor = null;
@@ -110,11 +111,13 @@ public sealed class ImageQueryService : IImageQueryService
 
     public async Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default)
     {
-        var row = await _images.GetVisibleDetailAsync(id, cancellationToken);
+        var row = await _images.GetVisibleDetailAsync(id, _currentUser.UserId, cancellationToken);
         if (row is null)
             return Result.NotFound();
 
-        var albums = await _images.GetAlbumsContainingAsync(id, _currentUser.UserId, cancellationToken);
+        var albums = (await _images.GetAlbumsContainingAsync(id, _currentUser.UserId, cancellationToken))
+            .Select(a => new AlbumRef(a.Id, a.Name, AlbumAccessRules.From(a.IsOwner, a.IsEditor).ToString()))
+            .ToList();
         var image = row.Image;
         return Result<ImageDetail>.Ok(new ImageDetail(
             image.Id, image.FolderId, image.FileName, image.Extension, image.Width, image.Height, image.DateTaken,
@@ -152,7 +155,7 @@ public sealed class ImageQueryService : IImageQueryService
 
     public async Task<Result> SetFavoriteAsync(int id, bool isFavorite, CancellationToken cancellationToken = default)
     {
-        return await _images.SetFavoriteAsync(id, isFavorite, _clock.UtcNow, cancellationToken)
+        return await _images.SetFavoriteAsync(id, _currentUser.UserId, isFavorite, _clock.UtcNow, cancellationToken)
             ? Result.Ok()
             : Result.NotFound();
     }

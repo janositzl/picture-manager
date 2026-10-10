@@ -37,10 +37,10 @@ public sealed class AlbumRepository : IAlbumRepository
         return album;
     }
 
-    public async Task<IReadOnlyList<AlbumSummaryRow>> GetSummariesAsync(int ownerUserId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AlbumSummaryRow>> GetSummariesAsync(int userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Albums.AsNoTracking()
-            .Where(a => a.OwnerUserId == ownerUserId)
+            .Where(a => a.OwnerUserId == userId || a.Shares.Any(s => s.UserId == userId))
             .OrderBy(a => a.Name.ToLower()).ThenBy(a => a.Id)
             .Select(a => new AlbumSummaryRow(
                 a.Id,
@@ -53,14 +53,49 @@ public sealed class AlbumRepository : IAlbumRepository
                 a.AlbumImages.Where(ai => ai.Image!.ContentHash != "")
                     .OrderByDescending(ai => ai.ImageId == a.CoverImageId).ThenBy(ai => ai.SortOrder).ThenBy(ai => ai.ImageId)
                     .Select(ai => ai.Image!.ContentHash).FirstOrDefault(),
-                a.UpdatedAt))
+                a.UpdatedAt,
+                a.OwnerUserId == userId,
+                a.Shares.Any(s => s.UserId == userId && s.Permission == SharePermission.Editor),
+                a.OwnerUser!.DisplayName,
+                a.Shares.Count()))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Album?> GetOwnedAsync(int id, int ownerUserId, CancellationToken cancellationToken = default)
+    public async Task<AccessibleAlbum?> GetAccessibleAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Albums.FirstOrDefaultAsync(a => a.Id == id && a.OwnerUserId == ownerUserId, cancellationToken);
+        var row = await _dbContext.Albums
+            .Where(a => a.Id == id && (a.OwnerUserId == userId || a.Shares.Any(s => s.UserId == userId)))
+            .Select(a => new
+            {
+                Album = a,
+                OwnerDisplayName = a.OwnerUser!.DisplayName,
+                IsEditor = a.Shares.Any(s => s.UserId == userId && s.Permission == SharePermission.Editor)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        return row is null
+            ? null
+            : new AccessibleAlbum(row.Album, AlbumAccessRules.From(row.Album.OwnerUserId == userId, row.IsEditor), row.OwnerDisplayName);
     }
+
+    public async Task<IReadOnlyList<AlbumShareRow>> GetSharesAsync(int albumId, CancellationToken cancellationToken = default) =>
+        await _dbContext.AlbumShares.AsNoTracking()
+            .Where(s => s.AlbumId == albumId)
+            .OrderBy(s => s.User!.DisplayName).ThenBy(s => s.UserId)
+            .Select(s => new AlbumShareRow(s.UserId, s.User!.DisplayName, s.Permission))
+            .ToListAsync(cancellationToken);
+
+    public async Task SetShareAsync(int albumId, int userId, SharePermission permission, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        var share = await _dbContext.AlbumShares.FirstOrDefaultAsync(s => s.AlbumId == albumId && s.UserId == userId, cancellationToken);
+        if (share is null)
+            _dbContext.AlbumShares.Add(new AlbumShare { AlbumId = albumId, UserId = userId, Permission = permission, CreatedAt = nowUtc });
+        else
+            share.Permission = permission;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> RemoveShareAsync(int albumId, int userId, CancellationToken cancellationToken = default) =>
+        await _dbContext.AlbumShares.Where(s => s.AlbumId == albumId && s.UserId == userId).ExecuteDeleteAsync(cancellationToken) > 0;
 
     public async Task<int> CountImagesAsync(int albumId, CancellationToken cancellationToken = default)
     {
@@ -88,7 +123,7 @@ public sealed class AlbumRepository : IAlbumRepository
     }
 
     public async Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(
-        int albumId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default)
+        int albumId, int userId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.AlbumImages.AsNoTracking().Where(ai => ai.AlbumId == albumId);
         if (afterSortOrder is int sortOrder && afterImageId is int imageId)
@@ -99,7 +134,7 @@ public sealed class AlbumRepository : IAlbumRepository
             .Take(take)
             .Select(ai => new AlbumImageRow(
                 new ImageRow(ai.Image!.Id, ai.Image.FolderId, ai.Image.FileName, ai.Image.Extension, ai.Image.Width,
-                    ai.Image.Height, ai.Image.DateTaken, ai.Image.IsFavorite, ai.Image.ContentHash, ai.Image.SortDate,
+                    ai.Image.Height, ai.Image.DateTaken, ai.Image.Favorites.Any(f => f.UserId == userId), ai.Image.ContentHash, ai.Image.SortDate,
                     ai.Image.FileName.ToLower(), ai.Image.Folder!.Root!.Name, ai.Image.Folder.RelativePath, IndexState.Indexed, null, false, ai.Image.ThumbnailRotation),
                 ai.SortOrder,
                 ai.Image.IsHidden || ai.Image.MissingSinceUtc != null || !ai.Image.Folder!.IsActive || ai.Image.Folder.MissingSinceUtc != null || !ai.Image.Folder.Root!.IsActive))

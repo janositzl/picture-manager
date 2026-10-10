@@ -18,7 +18,7 @@ public class AlbumQueryRepositoryTests
     public async Task GetSummariesAsync_OwnerScoped_OrderedByName_WithCountAndCoverFromFirstHashedImage()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
-        var other = new AppUser { DisplayName = "Other", Role = UserRole.User };
+        var other = TestData.User("other");
         db.Context.AppUsers.Add(other);
         await db.Context.SaveChangesAsync();
 
@@ -93,10 +93,10 @@ public class AlbumQueryRepositoryTests
     }
 
     [Fact]
-    public async Task GetOwnedAsync_OtherOwnersAlbum_ReturnsNull()
+    public async Task GetAccessibleAsync_OtherOwnersUnsharedAlbum_ReturnsNull()
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
-        var other = new AppUser { DisplayName = "Other", Role = UserRole.User };
+        var other = TestData.User("other");
         db.Context.AppUsers.Add(other);
         await db.Context.SaveChangesAsync();
         var mine = TestData.Album("mine");
@@ -107,8 +107,8 @@ public class AlbumQueryRepositoryTests
         await using var context = db.CreateContext();
         var repository = new AlbumRepository(context);
 
-        (await repository.GetOwnedAsync(mine.Id, AppUser.InitialAdminId)).Should().NotBeNull();
-        (await repository.GetOwnedAsync(theirs.Id, AppUser.InitialAdminId)).Should().BeNull();
+        (await repository.GetAccessibleAsync(mine.Id, AppUser.InitialAdminId))!.Access.Should().Be(AlbumAccess.Owner);
+        (await repository.GetAccessibleAsync(theirs.Id, AppUser.InitialAdminId)).Should().BeNull();
     }
 
     [Fact]
@@ -142,8 +142,8 @@ public class AlbumQueryRepositoryTests
 
         await using var context = db.CreateContext();
         var repository = new AlbumRepository(context);
-        var first = await repository.ListImagesAsync(album.Id, null, null, 2);
-        var second = await repository.ListImagesAsync(album.Id, first[^1].SortOrder, first[^1].Image.Id, 2);
+        var first = await repository.ListImagesAsync(album.Id, AppUser.InitialAdminId, null, null, 2);
+        var second = await repository.ListImagesAsync(album.Id, AppUser.InitialAdminId, first[^1].SortOrder, first[^1].Image.Id, 2);
 
         first.Select(r => r.Image.Id).Should().Equal(c.Id, a.Id);
         first.Should().OnlyContain(r => !r.IsMissing);
@@ -161,7 +161,7 @@ public class AlbumQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, null, null, 10);
+        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, AppUser.InitialAdminId, null, null, 10);
 
         rows.Should().ContainSingle().Which.Image.Should().Match<ImageRow>(r => r.RootName == "nas" && r.RelativePath == "Holidays/Madeira");
     }
@@ -177,7 +177,7 @@ public class AlbumQueryRepositoryTests
         await db.Context.SaveChangesAsync();
 
         await using var context = db.CreateContext();
-        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, null, null, 10);
+        var rows = await new AlbumRepository(context).ListImagesAsync(album.Id, AppUser.InitialAdminId, null, null, 10);
 
         rows.Should().ContainSingle().Which.IsMissing.Should().BeTrue();
     }
@@ -284,7 +284,7 @@ public class AlbumQueryRepositoryTests
         await using (var context = db.CreateContext())
         {
             var repository = new AlbumRepository(context);
-            await repository.DeleteAsync((await repository.GetOwnedAsync(album.Id, AppUser.InitialAdminId))!);
+            await repository.DeleteAsync((await repository.GetAccessibleAsync(album.Id, AppUser.InitialAdminId))!.Album);
         }
 
         await using var read = db.CreateContext();

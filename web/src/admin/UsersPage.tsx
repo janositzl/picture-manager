@@ -25,7 +25,7 @@ import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { ACCENT_CHIP_SX, CARD_SX, PRIMARY_BUTTON_SX } from './adminStyles'
 import { DeleteUserDialog } from './DeleteUserDialog'
 import { ResetPasswordDialog } from './ResetPasswordDialog'
-import { UserAvatar } from './UserAvatar'
+import { UserAvatar } from '../shared/UserAvatar'
 import { UserCreateDialog } from './UserCreateDialog'
 import { UserEditDialog } from './UserEditDialog'
 

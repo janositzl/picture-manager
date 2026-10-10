@@ -2,7 +2,7 @@
 
 A web app for organizing images that live on a Windows NAS, shared over the network. It indexes folders and files into a catalog, extracts EXIF metadata, and layers albums and favorites on top — **without ever modifying the original files.**
 
-Use this document as the spec for the app. Local-account authentication (see "Authentication") is implemented; the admin UI for managing users and sharing/per-user favorites are planned and not built yet.
+Use this document as the spec for the app. Local-account authentication, user administration, album sharing and per-user favorites (see "Authentication") are implemented.
 
 ## Stack
 
@@ -52,7 +52,7 @@ Image
   FileSize, FileModified, Width, Height, Orientation,
   DateTaken, CameraMake, CameraModel, LensModel,
   Latitude, Longitude, RawMetadata (jsonb),
-  IsFavorite (bool — global, NOT per-user),
+  (favorites are per user, in the UserFavorites table),
   IndexState, FirstSeenUtc, MissingSinceUtc,
   CreatedAt, UpdatedAt
 
@@ -151,6 +151,8 @@ Local accounts (no external IdP); there is no registration. Accounts are managed
   - `admin`: roots, settings, removed folders, hide/rotate, people/face edits.
   - `auth`: login/logout/me/password.
 - User administration: admins manage accounts at Admin → Users (create, edit name/role/active/folder-actions, reset password, delete with album transfer or delete). A new or reset account must change its password at first login. Disabling, resetting or deleting a user ends their sessions immediately. The last active admin and your own account are protected from being disabled, demoted or deleted. `GET /api/users/directory` lists active users for sharing (used from Phase 3).
+- Sharing: owners share an album from its Share dialog as Can view (Viewer) or Can edit (Editor). Shared albums appear under "Shared with me". Viewers browse and export; editors also add, remove, reorder and set the cover; only the owner renames, deletes or shares. Anyone can leave an album shared with them. An album you have no access to is a 404; too little access is a 403.
+- Favorites are per user (`UserFavorites`); existing favorites went to the initial admin when the feature was added.
 - Design: docs/superpowers/specs/2026-10-09-user-management-design.md
 
 ## Infrastructure & deployment
@@ -219,11 +221,10 @@ ENTRYPOINT ["dotnet", "PictureManager.Api.dll"]
 - [ ] React + TypeScript + Vite + MUI
 - [ ] Folder tree (left) / image grid (right), virtualized
 - [ ] Image viewer, sortable by name/date
-- [ ] Favorites view (global favorites)
+- [ ] Favorites view (per-user favorites)
 - [ ] Album create/manage/export
 - [ ] Basic search bar (folder name, file name, favorites-only)
 - [ ] Settings page: excluded folder names, excluded/included extensions
 
-**Planned, not built yet:** admin UI for creating users (Phase 2), sharing and per-user favorites (Phase 3).
 
 **Explicitly out of scope for v1:** perceptual/visual-similarity duplicate detection, EXIF/date-range search, full-text search engine.

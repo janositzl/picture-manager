@@ -80,6 +80,11 @@ public sealed class AppUserRepository : IAppUserRepository
                 album.Name = name;
                 album.OwnerUserId = target;
             }
+
+            // The new owner may already have had a share on some of these albums; owning replaces it.
+            var movedIds = albums.Select(a => a.Id).ToList();
+            _dbContext.AlbumShares.RemoveRange(
+                await _dbContext.AlbumShares.Where(s => movedIds.Contains(s.AlbumId) && s.UserId == target).ToListAsync(cancellationToken));
         }
         else
         {

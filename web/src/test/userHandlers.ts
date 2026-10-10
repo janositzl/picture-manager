@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { UserSummary } from '../api/types'
+import { currentMe } from './authHandlers'
 
 const seed: UserSummary[] = [
   { id: 1, username: 'admin', displayName: 'Administrator', role: 'Admin', isActive: true, canRunFolderActions: false, mustChangePassword: false, createdAt: '2026-09-21T00:00:00Z', lastLoginAt: '2026-10-10T08:00:00Z', albumCount: 3 },
@@ -9,6 +10,8 @@ const seed: UserSummary[] = [
 const SELF_ID = 1
 
 let users: UserSummary[]
+
+export const userById = (id: number): UserSummary | undefined => users.find((u) => u.id === id)
 let nextId: number
 /** What the last reset-password call received, for assertions. */
 export const resetCalls: { id: number; newPassword: string }[] = []
@@ -29,6 +32,12 @@ const problem = (status: number, extra: Record<string, unknown>) =>
 const invalid = (field: string, message: string) => problem(400, { errors: { [field]: [message] } })
 
 export const userHandlers = [
+  http.get('/api/users/directory', () => {
+    const me = currentMe()
+    return HttpResponse.json(
+      users.filter((u) => u.isActive && u.id !== me?.id).map((u) => ({ id: u.id, displayName: u.displayName })),
+    )
+  }),
   http.get('/api/users', () => HttpResponse.json(users)),
   http.post('/api/users', async ({ request }) => {
     const body = (await request.json()) as {

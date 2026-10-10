@@ -197,4 +197,30 @@ public class AppUserRepositoryTests
         (await check.AlbumImages.CountAsync()).Should().Be(1);
         (await check.Images.CountAsync()).Should().Be(1);
     }
+
+    [Fact]
+    public async Task DeleteAsync_Transfer_DropsTheReceivingAdminsShareOnTheirNewAlbums_AndKeepsOthersShares()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var bob = NewAccount("bob");
+        var carol = NewAccount("carol");
+        db.Context.AppUsers.AddRange(bob, carol);
+        await db.Context.SaveChangesAsync();
+        var trip = TestData.Album("Trip", bob.Id);
+        db.Context.Albums.Add(trip);
+        db.Context.AlbumShares.AddRange(
+            new AlbumShare { Album = trip, UserId = AppUser.InitialAdminId, Permission = SharePermission.Viewer, CreatedAt = TestData.Utc },
+            new AlbumShare { Album = trip, UserId = carol.Id, Permission = SharePermission.Editor, CreatedAt = TestData.Utc });
+        await db.Context.SaveChangesAsync();
+
+        await using (var context = db.CreateContext())
+        {
+            var repository = new AppUserRepository(context);
+            await repository.DeleteAsync((await repository.GetByIdAsync(bob.Id))!, AppUser.InitialAdminId);
+        }
+
+        await using var check = db.CreateContext();
+        (await check.Albums.SingleAsync(a => a.Id == trip.Id)).OwnerUserId.Should().Be(AppUser.InitialAdminId);
+        (await check.AlbumShares.Select(s => s.UserId).ToListAsync()).Should().Equal(carol.Id);
+    }
 }

@@ -14,13 +14,22 @@ public interface IAlbumRepository
     Task<Album> AddAsync(Album album, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// The owner's albums ordered by lower(Name); cover = the chosen CoverImageId while it is still in the album with a
-    /// content hash, otherwise the first entry by SortOrder with a content hash.
+    /// Albums <paramref name="userId"/> owns or has been shared, ordered by lower(Name); cover = the chosen CoverImageId while it is
+    /// still in the album with a content hash, otherwise the first entry by SortOrder with a content hash.
     /// </summary>
-    Task<IReadOnlyList<AlbumSummaryRow>> GetSummariesAsync(int ownerUserId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AlbumSummaryRow>> GetSummariesAsync(int userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Tracked album if it exists AND belongs to the owner; otherwise null.</summary>
-    Task<Album?> GetOwnedAsync(int id, int ownerUserId, CancellationToken cancellationToken = default);
+    /// <summary>The album (tracked) with the caller's access, or null when it doesn't exist or isn't theirs or shared with them.</summary>
+    Task<AccessibleAlbum?> GetAccessibleAsync(int id, int userId, CancellationToken cancellationToken = default);
+
+    /// <summary>The album's shares, ordered by the user's display name.</summary>
+    Task<IReadOnlyList<AlbumShareRow>> GetSharesAsync(int albumId, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds the share, or changes its permission when the user already has one.</summary>
+    Task SetShareAsync(int albumId, int userId, SharePermission permission, DateTime nowUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>False when the user had no share on the album.</summary>
+    Task<bool> RemoveShareAsync(int albumId, int userId, CancellationToken cancellationToken = default);
 
     Task<int> CountImagesAsync(int albumId, CancellationToken cancellationToken = default);
 
@@ -30,8 +39,8 @@ public interface IAlbumRepository
 
     Task DeleteAsync(Album album, CancellationToken cancellationToken = default);
 
-    /// <summary>Album entries in (SortOrder, ImageId) order, after the given keyset when provided.</summary>
-    Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(int albumId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default);
+    /// <summary>Album entries in (SortOrder, ImageId) order, after the given keyset when provided. IsFavorite is <paramref name="userId"/>'s own favorite.</summary>
+    Task<IReadOnlyList<AlbumImageRow>> ListImagesAsync(int albumId, int userId, int? afterSortOrder, int? afterImageId, int take, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<int>> GetOrderedImageIdsAsync(int albumId, CancellationToken cancellationToken = default);
 
