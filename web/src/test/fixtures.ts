@@ -172,7 +172,7 @@ export function imageDetail(item: ImageListItem): ImageDetail {
     latitude: 32.6669,
     longitude: -16.9241,
     rawMetadata: { Exif: { ISO: 100 } },
-    albums: [{ id: 5, name: 'Best of 2025' }],
+    albums: [{ id: 5, name: 'Best of 2025', access: 'Owner' }],
   }
 }
 

@@ -4,6 +4,9 @@ import { adminMe } from './fixtures'
 
 let current: Me | null = adminMe
 
+/** The signed-in user, or null. */
+export const currentMe = (): Me | null => current
+
 /** What GET /api/auth/me answers; null means signed out (401). */
 export function signInAs(me: Me | null): void {
   current = me

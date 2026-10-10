@@ -86,4 +86,14 @@ describe('AlbumPicker', () => {
     expect(await screen.findByText('Added 3 photos to Empty.')).toBeInTheDocument()
     expect(albumStore.get(6)!.imageIds).toEqual([20, 21, 22])
   })
+
+  it('offers only albums you can add to, naming the owner of shared ones', async () => {
+    albumStore.addShared({ id: 7, name: 'Bob view only', permission: 'Viewer' })
+    albumStore.addShared({ id: 8, name: 'Bob editable', permission: 'Editor' })
+    renderPicker({ imageIds: [20] })
+    const list = await screen.findByRole('list', { name: 'Albums' })
+    expect(within(list).getByRole('button', { name: /Bob editable/ })).toBeInTheDocument()
+    expect(within(list).getByText('Shared by Bob B · 0 photos')).toBeInTheDocument()
+    expect(within(list).queryByRole('button', { name: /Bob view only/ })).not.toBeInTheDocument()
+  })
 })

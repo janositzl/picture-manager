@@ -9,14 +9,22 @@ export function initials(displayName: string): string {
 }
 
 /** Decorative (the name sits next to it), so it is hidden from assistive tech. */
-export function UserAvatar({ displayName, muted = false }: { displayName: string; muted?: boolean }) {
+export function UserAvatar({
+  displayName,
+  muted = false,
+  size = 36,
+}: {
+  displayName: string
+  muted?: boolean
+  size?: number
+}) {
   return (
     <Avatar
       aria-hidden
       sx={{
-        width: 36,
-        height: 36,
-        fontSize: 13,
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.36),
         fontWeight: 600,
         bgcolor: muted ? 'action.hover' : alpha(ACCENT, 0.14),
         color: muted ? 'text.disabled' : ACCENT,

@@ -22,6 +22,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import { AlbumRemovePicker } from '../albums/AlbumRemovePicker'
+import { canEdit } from '../albums/access'
 import { readLastUsedAlbum, writeLastUsedAlbum } from '../albums/preferences'
 import { useAlbumAdder } from '../albums/useAlbumAdder'
 import { usePermissions } from '../api/auth'
@@ -131,7 +132,7 @@ export function PhotoViewer({
     if (current === undefined || !canAdd) return
     const lastId = readLastUsedAlbum()
     const albums = lastId === null ? [] : await queryClient.ensureQueryData(albumsQuery)
-    const album = albums.find((a) => a.id === lastId)
+    const album = albums.find((a) => a.id === lastId && canEdit(a))
     if (album === undefined) {
       if (lastId !== null) writeLastUsedAlbum(null)
       setPickerOpen(true)
@@ -171,9 +172,13 @@ export function PhotoViewer({
       return
     }
     if (detail.data === undefined || detail.data.id !== current.id) return
-    const albums = detail.data.albums
+    const albums = detail.data.albums.filter(canEdit)
     if (albums.length === 0) {
-      notify("This photo isn't in any album.")
+      notify(
+        detail.data.albums.length === 0
+          ? "This photo isn't in any album."
+          : 'This photo is only in albums you can view.',
+      )
       return
     }
     const lastId = readLastUsedAlbum()

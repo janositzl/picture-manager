@@ -17,6 +17,7 @@ import {
 import { useState, type ReactNode } from 'react'
 import { useCreateAlbum, type AddTarget } from '../api/albums'
 import { useAlbums } from '../api/queries'
+import { canEdit, isOwner } from './access'
 import { albumFormErrors } from './errors'
 import { photoCount } from './messages'
 import { useAlbumAdder } from './useAlbumAdder'
@@ -63,7 +64,8 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
   }
 
   const needle = filter.trim().toLowerCase()
-  const visible = (albums.data ?? []).filter((album) => album.name.toLowerCase().includes(needle))
+  const editable = (albums.data ?? []).filter(canEdit)
+  const visible = editable.filter((album) => album.name.toLowerCase().includes(needle))
 
   let list: ReactNode
   if (albums.isPending) {
@@ -77,7 +79,7 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
   } else if (visible.length === 0) {
     list = (
       <Typography color="text.secondary" sx={{ my: 2 }}>
-        {albums.data.length === 0 ? 'No albums yet.' : 'No albums match.'}
+        {editable.length === 0 ? 'No albums yet.' : 'No albums match.'}
       </Typography>
     )
   } else {
@@ -91,7 +93,14 @@ export function AlbumPicker({ target, unavailable = 0, onClose, onAdded }: Props
             className="transition-colors duration-200 ease-in-out"
             sx={{ borderRadius: '8px', mb: 0.25 }}
           >
-            <ListItemText primary={album.name} secondary={photoCount(album.imageCount)} />
+            <ListItemText
+              primary={album.name}
+              secondary={
+                isOwner(album)
+                  ? photoCount(album.imageCount)
+                  : `Shared by ${album.ownerDisplayName} · ${photoCount(album.imageCount)}`
+              }
+            />
           </ListItemButton>
         ))}
       </List>

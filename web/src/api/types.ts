@@ -57,7 +57,10 @@ export type ImageListItem = {
   fileSize?: number
 }
 
-export type AlbumRef = { id: number; name: string }
+export type AlbumAccess = 'Owner' | 'Editor' | 'Viewer'
+export type SharePermission = 'Viewer' | 'Editor'
+
+export type AlbumRef = { id: number; name: string; access: AlbumAccess }
 
 export type ImageDetail = ImageListItem & {
   fileSize: number
@@ -88,6 +91,10 @@ export type AlbumSummary = {
   imageCount: number
   coverThumbnailUrl: string | null
   updatedAt: string
+  access: AlbumAccess
+  ownerDisplayName: string
+  /** How many people the caller shared it with; 0 unless they own it. */
+  shareCount: number
 }
 
 export type AlbumDetail = {
@@ -97,12 +104,19 @@ export type AlbumDetail = {
   imageCount: number
   createdAt: string
   updatedAt: string
+  access: AlbumAccess
+  ownerDisplayName: string
 }
 
 /** Missing files stay listed, with null URLs. */
 export type AlbumImageItem = ImageListItem & { isMissing: boolean }
 
 export type AlbumAddResult = { added: number; skipped: number }
+
+export type AlbumShare = { userId: number; displayName: string; permission: SharePermission }
+
+/** An active user other than the caller, as offered for sharing. */
+export type DirectoryUser = { id: number; displayName: string }
 
 export type SimilarGroup = {
   key: string
