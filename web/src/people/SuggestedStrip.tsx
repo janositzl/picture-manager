@@ -5,6 +5,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { Box, Button, IconButton, LinearProgress, Tooltip, Typography } from '@mui/material'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
+import { withBase } from '../api/client'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl, useAcceptAllSuggestions, useImageSuggestion } from '../api/people'
 import { useImages } from '../api/queries'
@@ -187,7 +188,7 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
                 >
                   {src !== null && (
                     <img
-                      src={src}
+                      src={withBase(src)}
                       alt=""
                       loading="lazy"
                       style={{ width: '100%', height: '100%', objectFit: useCrop ? 'cover' : 'contain', display: 'block' }}
