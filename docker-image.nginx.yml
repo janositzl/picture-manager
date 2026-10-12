@@ -32,6 +32,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nginx
+      args:
+        # Sub-path hosting (PM_BASE_PATH=/pm in .env). The in-container nginx serves files from the root,
+        # so the outer reverse proxy must strip the prefix (proxy_pass with a trailing slash).
+        VITE_BASE_PATH: ${PM_BASE_PATH:-}
     restart: unless-stopped
     depends_on:
       db:

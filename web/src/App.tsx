@@ -8,7 +8,8 @@ import { theme } from './theme'
 import { FolderJobsProvider } from './tree/FolderJobsContext'
 
 const queryClient = createQueryClient()
-const router = createBrowserRouter(appRoutes)
+// BASE_URL is the build's base path ("/" by default, "/pm/" for VITE_BASE_PATH=/pm).
+const router = createBrowserRouter(appRoutes, { basename: import.meta.env.BASE_URL })
 
 function App() {
   // Follows the OS light/dark preference; there is no manual toggle.

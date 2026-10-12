@@ -16,6 +16,9 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ .
+# Sub-path hosting (e.g. --build-arg VITE_BASE_PATH=/pm); empty builds for the site root.
+# Build args are visible to RUN as environment variables, which vite.config.ts reads.
+ARG VITE_BASE_PATH=
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build

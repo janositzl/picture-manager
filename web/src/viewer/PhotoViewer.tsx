@@ -26,7 +26,7 @@ import { canEdit } from '../albums/access'
 import { readLastUsedAlbum, writeLastUsedAlbum } from '../albums/preferences'
 import { useAlbumAdder } from '../albums/useAlbumAdder'
 import { usePermissions } from '../api/auth'
-import { isNotFound } from '../api/client'
+import { isNotFound, withBase } from '../api/client'
 import { useRemoveImagesFromAlbum } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
 import { albumsQuery, useImage } from '../api/queries'
@@ -298,7 +298,7 @@ export function PhotoViewer({
   // Warm the browser cache so ←/→ feel instant.
   useEffect(() => {
     for (const neighbour of [prev, next]) {
-      if (neighbour?.previewUrl) new Image().src = neighbour.previewUrl
+      if (neighbour?.previewUrl) new Image().src = withBase(neighbour.previewUrl)
     }
   }, [prev, next])
 
@@ -336,7 +336,7 @@ export function PhotoViewer({
         <img
           key={src}
           ref={setImageEl}
-          src={src}
+          src={withBase(src)}
           alt={name}
           onLoad={() => setLoadedSrc(src)}
           style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { apiFetch } from './client'
+import { apiFetch, withBase } from './client'
 import type {
   ActiveJobDto,
   DiscoveryProgress,
@@ -150,7 +150,7 @@ export function useJobEvents(
 
     async function read() {
       const response = await fetch(
-        new URL(`/api/${kind}/${jobId}/events`, window.location.origin),
+        new URL(withBase(`/api/${kind}/${jobId}/events`), window.location.origin),
         {
           signal: controller.signal,
           headers: { Accept: 'text/event-stream' },

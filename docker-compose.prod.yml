@@ -31,6 +31,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Sub-path hosting (PM_BASE_PATH=/pm in .env); empty serves the app at the site root.
+        VITE_BASE_PATH: ${PM_BASE_PATH:-}
     image: picturemanager-api:latest
     restart: unless-stopped
     depends_on:
@@ -45,6 +48,8 @@ services:
       ImageRoots__0__MountPath: /data/images
       # Initial password for the "admin" account; used only while no admin has a password. Changed at first login.
       Auth__InitialAdmin__Password: ${PM_ADMIN_PASSWORD:?Set PM_ADMIN_PASSWORD in .env}
+      # Same value as VITE_BASE_PATH above; the reverse proxy forwards /pm/... with the prefix intact.
+      PathBase: ${PM_BASE_PATH:-}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:

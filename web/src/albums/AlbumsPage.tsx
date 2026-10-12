@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import { useId, useState, type ReactNode } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router'
+import { withBase } from '../api/client'
 import { useAlbums } from '../api/queries'
 import type { AlbumSummary } from '../api/types'
 import { HEADING_SX } from '../design/accent'
@@ -156,7 +157,7 @@ function AlbumCard({ album }: { album: AlbumSummary }) {
           {album.coverThumbnailUrl ? (
             <CardMedia
               component="img"
-              image={album.coverThumbnailUrl}
+              image={withBase(album.coverThumbnailUrl)}
               alt=""
               sx={{ height: COVER_HEIGHT, objectFit: 'cover' }}
             />

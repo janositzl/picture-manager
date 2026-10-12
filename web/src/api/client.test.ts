@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../test/server'
-import { ApiError, apiFetch, isNotFound } from './client'
+import { ApiError, apiFetch, isNotFound, withBase } from './client'
 
 describe('apiFetch', () => {
   it('returns the parsed JSON body', async () => {
@@ -39,5 +39,26 @@ describe('apiFetch', () => {
     expect(error.problem).toBeNull()
     expect(error.message).toBe('Request failed with status 500')
     expect(isNotFound(error)).toBe(false)
+  })
+})
+
+describe('withBase', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('leaves the path unchanged at the site root', () => {
+    expect(withBase('/api/images/1/thumbnail')).toBe('/api/images/1/thumbnail')
+  })
+
+  it('prefixes the path under a sub-path build', () => {
+    vi.stubEnv('BASE_URL', '/pm/')
+    expect(withBase('/api/images/1/thumbnail')).toBe('/pm/api/images/1/thumbnail')
+  })
+
+  it('makes apiFetch request the prefixed path', async () => {
+    vi.stubEnv('BASE_URL', '/pm/')
+    server.use(http.get('/pm/api/thing', () => HttpResponse.json({ id: 2 })))
+    await expect(apiFetch<{ id: number }>('/api/thing')).resolves.toEqual({ id: 2 })
   })
 })

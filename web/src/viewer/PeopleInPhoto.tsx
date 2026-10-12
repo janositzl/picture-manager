@@ -13,6 +13,7 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import { Link as RouterLink } from 'react-router'
+import { withBase } from '../api/client'
 import {
   faceThumbnailUrl,
   useAssignFace,
@@ -86,7 +87,7 @@ const STATE_TEXT: Record<ImageFace['state'], string> = {
 function FaceCrop({ face, className }: { face: ImageFace; className: string }) {
   return (
     <img
-      src={faceThumbnailUrl(face.id)}
+      src={withBase(faceThumbnailUrl(face.id))}
       alt=""
       loading="lazy"
       className={`${className} shrink-0 rounded-full bg-zinc-800 object-cover`}

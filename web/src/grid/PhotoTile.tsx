@@ -6,6 +6,7 @@ import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import { Box, Checkbox, Chip, IconButton, Typography } from '@mui/material'
 import { memo, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { withBase } from '../api/client'
 import type { ImageListItem } from '../api/types'
 import type { SelectMods } from './useSelection'
 
@@ -84,7 +85,7 @@ function PhotoTileComponent({
   } else {
     content = (
       <img
-        src={thumbnail}
+        src={withBase(thumbnail)}
         alt=""
         decoding="async"
         onLoad={() => setLoaded(true)}
