@@ -69,6 +69,7 @@ deployment, the plain `Dockerfile` is simpler and sufficient.
    | `IMAGE_LIBRARY_PATH` | Absolute host path to your photo library, mounted read-only at `/data/images` |
    | `IMAGE_ROOT_NAME` | Display name for this image root |
    | `PM_ADMIN_PASSWORD` | **Required.** Initial password for the `admin` account (minimum 8 characters) |
+   | `PM_BASE_PATH` | Optional sub-path behind a reverse proxy, e.g. `/pm` — see [Hosting under a sub-path](#hosting-under-a-sub-path). Empty = site root |
 
    `.env` is gitignored — never commit real credentials.
 
@@ -118,6 +119,60 @@ curl http://localhost:${API_PORT:-5080}/api/ping
 ```
 
 Then open `http://localhost:${API_PORT:-5080}/` in a browser for the web UI.
+
+### Hosting under a sub-path
+
+To serve PictureManager at e.g. `http://servername/pm/` behind a reverse proxy
+that also hosts other things, set the sub-path in `.env` and rebuild — the path
+is baked into the web build, so `--build` is required whenever it changes:
+
+```bash
+# .env
+PM_BASE_PATH=/pm
+```
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+This sets both halves: `VITE_BASE_PATH` (build arg: asset URLs, API calls and
+client-side routes get the `/pm` prefix) and `PathBase` (the API strips `/pm`
+from incoming requests). Requests **without** the prefix are still answered, so
+`curl http://localhost:5080/api/ping` keeps working on the server itself.
+
+Reverse proxy (nginx on the host or in its own container) — forward `/pm/`
+**with the prefix intact** (no URI after the port in `proxy_pass`):
+
+```nginx
+location = /pm { return 301 /pm/; }
+
+location /pm/ {
+    proxy_pass http://127.0.0.1:5080;          # no trailing slash: /pm is kept
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 300s;
+    proxy_buffering off;                       # job progress is streamed (SSE)
+    client_max_body_size 200m;
+}
+```
+
+`127.0.0.1` assumes the proxy runs on the host or in a container with
+`network_mode: host`. The API trusts `X-Forwarded-*` only from loopback, so
+that setup keeps client IPs and the https scheme correct without extra
+configuration.
+
+**nginx variant (`docker-image.nginx.yml`):** only the web build takes
+`PM_BASE_PATH`; the in-container nginx serves files from its root, so the outer
+proxy must **strip** the prefix instead — `proxy_pass http://127.0.0.1:5080/;`
+(trailing slash).
+
+For local development under a sub-path, start the API with `PathBase=/pm` and
+the Vite dev server with `VITE_BASE_PATH=/pm`, then open
+`http://localhost:5173/pm/`. Without either setting, development is unchanged
+(`http://localhost:5173/`).
 
 ## 4. Data persistence
 
