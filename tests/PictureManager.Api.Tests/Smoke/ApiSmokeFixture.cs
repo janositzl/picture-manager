@@ -23,6 +23,7 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
     private const string CacheRootVariable = "ThumbnailCache__RootPath";
     private const string InitialAdminPasswordVariable = "Auth__InitialAdmin__Password";
     private const string LoginLimitVariable = "Auth__LoginAttemptsPerMinute";
+    private const string PathBaseVariable = "PathBase";
     public const string InitialAdminPassword = "initial-admin-pw";
     public const string AdminPassword = "smoke-admin-pw";
     public const string UserPassword = "smoke-user-pw";
@@ -45,6 +46,8 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable(InitialAdminPasswordVariable, InitialAdminPassword);
         // Every helper logs in from the same test-server "IP"; the real 10/minute limit would trip.
         Environment.SetEnvironmentVariable(LoginLimitVariable, "10000");
+        // Sub-path hosting on: the existing tests' un-prefixed paths double as the passthrough check.
+        Environment.SetEnvironmentVariable(PathBaseVariable, "/pm");
 
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
 
@@ -89,6 +92,7 @@ public sealed class ApiSmokeFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable(CacheRootVariable, null);
         Environment.SetEnvironmentVariable(InitialAdminPasswordVariable, null);
         Environment.SetEnvironmentVariable(LoginLimitVariable, null);
+        Environment.SetEnvironmentVariable(PathBaseVariable, null);
         await Database.DisposeAsync();
 
         // The cache directory is only created on demand, so it may not exist.

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
+using PictureManager.Api;
 using PictureManager.Api.Auth;
 using PictureManager.Api.Endpoints;
 using PictureManager.Api.Middleware;
@@ -81,6 +82,13 @@ try
     var app = builder.Build();
 
     app.UseForwardedHeaders();
+
+    // Optional sub-path hosting (PathBase=/pm behind a reverse proxy that forwards /pm unchanged). Requests
+    // without the prefix still pass through, so direct access to the published port keeps working.
+    app.UsePathBase(PathBaseSetting.Parse(app.Configuration["PathBase"]));
+    // WebApplication would otherwise add routing at the very start of the pipeline, before UsePathBase strips
+    // the prefix, and no /pm/... request would match a route.
+    app.UseRouting();
 
     // Outside Development, unhandled exceptions become a 500 ProblemDetails with no stack trace.
     if (!app.Environment.IsDevelopment())
