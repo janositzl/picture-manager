@@ -28,11 +28,21 @@ export function isNotFound(error: unknown): boolean {
 }
 
 /**
+ * Prefixes a root-relative API path ("/api/...") with the app's base path: "/pm/api/..." in a
+ * build made with VITE_BASE_PATH=/pm, unchanged at the site root. API paths (including the image
+ * URLs the API returns) stay un-prefixed everywhere else; this is applied where they reach the
+ * network (fetch, <img src>).
+ */
+export function withBase(path: string): string {
+  return import.meta.env.BASE_URL.replace(/\/$/, '') + path
+}
+
+/**
  * Fetches a same-origin API path ("/api/..."). Resolving against the page origin keeps relative
  * paths working in the browser and in tests (Node's fetch rejects bare relative URLs).
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(new URL(path, window.location.origin), {
+  const response = await fetch(new URL(withBase(path), window.location.origin), {
     ...init,
     headers: { Accept: 'application/json', ...init?.headers },
   })
@@ -61,7 +71,7 @@ async function readProblem(response: Response): Promise<ProblemDetails | null> {
 
 /** Like apiFetch, for plain-text responses (album export). */
 export async function apiFetchText(path: string, init?: RequestInit): Promise<string> {
-  const response = await fetch(new URL(path, window.location.origin), {
+  const response = await fetch(new URL(withBase(path), window.location.origin), {
     ...init,
     headers: { Accept: 'text/plain', ...init?.headers },
   })
