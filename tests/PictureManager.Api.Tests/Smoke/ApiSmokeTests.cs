@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -47,6 +48,8 @@ public partial class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
     [InlineData("DELETE", "/api/roots/{id:int}", ApiSurface.Admin)]
     [InlineData("GET", "/api/settings", ApiSurface.Admin)]
     [InlineData("PUT", "/api/settings", ApiSurface.Admin)]
+    [InlineData("GET", "/api/system/info", ApiSurface.Admin)]
+    [InlineData("GET", "/api/system/logs", ApiSurface.Admin)]
     [InlineData("POST", "/api/scans", ApiSurface.FolderActions)]
     [InlineData("DELETE", "/api/folders/{id:int}", ApiSurface.FolderActions)]
     [InlineData("GET", "/api/folders/removed", ApiSurface.Admin)]
@@ -84,6 +87,26 @@ public partial class ApiSmokeTests : IClassFixture<ApiSmokeFixture>
             && e.Metadata.GetMetadata<IHttpMethodMetadata>()!.HttpMethods.Contains(method));
 
         endpoint.Metadata.GetMetadata<ApiSurfaceMetadata>()!.Surface.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task SystemInfo_ReportsTheVersionFromTheVersionFile()
+    {
+        var expected = (await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "VERSION"))).Trim();
+
+        var info = await _fixture.Client.GetFromJsonAsync<JsonElement>("/api/system/info");
+
+        info.GetProperty("version").GetString().Should().Be(expected);
+        info.GetProperty("environment").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task SystemLogs_ReturnsATail_AndRejectsAnUnknownLevel()
+    {
+        var logs = await _fixture.Client.GetFromJsonAsync<JsonElement>("/api/system/logs?take=5&minLevel=Warning");
+        logs.GetProperty("entries").ValueKind.Should().Be(JsonValueKind.Array);
+
+        (await _fixture.Client.GetAsync("/api/system/logs?minLevel=Loud")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

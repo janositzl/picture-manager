@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { RemovedFolder, RootSummary, SettingsDto } from '../api/types'
+import type { AppVersionInfo, LogEntry, RemovedFolder, RootSummary, SettingsDto } from '../api/types'
 
 const notFound = () => HttpResponse.json({ title: 'Not Found', status: 404 }, { status: 404 })
 
@@ -9,6 +9,25 @@ const settingsSeed: SettingsDto = {
   includedExtensions: null,
   supportedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tif', '.tiff', '.heic', '.heif'],
 }
+
+export const systemInfoSeed: AppVersionInfo = {
+  version: '1.2.3',
+  buildTimeUtc: '2026-10-14T08:30:00Z',
+  startedUtc: '2026-10-14T09:00:00Z',
+  environment: 'Production',
+  runtime: '.NET 10.0.0',
+}
+
+export const logEntriesSeed: LogEntry[] = [
+  { timestamp: '2026-10-14 09:00:01.000 +00:00', level: 'Information', message: 'Starting PictureManager.Api', exception: null },
+  { timestamp: '2026-10-14 09:05:00.000 +00:00', level: 'Warning', message: 'Root is unavailable', exception: null },
+  {
+    timestamp: '2026-10-14 09:06:00.000 +00:00',
+    level: 'Error',
+    message: 'Scan failed',
+    exception: 'System.IO.IOException: disk gone\n   at Scanner.Run()',
+  },
+]
 
 const rootsSeed: RootSummary[] = [
   {
@@ -175,5 +194,13 @@ export const adminHandlers = [
     if (!removedFolders.some((f) => f.id === id)) return notFound()
     removedFolders = removedFolders.filter((f) => f.id !== id)
     return new HttpResponse(null, { status: 204 })
+  }),
+  http.get('/api/system/info', () => HttpResponse.json(systemInfoSeed)),
+  http.get('/api/system/logs', ({ request }) => {
+    const warningsOnly = new URL(request.url).searchParams.get('minLevel') === 'Warning'
+    const entries = warningsOnly
+      ? logEntriesSeed.filter((e) => e.level === 'Warning' || e.level === 'Error' || e.level === 'Fatal')
+      : logEntriesSeed
+    return HttpResponse.json({ fileName: 'picturemanager-20261014.log', entries, truncated: false })
   }),
 ]

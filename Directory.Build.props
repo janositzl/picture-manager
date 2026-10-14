@@ -1,0 +1,10 @@
+<Project>
+
+  <!-- Single source of truth for the application version: the VERSION file at the repo root.
+       Bump it with tools/bump-version.ps1; the Admin > System tab shows what was built. -->
+  <PropertyGroup>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+</Project>

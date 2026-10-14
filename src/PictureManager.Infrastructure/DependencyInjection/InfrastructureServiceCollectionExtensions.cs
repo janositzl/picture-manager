@@ -4,10 +4,12 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PictureManager.Application.Diagnostics;
 using PictureManager.Application.Faces;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Scanning;
 using PictureManager.Application.Thumbnails;
+using PictureManager.Infrastructure.Diagnostics;
 using PictureManager.Infrastructure.Faces;
 using PictureManager.Infrastructure.Persistence;
 using PictureManager.Infrastructure.Persistence.Repositories;
@@ -48,6 +50,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IImageValidator, SkiaImageValidator>();
         services.AddSingleton<IThumbnailService, SkiaSharpThumbnailService>();
         services.AddSingleton<IFaceAnalyzer, OnnxFaceAnalyzer>();
+        services.AddSingleton(LogFileOptionsFactory.FromConfiguration(configuration));
+        services.AddSingleton<ILogReader, FileLogReader>();
 
         return services;
     }

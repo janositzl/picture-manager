@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\VERSION" Link="VERSION" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Shared real-Postgres fixture; its per-assembly template name keeps the two test assemblies apart. -->
     <Compile Include="..\PictureManager.Infrastructure.Tests\Support\PostgresTestDatabase.cs" Link="Support\PostgresTestDatabase.cs" />
     <Compile Include="..\PictureManager.Infrastructure.Tests\Support\TestData.cs" Link="Support\TestData.cs" />

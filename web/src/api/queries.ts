@@ -24,6 +24,8 @@ import type {
   RemovedFolder,
   RootSummary,
   SettingsDto,
+  AppVersionInfo,
+  LogTail,
 } from './types'
 
 export const queryKeys = {
@@ -42,6 +44,8 @@ export const queryKeys = {
   duplicates: () => ['duplicates'] as const,
   similarDuplicates: () => ['duplicates', 'similar'] as const,
   settings: () => ['settings'] as const,
+  systemInfo: () => ['system', 'info'] as const,
+  systemLogs: (warningsOnly: boolean) => ['system', 'logs', { warningsOnly }] as const,
   roots: () => ['roots'] as const,
   removedFolders: () => ['folders', 'removed'] as const,
   // Under 'folders' so every invalidation that refreshes the tree (job done, exclusion, removal) refreshes it too.
@@ -213,6 +217,26 @@ export function useSettings() {
   return useQuery({
     queryKey: queryKeys.settings(),
     queryFn: ({ signal }) => apiFetch<SettingsDto>('/api/settings', { signal }),
+  })
+}
+
+export function useSystemInfo() {
+  return useQuery({
+    queryKey: queryKeys.systemInfo(),
+    queryFn: ({ signal }) => apiFetch<AppVersionInfo>('/api/system/info', { signal }),
+  })
+}
+
+export const LOG_TAIL_SIZE = 500
+
+export function useSystemLogs(warningsOnly: boolean) {
+  const params = new URLSearchParams({ take: String(LOG_TAIL_SIZE) })
+  if (warningsOnly) params.set('minLevel', 'Warning')
+  return useQuery({
+    queryKey: queryKeys.systemLogs(warningsOnly),
+    queryFn: ({ signal }) => apiFetch<LogTail>(`/api/system/logs?${params}`, { signal }),
+    // Logs are live: always refetch on mount rather than trusting a cached tail.
+    staleTime: 0,
   })
 }
 

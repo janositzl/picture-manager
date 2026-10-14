@@ -25,7 +25,7 @@ FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 WORKDIR /src
 
 # Restore first so dependency layers cache independently of source changes.
-COPY PictureManager.slnx ./
+COPY PictureManager.slnx VERSION Directory.Build.props ./
 COPY src/PictureManager.Api/PictureManager.Api.csproj src/PictureManager.Api/
 COPY src/PictureManager.Application/PictureManager.Application.csproj src/PictureManager.Application/
 COPY src/PictureManager.Infrastructure/PictureManager.Infrastructure.csproj src/PictureManager.Infrastructure/

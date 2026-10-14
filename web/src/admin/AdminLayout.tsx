@@ -9,6 +9,7 @@ const TABS = [
   { to: '/admin/roots', label: 'Roots' },
   { to: '/admin/users', label: 'Users' },
   { to: '/admin/removed-folders', label: 'Removed folders' },
+  { to: '/admin/system', label: 'System' },
 ]
 
 export function AdminLayout() {

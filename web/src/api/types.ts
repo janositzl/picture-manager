@@ -161,6 +161,31 @@ export type SettingsDto = {
 
 export type SettingsSaveResult = SettingsDto & { pruneOnNextScan: boolean }
 
+export type LogSeverity = 'Verbose' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Fatal'
+
+export type AppVersionInfo = {
+  version: string
+  buildTimeUtc: string
+  startedUtc: string
+  environment: string
+  runtime: string
+}
+
+/** level is null for a fragment whose header line was cut off by the tail read. */
+export type LogEntry = {
+  timestamp: string | null
+  level: LogSeverity | null
+  message: string
+  exception: string | null
+}
+
+/** fileName is null when the server has no log file. */
+export type LogTail = {
+  fileName: string | null
+  entries: LogEntry[]
+  truncated: boolean
+}
+
 export type RootSummary = {
   id: number
   name: string
