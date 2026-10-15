@@ -197,6 +197,30 @@ The entrypoint re-runs the migration bundle on every start, so any new EF Core
 migrations shipped with the update are applied automatically before the API
 starts serving traffic.
 
+### Versioning and releases
+
+The application version lives in one place: the `VERSION` file at the repo
+root (`MAJOR.MINOR.PATCH`). `Directory.Build.props` feeds it into every .NET
+assembly at build time, and the Docker build copies both files in before
+restoring, so the running container reports exactly what was built.
+
+To release a new version from your dev machine:
+
+```powershell
+.\tools\bump-version.ps1 patch      # or minor / major: edits VERSION, commits, tags vX.Y.Z
+git push origin HEAD vX.Y.Z         # the script prints the exact command
+```
+
+Editing `VERSION` by hand works too; the script only adds the commit and tag.
+On the server, run the update commands above, then open **Admin → System**:
+the card at the top shows the deployed version, when it was built and how long
+it has been running. If it still shows the old version, the image was not
+rebuilt (`up -d --build` is required).
+
+Below the version card, **Admin → System** also tails the current API log
+file (last 500 entries): warnings are highlighted amber, errors red with their
+stack trace expanded, and a switch limits the list to warnings and errors.
+
 ## 6. Stopping / removing
 
 ```bash

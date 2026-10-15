@@ -1,0 +1,101 @@
+ {
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "web: run",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "api: run",
+            "type": "shell",
+            "command": "dotnet run --project src/PictureManager.Api/PictureManager.Api.csproj",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "dotnet",
+                "pattern": {
+                    "regexp": "^\\s*(.*)$",
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*Starting PictureManager\\.Api.*$",
+                    "endsPattern": "^.*Now listening on:.*$"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "web: build",
+            "type": "shell",
+            "command": "npm run build",
+            "options": {
+                "cwd": "${workspaceFolder}/web"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "web: copy dist to wwwroot",
+            "type": "shell",
+            "command": "Remove-Item -Recurse -Force '${workspaceFolder}/src/PictureManager.Api/wwwroot' -ErrorAction SilentlyContinue; Copy-Item -Recurse -Force '${workspaceFolder}/web/dist' '${workspaceFolder}/src/PictureManager.Api/wwwroot'",
+            "dependsOn": "web: build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "api: run (with built frontend)",
+            "type": "shell",
+            "command": "dotnet run --project src/PictureManager.Api/PictureManager.Api.csproj",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "web: copy dist to wwwroot",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "dotnet",
+                "pattern": {
+                    "regexp": "^\\s*(.*)$",
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*Starting PictureManager\\.Api.*$",
+                    "endsPattern": "^.*Now listening on:.*$"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ]
+}

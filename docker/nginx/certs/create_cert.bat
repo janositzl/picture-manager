@@ -1,0 +1,1 @@
+c:\Utils\OpenSSL-Win64\bin\openssl.exe req -x509 -nodes -newkey rsa:2048 -sha256 -days 825 -keyout dminipc.key -out dminipc.crt -subj "/CN=dminipc" -addext "subjectAltName=DNS:dminipc,DNS:localhost,IP:192.168.0.50" -addext "basicConstraints=CA:FALSE" -addext "keyUsage=digitalSignature,keyEncipherment" -addext "extendedKeyUsage=serverAuth"

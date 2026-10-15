@@ -1,0 +1,1 @@
+powershell ./Copy_To_Osmc.ps1 -File %1 -RemoteFolder "/home/osmc/image_list"

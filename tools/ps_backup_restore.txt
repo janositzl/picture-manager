@@ -1,0 +1,41 @@
+# Backup
+docker exec phase3-scanning-pipeline-db-1 pg_dump -U picturemanager -Fc picturemanager -f /tmp/pm.dump
+docker cp phase3-scanning-pipeline-db-1:/tmp/pm.dump "$d\pm.dump"
+
+# Recreate the container
+docker rm -f phase3-scanning-pipeline-db-1
+docker run -d --name phase3-scanning-pipeline-db-1 --restart unless-stopped -e POSTGRES_DB=picturemanager -e POSTGRES_USER=picturemanager -e POSTGRES_PASSWORD=picturemanager -p 127.0.0.1:5432:5432 -v phase3-scanning-pipeline_pgdata:/var/lib/postgresql/data --health-cmd "pg_isready -U picturemanager" --health-interval 5s postgres:17-alpine
+
+# Verify
+docker port phase3-scanning-pipeline-db-1
+docker exec phase3-scanning-pipeline-db-1 psql -U picturemanager -d picturemanager -c "select count(*) from information_schema.tables where table_schema='public'"
+Get-NetTCPConnection -LocalPort 5432 -State Listen
+
+# Restore from the dump (not run)
+docker cp "$d\pm.dump" phase3-scanning-pipeline-db-1:/tmp/pm.dump
+docker exec phase3-scanning-pipeline-db-1 pg_restore -U picturemanager -d picturemanager --clean --if-exists /tmp/pm.dump
+
+docker cp "pm_2026_10_10_1.dump" pmimage-db-1:/tmp/pm_2026_10_10_1.dump
+docker exec pmimage-db-1 pg_restore -U picturemanager -d picturemanager --clean --if-exists /tmp/pm_2026_10_10_1.dump 
+
+
+
+#backup
+docker exec picturemanager-db-1 pg_dump -U picturemanager -Fc picturemanager -f /tmp/pm_2026_10_12.dump
+docker cp picturemanager-db-1:/tmp/pm_2026_10_10_1.dump "pm_2026_10_12.dump"
+rem docker exec picturemanager-db-1 rm /tmp/pm_2026_10_12.dump
+docker exec picturemanager-db-1 ls -la /tmp
+
+
+#update database
+dotnet ef database update --project src/PictureManager.Infrastructure --startup-project src/PictureManager.Api
+
+dotnet ef database update --project src/PictureManager.Infrastructure --startup-project src/PictureManager.Api --connection "Host=<server>;Port=5432;Database=picturemanager;Username=picturemanager;Password=<password>"
+
+dotnet ef migrations script 20261005220139_FaceReviewStates 20261007063124_AddImageIsHidden --project src/PictureManager.Infrastructure --startup-project src/PictureManager.Api -o hide.sql
+
+#docker compose
+docker compose -f docker-compose.prod.yml exec -T db psql -U picturemanager -d picturemanager < hide.sql
+
+git checkout -q main && git merge --ff-only feature/hide-images 2>&1 | tail -3; git log --oneline -3 | cat; git branch --show-current
+

@@ -51,3 +51,12 @@ desktop.ini
 
 # Face recognition models (downloaded by tools/download-face-models.ps1; non-commercial license)
 /models/
+
+# TLS private keys
+*.key
+
+# Private keys / local Claude state
+*.key
+*.pem
+.claude/settings.local.json
+.claude/worktrees/

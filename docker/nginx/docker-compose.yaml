@@ -1,0 +1,14 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs:/var/log/nginx
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the container reach the host
