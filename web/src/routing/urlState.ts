@@ -35,6 +35,15 @@ export function parseHiddenParam(params: URLSearchParams): boolean {
   return params.get('hidden') === '1'
 }
 
+/** The person view's "together with" filter (?with=3,7): sorted, unique, valid ids. */
+export function parseWithParam(params: URLSearchParams): number[] {
+  const ids = (params.get('with') ?? '')
+    .split(',')
+    .map((part) => parseId(part))
+    .filter((id): id is number => id !== null)
+  return [...new Set(ids)].sort((a, b) => a - b)
+}
+
 export function parseSearchState(params: URLSearchParams): SearchParamsState {
   return { q: (params.get('q') ?? '').trim(), in: parseId(params.get('in')) }
 }

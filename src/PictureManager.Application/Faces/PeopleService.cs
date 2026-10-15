@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using PictureManager.Application.Common;
+using PictureManager.Application.Images;
 using PictureManager.Application.Repositories;
 
 namespace PictureManager.Application.Faces;
@@ -24,6 +25,21 @@ public sealed class PeopleService : IPeopleService
 
     public async Task<Result<PersonSummary>> GetAsync(int id, CancellationToken cancellationToken = default) =>
         await _people.GetAsync(id, cancellationToken) is { } person ? Result<PersonSummary>.Ok(person) : Result.NotFound();
+
+    public async Task<Result<IReadOnlyList<PersonCompanion>>> GetCompanionsAsync(int id, string? state, CancellationToken cancellationToken = default)
+    {
+        PersonFaceState anchorState;
+        switch (state?.ToLowerInvariant())
+        {
+            case "confirmed": anchorState = PersonFaceState.Confirmed; break;
+            case "suggested": anchorState = PersonFaceState.Suggested; break;
+            default: return Result.Invalid("state", "Must be 'confirmed' or 'suggested'.");
+        }
+
+        if (await _people.GetAsync(id, cancellationToken) is null)
+            return Result.NotFound();
+        return Result<IReadOnlyList<PersonCompanion>>.Ok(await _people.GetCompanionsAsync(id, anchorState, cancellationToken));
+    }
 
     public async Task<Result<PersonSummary>> NameAsync(int id, string? name, CancellationToken cancellationToken = default)
     {

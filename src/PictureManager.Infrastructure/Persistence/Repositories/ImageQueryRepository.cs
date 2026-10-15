@@ -25,6 +25,27 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         int userId, ImageListFilter filter, ImageSort sort, SortDirection direction, ImageKeyset? after, int take,
         CancellationToken cancellationToken = default)
     {
+        var query = Filtered(userId, filter);
+
+        query = ApplyKeyset(query, sort, direction, after);
+        query = ApplyOrder(query, sort, direction);
+
+        var rows = await query.Take(take).Select(ImageProjections.ToRow(userId)).ToListAsync(cancellationToken);
+        if (filter.PersonId is int forPerson && rows.Count > 0)
+            rows = await WithFaceIdsAsync(rows, forPerson, filter.PersonState, cancellationToken);
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<int>> ListIdsAsync(
+        int userId, ImageListFilter filter, ImageSort sort, SortDirection direction, int take,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplyOrder(Filtered(userId, filter), sort, direction);
+        return await query.Take(take).Select(i => i.Id).ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<Image> Filtered(int userId, ImageListFilter filter)
+    {
         // Hidden images are listed only for one folder's "Show hidden" view.
         var query = filter.IncludeHidden && filter.FolderId is not null
             ? _dbContext.Images.AsNoTracking().WhereExisting()
@@ -63,6 +84,14 @@ public sealed class ImageQueryRepository : IImageQueryRepository
             };
         }
 
+        // One condition per person: the photo must contain all of them.
+        foreach (var withId in filter.WithPersonIds ?? [])
+        {
+            var otherId = withId;
+            query = query.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == otherId
+                && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed)));
+        }
+
         if (filter.HasFaces is bool hasFaces)
         {
             query = hasFaces
@@ -70,13 +99,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
                 : query.Where(i => !_dbContext.Faces.Any(f => f.ImageId == i.Id && f.AssignmentState != FaceAssignmentState.Ignored));
         }
 
-        query = ApplyKeyset(query, sort, direction, after);
-        query = ApplyOrder(query, sort, direction);
-
-        var rows = await query.Take(take).Select(ImageProjections.ToRow(userId)).ToListAsync(cancellationToken);
-        if (filter.PersonId is int forPerson && rows.Count > 0)
-            rows = await WithFaceIdsAsync(rows, forPerson, filter.PersonState, cancellationToken);
-        return rows;
+        return query;
     }
 
     // Per photo, the person's best face for the state being listed (so a face crop can stand in for the thumbnail).

@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using PictureManager.Application.Images;
 using PictureManager.Application.Repositories;
+using PictureManager.Infrastructure.Persistence.Queries;
 using PictureManager.Model;
 
 namespace PictureManager.Infrastructure.Persistence.Repositories;
@@ -51,7 +53,39 @@ public sealed class PeopleRepository : IPeopleRepository
         return summaries.OrderByDescending(s => s.ConfirmedImageCount).ThenByDescending(s => s.SuggestedImageCount).ThenBy(s => s.Id).ToList();
     }
 
-    public Task<PersonSummary?> GetAsync(int id, CancellationToken cancellationToken = default) =>
+    // The anchor photos follow the same Confirmed / Suggested-only rules as the person's photo grid, so the panel and the grid agree.
+    public async Task<IReadOnlyList<PersonCompanion>> GetCompanionsAsync(int personId, PersonFaceState anchorState, CancellationToken cancellationToken = default)
+    {
+        var anchorPhotos = _dbContext.Images.AsNoTracking().WhereVisible();
+        anchorPhotos = anchorState switch
+        {
+            PersonFaceState.Confirmed => anchorPhotos.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                && f.AssignmentState == FaceAssignmentState.Confirmed)),
+            _ => anchorPhotos.Where(i => _dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                    && f.AssignmentState == FaceAssignmentState.Suggested)
+                && !_dbContext.Faces.Any(f => f.ImageId == i.Id && f.PersonId == personId
+                    && f.AssignmentState == FaceAssignmentState.Confirmed)),
+        };
+
+        var shared = await _dbContext.Faces.AsNoTracking()
+            .Where(f => f.PersonId != null && f.PersonId != personId && f.Person!.Name != null
+                        && (f.AssignmentState == FaceAssignmentState.Suggested || f.AssignmentState == FaceAssignmentState.Confirmed)
+                        && anchorPhotos.Any(i => i.Id == f.ImageId))
+            .GroupBy(f => f.PersonId!.Value)
+            .Select(g => new { Id = g.Key, Count = g.Select(f => f.ImageId).Distinct().Count() })
+            .ToListAsync(cancellationToken);
+        if (shared.Count == 0)
+            return [];
+
+        var ids = shared.Select(s => s.Id).ToList();
+        var people = await Summaries(_dbContext.People.AsNoTracking().Where(p => ids.Contains(p.Id))).ToListAsync(cancellationToken);
+        return shared
+            .Join(people, s => s.Id, p => p.Id, (s, p) => new PersonCompanion(p.Id, p.Name!, p.CoverFaceId, s.Count))
+            .OrderByDescending(c => c.SharedImageCount).ThenBy(c => c.Name.ToLowerInvariant()).ThenBy(c => c.Id)
+            .ToList();
+    }
+
+    public Task<PersonSummary?> GetAsync(int id,CancellationToken cancellationToken = default) =>
         Summaries(_dbContext.People.AsNoTracking().Where(p => p.Id == id)).FirstOrDefaultAsync(cancellationToken);
 
     public async Task<int?> FindIdByNameAsync(string name, CancellationToken cancellationToken = default)

@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { apiFetch } from './client'
-import { toImageQuery, type ImageFilter } from './imageFilter'
+import { toImageIdsQuery, toImageQuery, type ImageFilter } from './imageFilter'
 import type {
   FolderFaceCoverage,
   AlbumDetail,
@@ -118,6 +118,13 @@ export function useImages(filter: ImageFilter, options: UseImagesOptions = {}) {
     // blanking the grid to a skeleton on every navigation.
     placeholderData: keepPreviousData,
   })
+}
+
+/** Ids of every photo matching the filter (for "Select all"); truncated = the server capped the list. */
+export function fetchImageIds(filter: ImageFilter) {
+  return apiFetch<{ ids: number[]; truncated: boolean }>(
+    `/api/images/ids?${toImageIdsQuery(filter)}`,
+  )
 }
 
 export function useImage(id: number | null) {

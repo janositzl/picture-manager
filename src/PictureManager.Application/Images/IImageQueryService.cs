@@ -9,6 +9,9 @@ public interface IImageQueryService
 {
     Task<Result<PagedResult<ImageListItem>>> ListAsync(ImageListRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>Ids of all photos matching the request's filters (sort applies; cursor and limit are ignored), capped at 5000.</summary>
+    Task<Result<ImageIdsResult>> ListIdsAsync(ImageListRequest request, CancellationToken cancellationToken = default);
+
     Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default);
 
     Task<Result<HiddenResult>> SetHiddenAsync(IReadOnlyCollection<int> imageIds, bool isHidden, CancellationToken cancellationToken = default);

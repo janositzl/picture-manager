@@ -58,7 +58,9 @@ describe('PersonView', () => {
     await saveName(' anna ')
 
     const dialog = await screen.findByRole('dialog', { name: 'Merge people?' })
-    expect(dialog).toHaveTextContent("Merge into existing 'Anna' (13 photos)? This can't be undone.")
+    expect(dialog).toHaveTextContent(
+      "Merge into existing 'Anna' (13 photos)? This can't be undone.",
+    )
     expect(sent).toEqual([])
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Merge' }))
@@ -71,9 +73,15 @@ describe('PersonView', () => {
     const sent = await openGroup(peopleFixture[0])
 
     await saveName('Anna')
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Merge people?' })).getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Merge people?' })).getByRole('button', {
+        name: 'Cancel',
+      }),
+    )
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Merge people?' })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Merge people?' })).not.toBeInTheDocument(),
+    )
     expect(sent).toEqual([])
   })
 
@@ -126,6 +134,121 @@ describe('PersonView', () => {
     expect(screen.getByText('10 confirmed · 3 suggested')).toBeInTheDocument()
   })
 
+  describe('people together with this person', () => {
+    const companions = [
+      { id: 7, name: 'Bob', coverFaceId: 201, sharedImageCount: 4 },
+      { id: 9, name: 'Cy', coverFaceId: null, sharedImageCount: 1 },
+    ]
+
+    function openAnna() {
+      const companionRequests: string[] = []
+      const imageQueries: URLSearchParams[] = []
+      server.use(
+        peopleList([
+          ...peopleFixture,
+          { id: 7, name: 'Bob', confirmedImageCount: 6, suggestedImageCount: 0, coverFaceId: 201 },
+          { id: 9, name: 'Cy', confirmedImageCount: 2, suggestedImageCount: 0, coverFaceId: null },
+        ]),
+        person(peopleFixture[0]),
+        http.get('/api/people/1/companions', ({ request }) => {
+          companionRequests.push(new URL(request.url).search)
+          return HttpResponse.json(companions)
+        }),
+        http.get('/api/images', ({ request }) => {
+          imageQueries.push(new URL(request.url).searchParams)
+          return HttpResponse.json({ items: [], nextCursor: null })
+        }),
+      )
+      return { companionRequests, imageQueries, ...renderApp('/people/1') }
+    }
+
+    it('asks the server for them only once the panel is opened', async () => {
+      const { companionRequests, user } = openAnna()
+      await screen.findByRole('heading', { name: 'Anna' })
+      expect(companionRequests).toEqual([])
+
+      await user.click(screen.getByRole('button', { name: 'Show people together with Anna' }))
+
+      expect(
+        await screen.findByRole('button', { name: 'Bob, 4 photos together' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cy, 1 photo together' })).toBeInTheDocument()
+      expect(companionRequests).toEqual(['?state=confirmed'])
+    })
+
+    it('lists them alphabetically and the name box narrows the list without unticking anyone', async () => {
+      const { user } = openAnna()
+      await user.click(
+        await screen.findByRole('button', { name: 'Show people together with Anna' }),
+      )
+      await screen.findByRole('button', { name: 'Bob, 4 photos together' })
+      const rows = () =>
+        screen
+          .getAllByRole('button', { name: /photos? together$/ })
+          .map((b) => b.getAttribute('aria-label'))
+      expect(rows()).toEqual(['Bob, 4 photos together', 'Cy, 1 photo together'])
+
+      await user.click(screen.getByRole('button', { name: 'Bob, 4 photos together' }))
+      await user.type(screen.getByRole('textbox', { name: 'Filter people by name' }), 'cy')
+
+      expect(rows()).toEqual(['Cy, 1 photo together'])
+      await user.click(screen.getByRole('button', { name: 'Clear name filter' }))
+      expect(screen.getByRole('textbox', { name: 'Filter people by name' })).toHaveValue('')
+      expect(screen.queryByRole('button', { name: 'Clear name filter' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Bob, 4 photos together' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
+
+    it('selecting people changes nothing until Filter is pressed, then filters by all of them', async () => {
+      const { imageQueries, router, user } = openAnna()
+      await user.click(
+        await screen.findByRole('button', { name: 'Show people together with Anna' }),
+      )
+      const filter = () => screen.getByRole('button', { name: /^Filter/ })
+      await screen.findByRole('button', { name: 'Bob, 4 photos together' })
+      await waitFor(() => expect(imageQueries.length).toBeGreaterThan(0))
+      const before = imageQueries.length
+      expect(filter()).toBeDisabled()
+
+      await user.click(screen.getByRole('button', { name: 'Bob, 4 photos together' }))
+      await user.click(screen.getByRole('button', { name: 'Cy, 1 photo together' }))
+
+      expect(filter()).toBeEnabled()
+      expect(filter()).toHaveTextContent('Filter (2)')
+      expect(imageQueries).toHaveLength(before)
+      expect(router.state.location.search).toBe('')
+
+      await user.click(filter())
+
+      await waitFor(() => expect(router.state.location.search).toBe('?with=7%2C9'))
+      await waitFor(() => expect(imageQueries.at(-1)!.getAll('withPersonId')).toEqual(['7', '9']))
+      expect(imageQueries.at(-1)!.get('personId')).toBe('1')
+      expect(await screen.findByText('No photos with all selected people.')).toBeInTheDocument()
+      expect(screen.getByText('With Bob, Cy')).toBeInTheDocument()
+    })
+
+    it('Clear unticks everyone, and Remove filter drops the applied filter', async () => {
+      const { router, user } = openAnna()
+      await user.click(
+        await screen.findByRole('button', { name: 'Show people together with Anna' }),
+      )
+      await user.click(await screen.findByRole('button', { name: 'Bob, 4 photos together' }))
+      await user.click(screen.getByRole('button', { name: 'Clear' }))
+      expect(screen.getByRole('button', { name: /^Filter/ })).toBeDisabled()
+
+      await user.click(screen.getByRole('button', { name: 'Bob, 4 photos together' }))
+      await user.click(screen.getByRole('button', { name: /^Filter/ }))
+      await waitFor(() => expect(router.state.location.search).toBe('?with=7'))
+
+      await user.click(await screen.findByRole('button', { name: 'Remove filter' }))
+
+      await waitFor(() => expect(router.state.location.search).toBe(''))
+      await waitFor(() => expect(screen.queryByText(/^With /)).not.toBeInTheDocument())
+    })
+  })
+
   it('deletes a person after confirming, then returns to the people list', async () => {
     let deleted = false
     server.use(
@@ -142,7 +265,11 @@ describe('PersonView', () => {
     await openEditor()
     fireEvent.click(screen.getByRole('button', { name: 'Delete person' }))
     expect(deleted).toBe(false)
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Delete person?' })).getByRole('button', { name: 'Delete' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Delete person?' })).getByRole('button', {
+        name: 'Delete',
+      }),
+    )
 
     await waitFor(() => expect(deleted).toBe(true))
     expect(await screen.findByText('Select a person to see their photos.')).toBeInTheDocument()
@@ -163,7 +290,12 @@ describe('PersonView', () => {
 
     await openEditor()
     fireEvent.click(screen.getByRole('button', { name: 'Ignore this group' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Ignore this group?' })).getByRole('button', { name: 'Ignore' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Ignore this group?' })).getByRole(
+        'button',
+        { name: 'Ignore' },
+      ),
+    )
 
     await waitFor(() => expect(ignored).toBe(true))
     expect(await screen.findByText('Select a person to see their photos.')).toBeInTheDocument()
@@ -183,7 +315,12 @@ describe('PersonView', () => {
     renderApp('/people/2')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ignore group' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Ignore this group?' })).getByRole('button', { name: 'Ignore' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Ignore this group?' })).getByRole(
+        'button',
+        { name: 'Ignore' },
+      ),
+    )
 
     await waitFor(() => expect(ignored).toBe(true))
     expect(await screen.findByText('Select a person to see their photos.')).toBeInTheDocument()
@@ -239,7 +376,9 @@ describe('PersonView', () => {
     fireEvent.click(within(confirm).getByRole('button', { name: 'Assign' }))
 
     await waitFor(() => expect(body).toEqual({ personId: peopleFixture[0].id, imageIds: [101] }))
-    await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Selection' })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByRole('toolbar', { name: 'Selection' })).not.toBeInTheDocument(),
+    )
   })
 
   it('offers no assign for a named person', async () => {
@@ -270,7 +409,9 @@ describe('PersonView', () => {
 
   it('shows not found, without the grid, when the person does not exist', async () => {
     server.use(
-      http.get('/api/people/9999', () => HttpResponse.json({ title: 'Not found' }, { status: 404 })),
+      http.get('/api/people/9999', () =>
+        HttpResponse.json({ title: 'Not found' }, { status: 404 }),
+      ),
       http.get('/api/images', () => {
         return HttpResponse.json({ items: [], nextCursor: null })
       }),

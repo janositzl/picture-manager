@@ -8,6 +8,9 @@ type Props = {
   /** Unknown-group views: assign just the selected photos to a person. */
   onAssign?: () => void
   onClear: () => void
+  /** Selects every photo of the view, not just the loaded ones. */
+  onSelectAll?: () => void
+  selectAllPending?: boolean
   onRemove?: () => void
   /** Folder view: hide the selected photos (or unhide them, when they are all hidden). */
   onHide?: () => void
@@ -24,6 +27,8 @@ export function SelectionBar({
   onAddToAlbum,
   onAssign,
   onClear,
+  onSelectAll,
+  selectAllPending = false,
   onRemove,
   onHide,
   hideLabel = 'Hide',
@@ -114,6 +119,16 @@ export function SelectionBar({
           sx={{ borderRadius: '8px', textTransform: 'none' }}
         >
           Remove from album
+        </Button>
+      )}
+      {onSelectAll && (
+        <Button
+          size="small"
+          onClick={onSelectAll}
+          disabled={selectAllPending}
+          sx={{ borderRadius: '8px', textTransform: 'none' }}
+        >
+          Select all
         </Button>
       )}
       <Button size="small" onClick={onClear} sx={{ borderRadius: '8px', textTransform: 'none' }}>

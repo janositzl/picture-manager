@@ -13,6 +13,7 @@ public static class ImageQueryEndpoints
     public static IEndpointRouteBuilder MapImageQueryEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder admin)
     {
         user.MapGet("/images", ListAsync);
+        user.MapGet("/images/ids", ListIdsAsync);
         admin.MapPut("/images/hidden", SetHiddenAsync);
         admin.MapPut("/images/thumbnail-rotation", RotateThumbnailsAsync);
         user.MapGet("/images/{id:int}", GetAsync);
@@ -23,10 +24,18 @@ public static class ImageQueryEndpoints
 
     public static async Task<Results<Ok<PagedResult<ImageListItem>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListAsync(
         int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? personState, string? faces, bool? includeHidden, string? sort, string? order, string? cursor, int? limit,
-        IImageQueryService service, ICurrentUser currentUser, CancellationToken cancellationToken)
+        IImageQueryService service, ICurrentUser currentUser, CancellationToken cancellationToken, [FromQuery] int[]? withPersonId = null)
     {
-        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit, personId, personState, faces, (includeHidden ?? false) && currentUser.IsAdmin);
+        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, cursor, limit, personId, personState, faces, (includeHidden ?? false) && currentUser.IsAdmin, withPersonId);
         return (await service.ListAsync(request, cancellationToken)).ToOk();
+    }
+
+    public static async Task<Results<Ok<ImageIdsResult>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListIdsAsync(
+        int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? personState, string? faces, bool? includeHidden, string? sort, string? order,
+        IImageQueryService service, ICurrentUser currentUser, CancellationToken cancellationToken, [FromQuery] int[]? withPersonId = null)
+    {
+        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, null, null, personId, personState, faces, (includeHidden ?? false) && currentUser.IsAdmin, withPersonId);
+        return (await service.ListIdsAsync(request, cancellationToken)).ToOk();
     }
 
     public sealed record SetHiddenRequest(IReadOnlyList<int>? ImageIds, bool IsHidden);

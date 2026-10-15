@@ -40,6 +40,58 @@ public class ImageQueryServiceTests
             .Returns(rows);
 
     [Fact]
+    public async Task ListAsync_WithPersonIds_AreDedupedAndWithoutThePersonThemselves()
+    {
+        await CreateService().ListAsync(new ImageListRequest(PersonId: 5, WithPersonIds: [7, 5, 7, 9]));
+
+        await _images.Received(1).ListAsync(
+            1, Arg.Is<ImageListFilter>(f => f.PersonId == 5 && f.WithPersonIds!.SequenceEqual(new[] { 7, 9 })),
+            Arg.Any<ImageSort>(), Arg.Any<SortDirection>(), null, 101, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListAsync_WithPersonIdsWithoutPersonId_IsInvalid()
+    {
+        var result = await CreateService().ListAsync(new ImageListRequest(WithPersonIds: [7]));
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.Errors.Should().ContainKey("withPersonId");
+    }
+
+    [Fact]
+    public async Task ListAsync_TooManyWithPersonIds_IsInvalid()
+    {
+        var result = await CreateService().ListAsync(new ImageListRequest(PersonId: 1, WithPersonIds: Enumerable.Range(2, 21).ToList()));
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+    }
+
+    [Fact]
+    public async Task ListIdsAsync_MoreThanTheCap_IsTruncated()
+    {
+        var ids = Enumerable.Range(1, ImageQueryService.MaxIds + 1).ToList();
+        _images.ListIdsAsync(1, Arg.Any<ImageListFilter>(), ImageSort.Name, SortDirection.Asc, ImageQueryService.MaxIds + 1, Arg.Any<CancellationToken>())
+            .Returns(ids);
+
+        var result = await CreateService().ListIdsAsync(new ImageListRequest(Sort: "name"));
+
+        result.Value!.Truncated.Should().BeTrue();
+        result.Value.Ids.Should().HaveCount(ImageQueryService.MaxIds);
+    }
+
+    [Fact]
+    public async Task ListIdsAsync_UnderTheCap_ReturnsAllIdsNotTruncated()
+    {
+        _images.ListIdsAsync(1, Arg.Any<ImageListFilter>(), Arg.Any<ImageSort>(), Arg.Any<SortDirection>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new[] { 3, 2, 1 });
+
+        var result = await CreateService().ListIdsAsync(new ImageListRequest());
+
+        result.Value!.Ids.Should().Equal(3, 2, 1);
+        result.Value.Truncated.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ListAsync_Defaults_AreDateDescLimit100_AndAskForOneExtraRow()
     {
         var result = await CreateService().ListAsync(new ImageListRequest());

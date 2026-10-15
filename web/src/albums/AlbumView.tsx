@@ -89,7 +89,29 @@ export function AlbumView() {
   const leave = useRemoveAlbumShare(albumId ?? 0)
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
-  const selection = useSelection(ids, `album-${albumId}`)
+  const [selectingAll, setSelectingAll] = useState(false)
+  // Albums have no ids endpoint, so "all" means loading the remaining pages first.
+  async function selectAllInAlbum() {
+    setSelectingAll(true)
+    try {
+      let latest = { hasNextPage: images.hasNextPage, data: images.data }
+      while (latest.hasNextPage) {
+        const next = await images.fetchNextPage({ cancelRefetch: false })
+        if (next.isError) throw next.error
+        latest = next
+      }
+      selection.selectIds(
+        latest.data?.pages.flatMap((page) => page.items.map((item) => item.id)) ?? [],
+      )
+    } catch {
+      notify("Couldn't select all photos.")
+    } finally {
+      setSelectingAll(false)
+    }
+  }
+  const selection = useSelection(ids, `album-${albumId}`, {
+    onSelectAll: () => void selectAllInAlbum(),
+  })
   const [showFolders, setShowFolders] = useState(readShowFolders)
   const [dialog, setDialog] = useState<OpenDialog>(null)
   const [picker, setPicker] = useState<PickerState | null>(null)
@@ -268,6 +290,8 @@ export function AlbumView() {
           ? () => void confirmSetCover(selectedIds[0]!)
           : undefined
       }
+      onSelectAll={() => void selectAllInAlbum()}
+      selectAllPending={selectingAll}
       onClear={selection.clear}
     />
   ) : (
@@ -330,7 +354,11 @@ export function AlbumView() {
           >
             Sort by…
           </Button>
-          <Menu anchorEl={sortAnchor} open={sortAnchor !== null} onClose={() => setSortAnchor(null)}>
+          <Menu
+            anchorEl={sortAnchor}
+            open={sortAnchor !== null}
+            onClose={() => setSortAnchor(null)}
+          >
             {SORT_OPTIONS.map(({ by, label }) => (
               <MenuItem
                 key={by}
@@ -360,7 +388,12 @@ export function AlbumView() {
         Export…
       </Button>
       {owner ? (
-        <Button size="small" color="error" onClick={() => setDialog('delete')} sx={HEADER_BUTTON_SX}>
+        <Button
+          size="small"
+          color="error"
+          onClick={() => setDialog('delete')}
+          sx={HEADER_BUTTON_SX}
+        >
           Delete…
         </Button>
       ) : (

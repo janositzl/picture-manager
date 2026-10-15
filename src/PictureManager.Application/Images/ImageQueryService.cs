@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
@@ -15,6 +16,8 @@ public sealed class ImageQueryService : IImageQueryService
 {
     public const int DefaultLimit = 100;
     public const int MaxLimit = 200;
+    public const int MaxIds = 5000;
+    public const int MaxWithPeople = 20;
 
     private readonly IImageQueryRepository _images;
     private readonly IFolderRepository _folders;
@@ -31,23 +34,10 @@ public sealed class ImageQueryService : IImageQueryService
 
     public async Task<Result<PagedResult<ImageListItem>>> ListAsync(ImageListRequest request, CancellationToken cancellationToken = default)
     {
-        var sortToken = (request.Sort ?? "date").ToLowerInvariant();
-        ImageSort sort;
-        switch (sortToken)
-        {
-            case "date": sort = ImageSort.Date; break;
-            case "name": sort = ImageSort.Name; break;
-            default: return Result.Invalid("sort", "Must be 'date' or 'name'.");
-        }
-
-        var orderToken = (request.Order ?? (sort == ImageSort.Date ? "desc" : "asc")).ToLowerInvariant();
-        SortDirection direction;
-        switch (orderToken)
-        {
-            case "asc": direction = SortDirection.Asc; break;
-            case "desc": direction = SortDirection.Desc; break;
-            default: return Result.Invalid("order", "Must be 'asc' or 'desc'.");
-        }
+        var (parsed, failure) = await ParseAsync(request, cancellationToken);
+        if (failure is not null)
+            return failure;
+        var (sortToken, sort, orderToken, direction, filter) = parsed!;
 
         var limit = request.Limit ?? DefaultLimit;
         if (limit is < 1 or > MaxLimit)
@@ -64,34 +54,6 @@ public sealed class ImageQueryService : IImageQueryService
                 return Result.Invalid("cursor", "The cursor is malformed.");
         }
 
-        if (request.FolderId is int folderId && !await _folders.IsVisibleAsync(folderId, cancellationToken))
-            return Result.NotFound();
-
-        PersonFaceState? personState = null;
-        if (request.PersonState is not null)
-        {
-            if (request.PersonId is null)
-                return Result.Invalid("personState", "Needs a personId.");
-            switch (request.PersonState.ToLowerInvariant())
-            {
-                case "confirmed": personState = PersonFaceState.Confirmed; break;
-                case "suggested": personState = PersonFaceState.Suggested; break;
-                default: return Result.Invalid("personState", "Must be 'confirmed' or 'suggested'.");
-            }
-        }
-
-        bool? hasFaces = null;
-        if (request.Faces is not null)
-        {
-            switch (request.Faces.ToLowerInvariant())
-            {
-                case "with": hasFaces = true; break;
-                case "without": hasFaces = false; break;
-                default: return Result.Invalid("faces", "Must be 'with' or 'without'.");
-            }
-        }
-
-        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces, request.IncludeHidden);
         var rows = await _images.ListAsync(_currentUser.UserId, filter, sort, direction, after, limit + 1, cancellationToken);
 
         var page = rows.Take(limit).ToList();
@@ -107,6 +69,82 @@ public sealed class ImageQueryService : IImageQueryService
 
         return Result<PagedResult<ImageListItem>>.Ok(
             new PagedResult<ImageListItem>(page.Select(ImageListItem.From).ToList(), nextCursor));
+    }
+
+    public async Task<Result<ImageIdsResult>> ListIdsAsync(ImageListRequest request, CancellationToken cancellationToken = default)
+    {
+        var (parsed, failure) = await ParseAsync(request, cancellationToken);
+        if (failure is not null)
+            return failure;
+        var (_, sort, _, direction, filter) = parsed!;
+
+        var ids = await _images.ListIdsAsync(_currentUser.UserId, filter, sort, direction, MaxIds + 1, cancellationToken);
+        return Result<ImageIdsResult>.Ok(new ImageIdsResult(ids.Take(MaxIds).ToList(), ids.Count > MaxIds));
+    }
+
+    private sealed record ParsedQuery(string SortToken, ImageSort Sort, string OrderToken, SortDirection Direction, ImageListFilter Filter);
+
+    /// <summary>Validates the sort, order and filter parameters shared by the paged list and the ids list.</summary>
+    private async Task<(ParsedQuery? Query, Result? Failure)> ParseAsync(ImageListRequest request, CancellationToken cancellationToken)
+    {
+        var sortToken = (request.Sort ?? "date").ToLowerInvariant();
+        ImageSort sort;
+        switch (sortToken)
+        {
+            case "date": sort = ImageSort.Date; break;
+            case "name": sort = ImageSort.Name; break;
+            default: return (null, Result.Invalid("sort", "Must be 'date' or 'name'."));
+        }
+
+        var orderToken = (request.Order ?? (sort == ImageSort.Date ? "desc" : "asc")).ToLowerInvariant();
+        SortDirection direction;
+        switch (orderToken)
+        {
+            case "asc": direction = SortDirection.Asc; break;
+            case "desc": direction = SortDirection.Desc; break;
+            default: return (null, Result.Invalid("order", "Must be 'asc' or 'desc'."));
+        }
+
+        if (request.FolderId is int folderId && !await _folders.IsVisibleAsync(folderId, cancellationToken))
+            return (null, Result.NotFound());
+
+        PersonFaceState? personState = null;
+        if (request.PersonState is not null)
+        {
+            if (request.PersonId is null)
+                return (null, Result.Invalid("personState", "Needs a personId."));
+            switch (request.PersonState.ToLowerInvariant())
+            {
+                case "confirmed": personState = PersonFaceState.Confirmed; break;
+                case "suggested": personState = PersonFaceState.Suggested; break;
+                default: return (null, Result.Invalid("personState", "Must be 'confirmed' or 'suggested'."));
+            }
+        }
+
+        bool? hasFaces = null;
+        if (request.Faces is not null)
+        {
+            switch (request.Faces.ToLowerInvariant())
+            {
+                case "with": hasFaces = true; break;
+                case "without": hasFaces = false; break;
+                default: return (null, Result.Invalid("faces", "Must be 'with' or 'without'."));
+            }
+        }
+
+        IReadOnlyList<int>? withPersonIds = null;
+        if (request.WithPersonIds is { Count: > 0 })
+        {
+            if (request.PersonId is null)
+                return (null, Result.Invalid("withPersonId", "Needs a personId."));
+            if (request.WithPersonIds.Count > MaxWithPeople)
+                return (null, Result.Invalid("withPersonId", $"Must not contain more than {MaxWithPeople} ids."));
+            var others = request.WithPersonIds.Where(id => id != request.PersonId).Distinct().ToList();
+            withPersonIds = others.Count > 0 ? others : null;
+        }
+
+        var filter = new ImageListFilter(request.FolderId, request.Folder, request.FileName, request.FavoritesOnly, request.PersonId, personState, hasFaces, request.IncludeHidden, withPersonIds);
+        return (new ParsedQuery(sortToken, sort, orderToken, direction, filter), null);
     }
 
     public async Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default)

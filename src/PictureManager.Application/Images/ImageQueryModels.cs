@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using PictureManager.Model;
 
 namespace PictureManager.Application.Images;
@@ -26,10 +27,14 @@ public enum PersonFaceState
 /// AND-combined listing filters. FolderId = images directly in that folder only. PersonId = photos with that person's
 /// Suggested/Confirmed face; PersonState narrows that to Confirmed, or to Suggested-only (no Confirmed face of that person in the photo).
 /// HasFaces true = at least one detected face that is not Ignored, false = none (including photos not analysed yet), null = no filter.
+/// WithPersonIds = every one of these people must also have a Suggested/Confirmed face in the photo (AND), on top of PersonId.
 /// </summary>
 public sealed record ImageListFilter(
     int? FolderId, string? FolderName, string? FileName, bool FavoritesOnly, int? PersonId = null, PersonFaceState? PersonState = null,
-    bool? HasFaces = null, bool IncludeHidden = false);
+    bool? HasFaces = null, bool IncludeHidden = false, IReadOnlyList<int>? WithPersonIds = null);
+
+/// <summary>Ids of every photo matching a listing filter, up to a cap; Truncated = there were more.</summary>
+public sealed record ImageIdsResult(IReadOnlyList<int> Ids, bool Truncated);
 
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);

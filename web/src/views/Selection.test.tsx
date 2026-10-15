@@ -1,8 +1,11 @@
 import { screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { describe, expect, it } from 'vitest'
+import { delay, http, HttpResponse } from 'msw'
 import { albumStore } from '../test/albumHandlers'
+import { madeiraImages } from '../test/fixtures'
 import { renderApp } from '../test/render'
+import { server } from '../test/server'
 
 const selectionBar = () => screen.findByRole('toolbar', { name: 'Selection' })
 
@@ -28,6 +31,47 @@ describe('selecting photos', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select IMG_0002.jpg' }))
     await user.keyboard('{Control>}a{/Control}')
     expect(await selectionBar()).toHaveTextContent('3 selected')
+  })
+
+  it('Select all picks every matching photo when more pages remain, not just the loaded ones', async () => {
+    const idsQueries: URLSearchParams[] = []
+    server.use(
+      http.get('/api/images', async ({ request }) => {
+        // The second page never arrives, so the grid keeps "more to load" without fetching in a loop.
+        if (new URL(request.url).searchParams.has('cursor')) await delay('infinite')
+        return HttpResponse.json({ items: madeiraImages, nextCursor: 'more' })
+      }),
+      http.get('/api/images/ids', ({ request }) => {
+        idsQueries.push(new URL(request.url).searchParams)
+        return HttpResponse.json({ ids: [20, 21, 22, 23, 24], truncated: false })
+      }),
+    )
+    const { user } = renderApp('/folders/3')
+    await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Select all' }))
+
+    await waitFor(async () => expect(await selectionBar()).toHaveTextContent('5 selected'))
+    expect(idsQueries).toHaveLength(1)
+    expect(idsQueries[0]!.get('folderId')).toBe('3')
+    expect(idsQueries[0]!.has('limit')).toBe(false)
+  })
+
+  it('Select all selects the loaded photos without asking the server when they are all there', async () => {
+    let idsRequested = false
+    server.use(
+      http.get('/api/images/ids', () => {
+        idsRequested = true
+        return HttpResponse.json({ ids: [], truncated: false })
+      }),
+    )
+    const { user } = renderApp('/folders/3')
+    await user.click(await screen.findByRole('checkbox', { name: 'Select IMG_0001.jpg' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Select all' }))
+
+    expect(await selectionBar()).toHaveTextContent('3 selected')
+    expect(idsRequested).toBe(false)
   })
 
   it('Ctrl-click starts a selection', async () => {

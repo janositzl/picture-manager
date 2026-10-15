@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using PictureManager.Application.Images;
 using PictureManager.Infrastructure.Persistence.Repositories;
 using PictureManager.Model;
 using PictureManager.Tests.Support;
@@ -13,6 +14,74 @@ namespace PictureManager.Infrastructure.Tests.Persistence.Repositories;
 public class PeopleRepositoryTests
 {
     private static readonly DateTime Now = new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task GetCompanionsAsync_CountsDistinctSharedPhotos_NamedOnly_BestFirst()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var one = await FaceTestData.AddImageAsync(db.Context, top, "one");
+        var two = await FaceTestData.AddImageAsync(db.Context, top, "two");
+        var alone = await FaceTestData.AddImageAsync(db.Context, top, "alone");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        var bob = new Person { Name = "Bob", CreatedUtc = Now, ModifiedUtc = Now };
+        var cy = new Person { Name = "Cy", CreatedUtc = Now, ModifiedUtc = Now };
+        var unnamed = new Person { CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(anna, bob, cy, unnamed);
+        await db.Context.SaveChangesAsync();
+        var seed = 0;
+        async Task Face(Image image, Person person, FaceAssignmentState state) =>
+            await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(seed++), person.Id, state);
+        await Face(one, anna, FaceAssignmentState.Confirmed);
+        await Face(one, cy, FaceAssignmentState.Confirmed);
+        await Face(one, unnamed, FaceAssignmentState.Suggested);
+        await Face(two, anna, FaceAssignmentState.Confirmed);
+        await Face(two, bob, FaceAssignmentState.Suggested);
+        await Face(two, bob, FaceAssignmentState.Confirmed);
+        await Face(two, cy, FaceAssignmentState.Confirmed);
+        await Face(alone, bob, FaceAssignmentState.Confirmed);
+
+        var companions = await new PeopleRepository(db.CreateContext()).GetCompanionsAsync(anna.Id, PersonFaceState.Confirmed);
+
+        companions.Select(c => (c.Name, c.SharedImageCount)).Should().Equal(("Cy", 2), ("Bob", 1));
+        companions.Should().OnlyContain(c => c.CoverFaceId != null);
+    }
+
+    [Fact]
+    public async Task GetCompanionsAsync_IgnoresHiddenPhotosAndIgnoredFaces_AndFollowsTheAnchorState()
+    {
+        await using var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var hidden = await FaceTestData.AddImageAsync(db.Context, top, "hidden");
+        var confirmedPhoto = await FaceTestData.AddImageAsync(db.Context, top, "confirmed");
+        var suggestedPhoto = await FaceTestData.AddImageAsync(db.Context, top, "suggested");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = Now, ModifiedUtc = Now };
+        var bob = new Person { Name = "Bob", CreatedUtc = Now, ModifiedUtc = Now };
+        var cy = new Person { Name = "Cy", CreatedUtc = Now, ModifiedUtc = Now };
+        db.Context.People.AddRange(anna, bob, cy);
+        await db.Context.SaveChangesAsync();
+        var seed = 0;
+        async Task Face(Image image, Person person, FaceAssignmentState state) =>
+            await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(seed++), person.Id, state);
+        await Face(hidden, anna, FaceAssignmentState.Confirmed);
+        await Face(hidden, bob, FaceAssignmentState.Confirmed);
+        await Face(confirmedPhoto, anna, FaceAssignmentState.Confirmed);
+        await Face(confirmedPhoto, bob, FaceAssignmentState.Ignored);
+        await Face(confirmedPhoto, cy, FaceAssignmentState.Confirmed);
+        await Face(suggestedPhoto, anna, FaceAssignmentState.Suggested);
+        await Face(suggestedPhoto, bob, FaceAssignmentState.Confirmed);
+        hidden.IsHidden = true;
+        await db.Context.SaveChangesAsync();
+        var repository = new PeopleRepository(db.CreateContext());
+
+        var confirmed = await repository.GetCompanionsAsync(anna.Id, PersonFaceState.Confirmed);
+        var suggested = await repository.GetCompanionsAsync(anna.Id, PersonFaceState.Suggested);
+
+        confirmed.Select(c => c.Name).Should().Equal("Cy");
+        suggested.Select(c => c.Name).Should().Equal("Bob");
+    }
 
     [Fact]
     public async Task GetAllAsync_IgnoresFacesOnHiddenImages()

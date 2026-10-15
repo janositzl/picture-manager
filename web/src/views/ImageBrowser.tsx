@@ -6,9 +6,10 @@ import { useSetFavorite } from '../api/favorites'
 import { useSetHidden } from '../api/hidden'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl } from '../api/people'
-import { useImages } from '../api/queries'
+import { fetchImageIds, useImages } from '../api/queries'
 import { useRotateThumbnails } from '../api/rotation'
 import type { ImageListItem } from '../api/types'
+import { useNotify } from '../app/notify'
 import { PhotoGrid } from '../grid/PhotoGrid'
 import { PhotoTile } from '../grid/PhotoTile'
 import { SelectionBar } from '../grid/SelectionBar'
@@ -65,20 +66,47 @@ export function ImageBrowser({
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
   const filterKey = JSON.stringify(filter)
-  const selection = useSelection(ids, filterKey)
+  const notify = useNotify()
+  const [selectingAll, setSelectingAll] = useState(false)
+  // "Select all" covers every matching photo; the loaded pages are only part of them while more pages remain.
+  async function selectAllPhotos() {
+    if (!images.hasNextPage) {
+      selection.selectAll()
+      return
+    }
+    setSelectingAll(true)
+    try {
+      const result = await fetchImageIds(filter)
+      selection.selectIds(result.ids)
+      if (result.truncated)
+        notify(`Selected the first ${result.ids.length.toLocaleString()} photos.`)
+    } catch {
+      notify("Couldn't select all photos.")
+    } finally {
+      setSelectingAll(false)
+    }
+  }
+  const selection = useSelection(ids, filterKey, { onSelectAll: () => void selectAllPhotos() })
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
   const setHidden = useSetHidden()
+  // Grid order for the loaded photos, then any selected ones that are not loaded (after Select all).
+  const selectedIds = useMemo(() => {
+    const loaded = new Set(ids)
+    return [
+      ...ids.filter((id) => selection.selected.has(id)),
+      ...[...selection.selected].filter((id) => !loaded.has(id)),
+    ]
+  }, [ids, selection.selected])
   const selectedItems = items.filter((item) => selection.selected.has(item.id))
   // Unhide only when every selected photo is hidden; a mixed selection hides the rest.
   const allHidden =
     selectedItems.length > 0 && selectedItems.every((item) => item.isHidden === true)
   const coverFaceId = selectedItems.length === 1 ? (selectedItems[0]?.faceId ?? null) : null
   const rotateThumbnails = useRotateThumbnails()
-  const rotateSelected = () =>
-    rotateThumbnails.mutate({ imageIds: selectedItems.map((item) => item.id), degrees: 90 })
+  const rotateSelected = () => rotateThumbnails.mutate({ imageIds: selectedIds, degrees: 90 })
   const hideSelected = () =>
     setHidden.mutate(
-      { imageIds: selectedItems.map((item) => item.id), isHidden: !allHidden },
+      { imageIds: selectedIds, isHidden: !allHidden },
       { onSuccess: selection.clear },
     )
 
@@ -136,17 +164,8 @@ export function ImageBrowser({
       {selection.isSelecting ? (
         <SelectionBar
           count={selection.count}
-          onAddToAlbum={() =>
-            setPickerTarget({ imageIds: ids.filter((id) => selection.selected.has(id)) })
-          }
-          onAssign={
-            onAssignSelected &&
-            (() =>
-              onAssignSelected(
-                ids.filter((id) => selection.selected.has(id)),
-                selection.clear,
-              ))
-          }
+          onAddToAlbum={() => setPickerTarget({ imageIds: selectedIds })}
+          onAssign={onAssignSelected && (() => onAssignSelected(selectedIds, selection.clear))}
           onSetCover={
             onSetCoverSelected && coverFaceId !== null
               ? () => onSetCoverSelected(coverFaceId, selection.clear)
@@ -155,6 +174,8 @@ export function ImageBrowser({
           onRotate={rotatable ? rotateSelected : undefined}
           onHide={hideable ? hideSelected : undefined}
           hideLabel={allHidden ? 'Unhide' : 'Hide'}
+          onSelectAll={() => void selectAllPhotos()}
+          selectAllPending={selectingAll}
           onClear={selection.clear}
         />
       ) : (

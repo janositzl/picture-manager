@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +32,61 @@ public class ImageQueryRepositoryTests
         }
 
         throw new InvalidOperationException("Paging did not terminate.");
+    }
+
+    private static readonly DateTime PeopleNow = new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    // Photos: ab = Anna+Bob, ac = Anna+Cy, abc = all three, a = Anna alone.
+    private static async Task<(PictureManager.Tests.Support.PostgresTestDatabase Db, Person Anna, Person Bob, Person Cy, Image Ab, Image Ac, Image Abc, Image A)> SeedGroupAsync()
+    {
+        var db = await PostgresTestDatabase.CreateAsync();
+        var top = await FaceTestData.SeedRootAsync(db.Context);
+        var ab = await FaceTestData.AddImageAsync(db.Context, top, "n2");
+        var ac = await FaceTestData.AddImageAsync(db.Context, top, "n3");
+        var abc = await FaceTestData.AddImageAsync(db.Context, top, "n4");
+        var a = await FaceTestData.AddImageAsync(db.Context, top, "n1");
+        var model = await FaceTestData.AddModelAsync(db.Context);
+        var anna = new Person { Name = "Anna", CreatedUtc = PeopleNow, ModifiedUtc = PeopleNow };
+        var bob = new Person { Name = "Bob", CreatedUtc = PeopleNow, ModifiedUtc = PeopleNow };
+        var cy = new Person { Name = "Cy", CreatedUtc = PeopleNow, ModifiedUtc = PeopleNow };
+        db.Context.People.AddRange(anna, bob, cy);
+        await db.Context.SaveChangesAsync();
+        var seed = 0;
+        foreach (var (image, people) in new[] { (ab, new[] { anna, bob }), (ac, new[] { anna, cy }), (abc, new[] { anna, bob, cy }), (a, new[] { anna }) })
+            foreach (var person in people)
+                await FaceTestData.AddFaceAsync(db.Context, image.Id, model, FaceTestData.Embedding(seed++), person.Id, FaceAssignmentState.Confirmed);
+        return (db, anna, bob, cy, ab, ac, abc, a);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithPersonIds_RequiresEveryListedPerson()
+    {
+        var (db, anna, bob, cy, ab, _, abc, _) = await SeedGroupAsync();
+        await using var _db = db;
+        var repository = new ImageQueryRepository(db.CreateContext());
+
+        var withBob = await repository.ListAsync(AppUser.InitialAdminId,
+            NoFilter with { PersonId = anna.Id, WithPersonIds = [bob.Id] }, ImageSort.Name, SortDirection.Asc, null, 50);
+        var withBobAndCy = await repository.ListAsync(AppUser.InitialAdminId,
+            NoFilter with { PersonId = anna.Id, WithPersonIds = [bob.Id, cy.Id] }, ImageSort.Name, SortDirection.Asc, null, 50);
+
+        withBob.Select(r => r.Id).Should().Equal(ab.Id, abc.Id);
+        withBobAndCy.Select(r => r.Id).Should().Equal(abc.Id);
+    }
+
+    [Fact]
+    public async Task ListIdsAsync_KeepsTheOrderAndTheCap()
+    {
+        var (db, anna, _, _, ab, ac, abc, a) = await SeedGroupAsync();
+        await using var _db = db;
+        var repository = new ImageQueryRepository(db.CreateContext());
+        var filter = NoFilter with { PersonId = anna.Id };
+
+        var all = await repository.ListIdsAsync(AppUser.InitialAdminId, filter, ImageSort.Name, SortDirection.Asc, 50);
+        var capped = await repository.ListIdsAsync(AppUser.InitialAdminId, filter, ImageSort.Name, SortDirection.Desc, 2);
+
+        all.Should().Equal(a.Id, ab.Id, ac.Id, abc.Id);
+        capped.Should().Equal(abc.Id, ac.Id);
     }
 
     [Fact]
@@ -316,7 +371,7 @@ public class ImageQueryRepositoryTests
     {
         await using var db = await PostgresTestDatabase.CreateAsync();
         var folder = TestData.Folder(TestData.Root("r"), "");
-        var images = new[] { "Ádám", "zebra", "Apple", "ádám2", "Zulu", "apple", "Éva", "eva" }
+        var images = new[] { "ÃdÃ¡m", "zebra", "Apple", "Ã¡dÃ¡m2", "Zulu", "apple", "Ã‰va", "eva" }
             .Select(name => TestData.Image(folder, name)).ToList();
         db.Context.Images.AddRange(images);
         await db.Context.SaveChangesAsync();

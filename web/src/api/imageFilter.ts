@@ -10,8 +10,21 @@ export type ImageFilter = (
   | { kind: 'folder'; folderId: number; faces?: FacesFilter; includeHidden?: boolean }
   | { kind: 'favorites' }
   | { kind: 'search'; q: string; in?: number }
-  | { kind: 'person'; personId: number; state?: 'confirmed' | 'suggested' }
+  | {
+      kind: 'person'
+      personId: number
+      state?: 'confirmed' | 'suggested'
+      /** Only photos where all of these people appear too. */
+      withPersonIds?: number[]
+    }
 ) & { sort: Sort; order: Order }
+
+/** Query string for GET /api/images/ids: the same filters as the list, without paging. */
+export function toImageIdsQuery(filter: ImageFilter): URLSearchParams {
+  const params = toImageQuery(filter, null)
+  params.delete('limit')
+  return params
+}
 
 /** Query string for GET /api/images. */
 export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSearchParams {
@@ -32,6 +45,7 @@ export function toImageQuery(filter: ImageFilter, cursor: string | null): URLSea
     case 'person':
       params.set('personId', String(filter.personId))
       if (filter.state !== undefined) params.set('personState', filter.state)
+      for (const id of filter.withPersonIds ?? []) params.append('withPersonId', String(id))
       break
   }
   params.set('sort', filter.sort)

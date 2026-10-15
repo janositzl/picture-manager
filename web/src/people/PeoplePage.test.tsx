@@ -30,6 +30,33 @@ describe('PeoplePage', () => {
     expect(await screen.findByRole('link', { name: /Peter/ })).toHaveTextContent(/^Peter12$/)
   })
 
+  it('matches names without their accents, and the x clears the search', async () => {
+    server.use(
+      peopleList([
+        { id: 1, name: 'Ábel', confirmedImageCount: 4, suggestedImageCount: 0, coverFaceId: null },
+        { id: 3, name: 'Márti', confirmedImageCount: 2, suggestedImageCount: 0, coverFaceId: null },
+        { id: 4, name: 'Anna', confirmedImageCount: 1, suggestedImageCount: 0, coverFaceId: null },
+      ]),
+    )
+    renderApp('/people')
+    await screen.findByRole('link', { name: /Ábel/ })
+    const box = screen.getByRole('textbox', { name: 'Search people' })
+    const list = within(screen.getByRole('complementary', { name: 'People' }))
+
+    fireEvent.change(box, { target: { value: 'abel' } })
+    expect(list.getByRole('link', { name: /Ábel/ })).toBeInTheDocument()
+    expect(list.queryByRole('link', { name: /Márti/ })).not.toBeInTheDocument()
+
+    fireEvent.change(box, { target: { value: 'Ma' } })
+    expect(list.getByRole('link', { name: /Márti/ })).toBeInTheDocument()
+    expect(list.queryByRole('link', { name: /Ábel/ })).not.toBeInTheDocument()
+
+    fireEvent.click(list.getByRole('button', { name: 'Clear search' }))
+    expect(box).toHaveValue('')
+    expect(list.getByRole('link', { name: /Ábel/ })).toBeInTheDocument()
+    expect(list.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument()
+  })
+
   it('filters by the search text', async () => {
     server.use(peopleList())
     renderApp('/people')
