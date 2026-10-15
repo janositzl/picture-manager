@@ -7,9 +7,7 @@
       "Bash(curl -s -X PUT localhost:5199/api/settings -H 'Content-Type: application/json' -d '{\"excludedFolderNames\":[\"raw\",\"backup\",\"@eaDir\"],\"excludedExtensions\":[\".heic\",\"PNG\"],\"includedExtensions\":null}')",
       "Bash(bash /c/Users/LORAND~1/AppData/Local/Temp/claude/c--Work-PictureManager/b5e2efa4-951f-49c9-b27c-3ec0d87c01fc/scratchpad/scan.sh 1)",
       "Bash(curl -s localhost:5199/api/images?fileName=screenshot)",
-      "Bash(./scripts/wait-for-api.sh *)",
-      "Bash(curl -s http://localhost:5199/*)",
-      "Bash(tail *)"
+      "Bash(./scripts/wait-for-api.sh *)"
     ]
   }
 }
