@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,9 @@ public sealed class FaceRecognitionBackgroundService : BackgroundService
         {
             // Register is idempotent: QueueAsync already registered it, so a cancel while queued is honored here.
             using var jobCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _cancellations.Register(job.JobId));
+            var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation("Face recognition {JobId} started (folder {FolderId}, recursive {IsRecursive}, preset {Preset})",
+                job.JobId, job.FolderId, job.IsRecursive, job.Preset);
             try
             {
                 using var scope = _scopeFactory.CreateScope();
@@ -77,7 +81,26 @@ public sealed class FaceRecognitionBackgroundService : BackgroundService
             finally
             {
                 _cancellations.Release(job.JobId);
+                await LogFinishedAsync(job.JobId, stopwatch.Elapsed);
             }
+        }
+    }
+
+    /// <summary>Logs how the job ended and how long it took; never throws, so it can't disturb the queue loop.</summary>
+    private async Task LogFinishedAsync(int jobId, TimeSpan elapsed)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
+            var finished = await jobs.GetByIdAsync(jobId, CancellationToken.None);
+            _logger.LogInformation(
+                "Face recognition {JobId} finished with status {Status} in {Elapsed}: {Processed}/{Found} images, {Faces} faces",
+                jobId, finished?.Status, elapsed, finished?.FilesEnriched, finished?.FilesFound, finished?.FacesFound);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Face recognition {JobId} finished in {Elapsed} (could not read its final state)", jobId, elapsed);
         }
     }
 

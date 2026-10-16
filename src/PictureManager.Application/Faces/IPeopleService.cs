@@ -11,6 +11,9 @@ public interface IPeopleService
     Task<IReadOnlyList<PersonSummary>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Result<PersonSummary>> GetAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>Named people who appear in photos with this person. state = "confirmed" or "suggested" (which of the person's photos to look at).</summary>
+    Task<Result<IReadOnlyList<PersonCompanion>>> GetCompanionsAsync(int id, string? state, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Names a person or group (trimmed, 1-200 chars). If another person already has that name (case-insensitive),
     /// this one is merged into them and the surviving person is returned.

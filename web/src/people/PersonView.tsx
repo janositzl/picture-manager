@@ -1,17 +1,18 @@
 import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import HideSourceIcon from '@mui/icons-material/HideSource'
-import { Box, Button, IconButton, Tooltip } from '@mui/material'
+import { Box, Button, Chip, IconButton, Tooltip } from '@mui/material'
 import { useState } from 'react'
 import { Link as RouterLink, useLocation, useParams, useSearchParams } from 'react-router'
 import { usePermissions } from '../api/auth'
 import { unknownLabels, usePeople, usePerson, useSetPersonCover } from '../api/people'
 import { useNotify } from '../app/notify'
-import { parseGridParams } from '../routing/urlState'
+import { parseGridParams, parseWithParam, withParams } from '../routing/urlState'
 import { EmptyMessage } from '../shared/EmptyMessage'
 import { GridHeader } from '../views/GridHeader'
 import { ImageBrowser } from '../views/ImageBrowser'
 import { AssignGroupDialog } from './AssignGroupDialog'
+import { CompanionsPanel } from './CompanionsPanel'
 import { FACE_MODES } from './faceModes'
 import { FaceModeToggle } from './FaceModeToggle'
 import { openedFromStrip } from './openedFromStrip'
@@ -38,9 +39,10 @@ function PersonContent({ personId }: PersonContentProps) {
   const { isAdmin } = usePermissions()
   const setCover = useSetPersonCover()
   const notify = useNotify()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const { sort, order } = parseGridParams(searchParams)
+  const withIds = parseWithParam(searchParams)
   const [gridMode, setGridMode] = useStoredChoice('pm.people.gridMode', FACE_MODES, 'photos')
   const [stripMode, setStripMode] = useStoredChoice('pm.people.stripMode', FACE_MODES, 'faces')
   const [editing, setEditing] = useState(false)
@@ -60,98 +62,143 @@ function PersonContent({ personId }: PersonContentProps) {
   const label =
     person.data.name ?? unknownLabels(people.data ?? []).get(personId) ?? 'Unknown person'
 
+  const withNames = withIds.map(
+    (id) => people.data?.find((other) => other.id === id)?.name ?? 'Someone',
+  )
+  const applyWith = (ids: number[]) =>
+    setSearchParams((prev) => withParams(prev, { with: ids.join(',') || null }))
+
   return (
-    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <ImageBrowser
-        filter={{ kind: 'person', personId, state: gridState, sort, order }}
-        showFaceCrops={gridMode === 'faces'}
-        faceReview={isAdmin ? { personId } : undefined}
-        onAssignSelected={
-          isAdmin && isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined
-        }
-        onSetCoverSelected={
-          isAdmin
-            ? (faceId, clearSelection) =>
-                setCover.mutate(
-                  { id: personId, faceId },
-                  {
-                    onSuccess: () => {
-                      notify('Cover updated.')
-                      clearSelection()
+    <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <ImageBrowser
+          filter={{
+            kind: 'person',
+            personId,
+            state: gridState,
+            withPersonIds: withIds.length > 0 ? withIds : undefined,
+            sort,
+            order,
+          }}
+          showFaceCrops={gridMode === 'faces'}
+          faceReview={isAdmin ? { personId } : undefined}
+          onAssignSelected={
+            isAdmin && isGroup ? (imageIds, clear) => setAssigning({ imageIds, clear }) : undefined
+          }
+          onSetCoverSelected={
+            isAdmin
+              ? (faceId, clearSelection) =>
+                  setCover.mutate(
+                    { id: personId, faceId },
+                    {
+                      onSuccess: () => {
+                        notify('Cover updated.')
+                        clearSelection()
+                      },
+                      onError: () => notify("Couldn't change the cover."),
                     },
-                    onError: () => notify("Couldn't change the cover."),
-                  },
-                )
-            : undefined
-        }
-        viewerEnabled={!openedFromStrip(location.state)}
-        banner={
-          isAdmin &&
-          !isGroup && (
-            <SuggestedStrip
-              key={personId}
-              personId={personId}
+                  )
+              : undefined
+          }
+          viewerEnabled={!openedFromStrip(location.state)}
+          banner={
+            isAdmin &&
+            !isGroup && (
+              <SuggestedStrip
+                key={personId}
+                personId={personId}
+                sort={sort}
+                order={order}
+                mode={stripMode}
+                onModeChange={setStripMode}
+              />
+            )
+          }
+          header={
+            <GridHeader
+              title={label}
+              count={
+                withIds.length > 0
+                  ? undefined
+                  : isGroup
+                    ? person.data.suggestedImageCount
+                    : person.data.confirmedImageCount
+              }
               sort={sort}
               order={order}
-              mode={stripMode}
-              onModeChange={setStripMode}
-            />
-          )
-        }
-        header={
-          <GridHeader
-            title={label}
-            count={isGroup ? person.data.suggestedImageCount : person.data.confirmedImageCount}
-            sort={sort}
-            order={order}
-            titleAdornment={
-              isAdmin ? (
+              titleAdornment={
+                isAdmin ? (
+                  <>
+                    <Tooltip title="Edit person">
+                      <IconButton
+                        size="small"
+                        aria-label="Edit person"
+                        onClick={() => setEditing(true)}
+                        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                      >
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {isGroup && (
+                      <Tooltip title="Assign to person">
+                        <IconButton
+                          size="small"
+                          aria-label="Assign to person"
+                          onClick={() => setAssigning({})}
+                          className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                        >
+                          <DriveFileMoveOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {isGroup && (
+                      <Tooltip title="Ignore group">
+                        <IconButton
+                          size="small"
+                          aria-label="Ignore group"
+                          onClick={() => setIgnoring(true)}
+                          className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
+                        >
+                          <HideSourceIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </>
+                ) : undefined
+              }
+              actions={
                 <>
-                  <Tooltip title="Edit person">
-                    <IconButton
+                  {withIds.length > 0 && (
+                    <Chip
                       size="small"
-                      aria-label="Edit person"
-                      onClick={() => setEditing(true)}
-                      className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-                    >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  {isGroup && (
-                    <Tooltip title="Assign to person">
-                      <IconButton
-                        size="small"
-                        aria-label="Assign to person"
-                        onClick={() => setAssigning({})}
-                        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-                      >
-                        <DriveFileMoveOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                      label={`With ${withNames.join(', ')}`}
+                      onDelete={() => applyWith([])}
+                      sx={{ maxWidth: 320 }}
+                    />
                   )}
-                  {isGroup && (
-                    <Tooltip title="Ignore group">
-                      <IconButton
-                        size="small"
-                        aria-label="Ignore group"
-                        onClick={() => setIgnoring(true)}
-                        className="transition-all duration-200 ease-in-out hover:scale-[1.05]"
-                      >
-                        <HideSourceIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                  <FaceModeToggle value={gridMode} onChange={setGridMode} label="Grid view" />
                 </>
-              ) : undefined
-            }
-            actions={<FaceModeToggle value={gridMode} onChange={setGridMode} label="Grid view" />}
-          />
-        }
-        emptyState={
-          <EmptyMessage>
-            {isGroup ? 'No photos for this person.' : 'No confirmed photos yet.'}
-          </EmptyMessage>
-        }
+              }
+            />
+          }
+          emptyState={
+            <EmptyMessage>
+              {withIds.length > 0
+                ? 'No photos with all selected people.'
+                : isGroup
+                  ? 'No photos for this person.'
+                  : 'No confirmed photos yet.'}
+            </EmptyMessage>
+          }
+        />
+      </Box>
+      <CompanionsPanel
+        key={`${personId}:${withIds.join(',')}`}
+        personId={personId}
+        label={label}
+        state={gridState}
+        applied={withIds}
+        onApply={applyWith}
       />
       {ignoring && (
         <IgnoreGroupConfirm

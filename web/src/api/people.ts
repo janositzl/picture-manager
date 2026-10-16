@@ -27,9 +27,18 @@ export type ImageFace = {
 
 export type AssignTarget = { personId: number } | { name: string }
 
+/** A named person who appears in photos with another person; sharedImageCount = distinct such photos. */
+export type PersonCompanion = {
+  id: number
+  name: string
+  coverFaceId: number | null
+  sharedImageCount: number
+}
+
 export const peopleKeys = {
   all: () => ['people'] as const,
   one: (id: number) => ['people', id] as const,
+  companions: (id: number, state: string) => ['people', id, 'companions', state] as const,
 }
 
 export const faceKeys = {
@@ -52,6 +61,20 @@ export function usePerson(id: number) {
   return useQuery({
     queryKey: peopleKeys.one(id),
     queryFn: () => apiFetch<PersonSummary>(`/api/people/${id}`),
+  })
+}
+
+/** Who appears in photos with this person. Fetches only while `enabled` (the panel is open). */
+export function usePersonCompanions(
+  id: number,
+  state: 'confirmed' | 'suggested',
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: peopleKeys.companions(id, state),
+    queryFn: ({ signal }) =>
+      apiFetch<PersonCompanion[]>(`/api/people/${id}/companions?state=${state}`, { signal }),
+    enabled,
   })
 }
 

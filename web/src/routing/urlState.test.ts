@@ -4,6 +4,7 @@ import {
   parseHiddenParam,
   parseId,
   parseSearchState,
+  parseWithParam,
   withParams,
 } from './urlState'
 
@@ -79,5 +80,16 @@ describe('parseHiddenParam', () => {
     expect(parseHiddenParam(params('hidden=1'))).toBe(true)
     expect(parseHiddenParam(params('hidden=0'))).toBe(false)
     expect(parseHiddenParam(params(''))).toBe(false)
+  })
+})
+
+describe('parseWithParam', () => {
+  it('returns sorted, unique, valid ids', () => {
+    expect(parseWithParam(params('with=9,3,9,x,0,-2,07'))).toEqual([3, 9])
+  })
+
+  it('is empty without the parameter', () => {
+    expect(parseWithParam(params(''))).toEqual([])
+    expect(parseWithParam(params('with='))).toEqual([])
   })
 })

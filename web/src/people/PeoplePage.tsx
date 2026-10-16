@@ -1,6 +1,7 @@
 import FaceRetouchingNaturalIcon from '@mui/icons-material/FaceRetouchingNatural'
+import ClearIcon from '@mui/icons-material/Clear'
 import SearchIcon from '@mui/icons-material/Search'
-import { Box, Button, InputAdornment, TextField, Tooltip, Typography } from '@mui/material'
+import { Box, Button, IconButton, InputAdornment, TextField, Tooltip, Typography } from '@mui/material'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -8,6 +9,7 @@ import { usePermissions } from '../api/auth'
 import { unknownLabels, usePeople, type PersonSummary } from '../api/people'
 import { HEADING_SX } from '../design/accent'
 import { EmptyMessage } from '../shared/EmptyMessage'
+import { foldText } from '../shared/foldText'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { useFolderJobs } from '../tree/FolderJobsContext'
 import { countText } from './countText'
@@ -153,11 +155,11 @@ function PeopleList() {
 
   const all = people.data ?? []
   const labels = unknownLabels(all)
-  const needle = search.trim().toLowerCase()
+  const needle = foldText(search.trim())
   const needsReview = all.filter((person) => person.suggestedImageCount > 0).length
   const rows = all
     .map((person) => ({ person, label: person.name ?? labels.get(person.id) ?? 'Unknown' }))
-    .filter((row) => row.label.toLowerCase().includes(needle))
+    .filter((row) => foldText(row.label).includes(needle))
     .filter((row) => !needsReviewOnly || row.person.suggestedImageCount > 0)
   const named = pendingFirst(rows.filter((row) => row.person.name !== null))
   const unknown = pendingFirst(rows.filter((row) => row.person.name === null).sort((a, b) => a.person.id - b.person.id))
@@ -197,6 +199,19 @@ function PeopleList() {
               startAdornment: (
                 <InputAdornment position="start">
                   <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: search !== '' && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="Clear search"
+                    onClick={() => setSearch('')}
+                    sx={{ p: 0.25 }}
+                  >
+                    <ClearIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
                 </InputAdornment>
               ),
             },

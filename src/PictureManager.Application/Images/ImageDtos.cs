@@ -68,7 +68,8 @@ public sealed record ImageListRequest(
     int? PersonId = null,
     string? PersonState = null,
     string? Faces = null,
-    bool IncludeHidden = false);
+    bool IncludeHidden = false,
+    IReadOnlyList<int>? WithPersonIds = null);
 
 /// <summary>Cursor payload. Key = SortDate ticks (date sort) or the DB's lower(FileName) (name sort).</summary>
 public sealed record ImageCursor(

@@ -13,6 +13,7 @@ public static class PeopleEndpoints
     {
         user.MapGet("/people", GetAllAsync);
         user.MapGet("/people/{id:int}", GetAsync);
+        user.MapGet("/people/{id:int}/companions", GetCompanionsAsync);
         admin.MapPatch("/people/{id:int}", NameAsync);
         admin.MapPut("/people/{id:int}/cover", SetCoverAsync);
         admin.MapDelete("/people/{id:int}", DeleteAsync);
@@ -93,6 +94,10 @@ public static class PeopleEndpoints
     public static async Task<Results<Ok<PersonSummary>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetAsync(
         int id, IPeopleService service, CancellationToken cancellationToken) =>
         (await service.GetAsync(id, cancellationToken)).ToOk();
+
+    public static async Task<Results<Ok<IReadOnlyList<PersonCompanion>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetCompanionsAsync(
+        int id, string? state, IPeopleService service, CancellationToken cancellationToken) =>
+        (await service.GetCompanionsAsync(id, state ?? "confirmed", cancellationToken)).ToOk();
 
     public static async Task<Results<Ok<PersonSummary>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> NameAsync(
         int id, PersonNameRequest request, IPeopleService service, CancellationToken cancellationToken) =>

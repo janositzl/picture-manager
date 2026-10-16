@@ -7,13 +7,24 @@ export type Selection = {
   isSelecting: boolean
   toggle: (id: number, mods: SelectMods) => void
   selectAll: () => void
+  /** Selects exactly these ids, which may include photos that are not loaded yet. */
+  selectIds: (ids: readonly number[]) => void
   clear: () => void
+}
+
+type Options = {
+  /** Replaces Ctrl+A when selecting "all" means more than the loaded photos. */
+  onSelectAll?: () => void
 }
 
 type State = { key: string; ids: ReadonlySet<number>; anchor: number | null }
 
 /** In-memory selection over a grid, in grid order; starts empty again whenever `resetKey` changes. */
-export function useSelection(orderedIds: readonly number[], resetKey: string): Selection {
+export function useSelection(
+  orderedIds: readonly number[],
+  resetKey: string,
+  options: Options = {},
+): Selection {
   const [state, setState] = useState<State>({ key: resetKey, ids: new Set(), anchor: null })
   const current: State =
     state.key === resetKey ? state : { key: resetKey, ids: new Set(), anchor: null }
@@ -36,6 +47,8 @@ export function useSelection(orderedIds: readonly number[], resetKey: string): S
 
   const selectAll = () =>
     setState({ key: resetKey, ids: new Set(orderedIds), anchor: current.anchor })
+  const selectIds = (ids: readonly number[]) =>
+    setState({ key: resetKey, ids: new Set(ids), anchor: current.anchor })
   const clear = () => setState({ key: resetKey, ids: new Set(), anchor: null })
 
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -48,7 +61,8 @@ export function useSelection(orderedIds: readonly number[], resetKey: string): S
       clear()
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
-      selectAll()
+      if (options.onSelectAll) options.onSelectAll()
+      else selectAll()
     }
   })
 
@@ -60,5 +74,13 @@ export function useSelection(orderedIds: readonly number[], resetKey: string): S
     return () => window.removeEventListener('keydown', listener)
   }, [isSelecting])
 
-  return { selected: current.ids, count: current.ids.size, isSelecting, toggle, selectAll, clear }
+  return {
+    selected: current.ids,
+    count: current.ids.size,
+    isSelecting,
+    toggle,
+    selectAll,
+    selectIds,
+    clear,
+  }
 }

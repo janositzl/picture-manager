@@ -15,6 +15,11 @@ public interface IImageQueryRepository
         int userId, ImageListFilter filter, ImageSort sort, SortDirection direction, ImageKeyset? after, int take,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Ids of the photos matching the filter, in the given order; at most <paramref name="take"/>.</summary>
+    Task<IReadOnlyList<int>> ListIdsAsync(
+        int userId, ImageListFilter filter, ImageSort sort, SortDirection direction, int take,
+        CancellationToken cancellationToken = default);
+
     Task<ImageDetailRow?> GetVisibleDetailAsync(int id, int userId, CancellationToken cancellationToken = default);
 
     /// <summary>Albums containing the image that <paramref name="userId"/> owns or has been shared, ordered by name.</summary>
