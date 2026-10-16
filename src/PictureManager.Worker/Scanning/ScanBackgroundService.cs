@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,11 +34,15 @@ public sealed class ScanBackgroundService : BackgroundService
     {
         await foreach (var scan in _queue.ReadAllAsync(stoppingToken))
         {
+            var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation("Scan {ScanJobId} started", scan.ScanJobId);
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var scanService = scope.ServiceProvider.GetRequiredService<IScanService>();
                 await scanService.RunScanAsync(scan, stoppingToken);
+                // Enumeration only: files are enriched afterwards by EnrichmentBackgroundService.
+                _logger.LogInformation("Scan {ScanJobId} enumeration finished in {Elapsed}", scan.ScanJobId, stopwatch.Elapsed);
             }
             catch (Exception ex) when (ex is ScanRootsUnavailableException or ScanRootUnavailableException
                                             or FolderUnavailableException or FolderNotOnDiskException)
