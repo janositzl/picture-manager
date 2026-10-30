@@ -49,6 +49,9 @@ public interface IFaceReviewRepository
     /// <summary>Accepts every Suggested face of the person.</summary>
     Task<int> AcceptAllAsync(int personId, CancellationToken cancellationToken = default);
 
+    /// <summary>Accepts the person's Suggested faces in the given images only.</summary>
+    Task<int> AcceptImagesAsync(int personId, IReadOnlyCollection<int> imageIds, CancellationToken cancellationToken = default);
+
     /// <summary>Accepts the person's Suggested faces in one image.</summary>
     Task<int> AcceptImageAsync(int personId, int imageId, CancellationToken cancellationToken = default);
 

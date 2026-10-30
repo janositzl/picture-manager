@@ -135,6 +135,11 @@ public sealed class FaceReviewService : IFaceReviewService
             ? Result<CountResponse>.Ok(new CountResponse(await _review.AcceptAllAsync(personId, cancellationToken)))
             : Result.NotFound();
 
+    public async Task<Result<CountResponse>> AcceptImagesAsync(int personId, IReadOnlyCollection<int> imageIds, CancellationToken cancellationToken = default) =>
+        await _review.PersonExistsAsync(personId, cancellationToken)
+            ? Result<CountResponse>.Ok(new CountResponse(imageIds.Count == 0 ? 0 : await _review.AcceptImagesAsync(personId, imageIds, cancellationToken)))
+            : Result.NotFound();
+
     public Task<Result> AcceptImageAsync(int personId, int imageId, CancellationToken cancellationToken = default) =>
         OnPersonAsync(personId, () => _review.AcceptImageAsync(personId, imageId, cancellationToken), cancellationToken);
 

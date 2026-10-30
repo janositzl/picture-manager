@@ -56,6 +56,41 @@ describe('Suggested strip', () => {
     expect(await screen.findByText('Accepted 1 suggestion.')).toBeInTheDocument()
   })
 
+  it('offers "Accept listed" only while more suggestions are unlisted, and sends just the listed photos', async () => {
+    let body: unknown = null
+    server.use(
+      peopleList(),
+      person(peopleFixture[0]),
+      http.get('/api/images', ({ request }) => {
+        const state = new URL(request.url).searchParams.get('personState')
+        return state === 'suggested'
+          ? HttpResponse.json({ items: [{ ...first, faceId: 55 }], nextCursor: 'more' })
+          : HttpResponse.json({ items: [{ ...second, faceId: 56 }], nextCursor: null })
+      }),
+      http.post('/api/people/1/suggestions/accept-images', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ count: 1 })
+      }),
+    )
+    const { user } = renderApp('/people/1')
+    const strip = await screen.findByRole('region', { name: 'Suggested' })
+
+    await user.click(await within(strip).findByRole('button', { name: 'Accept listed' }))
+
+    await waitFor(() => expect(body).toEqual({ imageIds: [first.id] }))
+    expect(within(strip).getByRole('button', { name: 'Accept all' })).toBeInTheDocument()
+    expect(await screen.findByText('Accepted 1 listed suggestion.')).toBeInTheDocument()
+  })
+
+  it('has no "Accept listed" when every suggestion is listed', async () => {
+    server.use(peopleList(), person(peopleFixture[0]), personImages)
+    renderApp('/people/1')
+    const strip = await screen.findByRole('region', { name: 'Suggested' })
+    await within(strip).findByRole('button', { name: 'Accept all' })
+
+    expect(within(strip).queryByRole('button', { name: 'Accept listed' })).not.toBeInTheDocument()
+  })
+
   it('reviews with the keyboard: A accepts and R rejects the focused photo, and progress is shown', async () => {
     const sent: string[] = []
     server.use(

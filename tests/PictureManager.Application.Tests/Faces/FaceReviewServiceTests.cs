@@ -192,4 +192,16 @@ public class FaceReviewServiceTests
         (await Create().AcceptAllAsync(8)).Status.Should().Be(ResultStatus.NotFound);
         (await Create().AcceptAllAsync(7)).Value!.Count.Should().Be(4);
     }
+
+    [Fact]
+    public async Task AcceptImages_UnknownPerson_IsNotFound_KnownReturnsTheCount_EmptyTouchesNothing()
+    {
+        int[] ids = [1, 2];
+        _review.AcceptImagesAsync(7, Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(2);
+
+        (await Create().AcceptImagesAsync(8, ids)).Status.Should().Be(ResultStatus.NotFound);
+        (await Create().AcceptImagesAsync(7, ids)).Value!.Count.Should().Be(2);
+        (await Create().AcceptImagesAsync(7, [])).Value!.Count.Should().Be(0);
+        await _review.Received(1).AcceptImagesAsync(7, Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>());
+    }
 }

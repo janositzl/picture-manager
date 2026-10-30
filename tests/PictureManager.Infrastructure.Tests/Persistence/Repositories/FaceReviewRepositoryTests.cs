@@ -172,6 +172,21 @@ public class FaceReviewRepositoryTests
     }
 
     [Fact]
+    public async Task AcceptImages_ConfirmsOnlyThePersonsSuggestionsInTheGivenImages()
+    {
+        var s = await SeedAsync();
+        await using var _ = s.Db;
+        var listed = await AddAsync(s, 0, s.Anna.Id, FaceAssignmentState.Suggested);
+        var theirs = await AddAsync(s, 1, s.Bela.Id, FaceAssignmentState.Suggested);
+
+        (await new FaceReviewRepository(s.Db.CreateContext()).AcceptImagesAsync(s.Anna.Id, [s.ImageId, s.ImageId + 1000])).Should().Be(1);
+        (await new FaceReviewRepository(s.Db.CreateContext()).AcceptImagesAsync(s.Anna.Id, [s.ImageId + 1000])).Should().Be(0);
+
+        (await ReadAsync(s, listed.Id)).AssignmentState.Should().Be(FaceAssignmentState.Confirmed);
+        (await ReadAsync(s, theirs.Id)).AssignmentState.Should().Be(FaceAssignmentState.Suggested);
+    }
+
+    [Fact]
     public async Task RejectImage_OnlyAffectsThatPersonsSuggestionInThatImage()
     {
         var s = await SeedAsync();

@@ -106,6 +106,12 @@ public sealed class FaceReviewRepository : IFaceReviewRepository
     public Task<int> AcceptAllAsync(int personId, CancellationToken cancellationToken = default) =>
         AcceptWhere(f => f.PersonId == personId, cancellationToken);
 
+    public Task<int> AcceptImagesAsync(int personId, IReadOnlyCollection<int> imageIds, CancellationToken cancellationToken = default)
+    {
+        var ids = imageIds.ToArray();
+        return AcceptWhere(f => f.PersonId == personId && ids.Contains(f.ImageId), cancellationToken);
+    }
+
     public Task<int> AcceptImageAsync(int personId, int imageId, CancellationToken cancellationToken = default) =>
         AcceptWhere(f => f.PersonId == personId && f.ImageId == imageId, cancellationToken);
 

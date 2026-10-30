@@ -7,7 +7,12 @@ import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import { withBase } from '../api/client'
 import type { ImageFilter } from '../api/imageFilter'
-import { faceThumbnailUrl, useAcceptAllSuggestions, useImageSuggestion } from '../api/people'
+import {
+  faceThumbnailUrl,
+  useAcceptAllSuggestions,
+  useAcceptListedSuggestions,
+  useImageSuggestion,
+} from '../api/people'
 import { useImages } from '../api/queries'
 import type { ImageListItem } from '../api/types'
 import { useNotify } from '../app/notify'
@@ -45,6 +50,7 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
   const { image } = parseGridParams(searchParams)
   const suggestion = useImageSuggestion()
   const acceptAll = useAcceptAllSuggestions()
+  const acceptListed = useAcceptListedSuggestions()
   const notify = useNotify()
 
   if (items.length === 0) return null
@@ -118,6 +124,31 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
           </span>
         )}
         <FaceModeToggle value={mode} onChange={onModeChange} label="Suggested view" />
+        {images.hasNextPage && (
+          // Not every suggestion is listed yet: this accepts only the ones on screen.
+          <Button
+            size="small"
+            variant="outlined"
+            color="success"
+            startIcon={<CheckIcon fontSize="small" />}
+            sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 500 }}
+            disabled={acceptListed.isPending || acceptAll.isPending}
+            onClick={() =>
+              acceptListed.mutate(
+                { personId, imageIds: items.map((item) => item.id) },
+                {
+                  onSuccess: ({ count }) => {
+                    setReviewed((value) => value + count)
+                    notify(`Accepted ${count} listed ${count === 1 ? 'suggestion' : 'suggestions'}.`)
+                  },
+                  onError: () => notify("Couldn't accept the listed suggestions."),
+                },
+              )
+            }
+          >
+            Accept listed
+          </Button>
+        )}
         <Button
           size="small"
           variant="contained"
@@ -125,7 +156,7 @@ export function SuggestedStrip({ personId, sort, order, mode, onModeChange }: Pr
           disableElevation
           startIcon={<CheckIcon fontSize="small" />}
           sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 500 }}
-          disabled={acceptAll.isPending}
+          disabled={acceptAll.isPending || acceptListed.isPending}
           onClick={() =>
             acceptAll.mutate(personId, {
               onSuccess: ({ count }) => {

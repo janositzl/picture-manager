@@ -41,6 +41,8 @@ public interface IFaceReviewService
     Task<Result<CountResponse>> RecheckFacesAsync(int imageId, CancellationToken cancellationToken = default);
 
     Task<Result<CountResponse>> AcceptAllAsync(int personId, CancellationToken cancellationToken = default);
+    /// <summary>Accepts the person's Suggested faces in just the given images; returns how many faces were confirmed.</summary>
+    Task<Result<CountResponse>> AcceptImagesAsync(int personId, IReadOnlyCollection<int> imageIds, CancellationToken cancellationToken = default);
     Task<Result> AcceptImageAsync(int personId, int imageId, CancellationToken cancellationToken = default);
     Task<Result> RejectImageAsync(int personId, int imageId, CancellationToken cancellationToken = default);
 }

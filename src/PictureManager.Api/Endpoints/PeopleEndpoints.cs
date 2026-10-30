@@ -31,6 +31,7 @@ public static class PeopleEndpoints
         admin.MapPost("/faces/{id:int}/restore", RestoreAsync);
         admin.MapPost("/faces/{id:int}/assign", AssignAsync);
         admin.MapPost("/people/{id:int}/suggestions/accept", AcceptAllAsync);
+        admin.MapPost("/people/{id:int}/suggestions/accept-images", AcceptImagesAsync);
         admin.MapPost("/people/{id:int}/images/{imageId:int}/accept", AcceptImageAsync);
         admin.MapPost("/people/{id:int}/images/{imageId:int}/reject", RejectImageAsync);
         return user;
@@ -79,6 +80,10 @@ public static class PeopleEndpoints
     public static async Task<Results<Ok<CountResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AcceptAllAsync(
         int id, IFaceReviewService service, CancellationToken cancellationToken) =>
         (await service.AcceptAllAsync(id, cancellationToken)).ToOk();
+
+    public static async Task<Results<Ok<CountResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AcceptImagesAsync(
+        int id, AcceptImagesRequest request, IFaceReviewService service, CancellationToken cancellationToken) =>
+        (await service.AcceptImagesAsync(id, request.ImageIds ?? [], cancellationToken)).ToOk();
 
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> AcceptImageAsync(
         int id, int imageId, IFaceReviewService service, CancellationToken cancellationToken) =>
@@ -131,5 +136,7 @@ public sealed record PersonCoverRequest(int? FaceId);
 public sealed record PersonNameRequest(string? Name);
 
 public sealed record ReanalyzeImageRequest(string? Preset);
+
+public sealed record AcceptImagesRequest(IReadOnlyList<int>? ImageIds);
 
 public sealed record AssignGroupRequest(int PersonId, IReadOnlyList<int>? ImageIds = null);

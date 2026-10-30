@@ -253,6 +253,16 @@ export function useAcceptAllSuggestions() {
   })
 }
 
+/** Accept a person's suggestions in just the given photos (the listed ones); resolves to how many faces were confirmed. */
+export function useAcceptListedSuggestions() {
+  const invalidate = useInvalidatePeopleData()
+  return useMutation({
+    mutationFn: ({ personId, imageIds }: { personId: number; imageIds: number[] }) =>
+      post<{ count: number }>(`/api/people/${personId}/suggestions/accept-images`, { imageIds }),
+    onSuccess: invalidate,
+  })
+}
+
 /** Accept or reject one person's suggestion in one photo. */
 export function useImageSuggestion() {
   const invalidate = useInvalidatePeopleData()
