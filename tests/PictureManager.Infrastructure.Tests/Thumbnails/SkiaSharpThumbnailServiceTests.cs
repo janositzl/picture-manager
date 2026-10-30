@@ -145,6 +145,47 @@ public class SkiaSharpThumbnailServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOrCreateDerivativePathAsync_LargeJpegDecodedDownsampled_ResizedToLongestEdge()
+    {
+        var largePath = Path.Combine(_cacheRoot, "large.jpg");
+        WriteTestJpeg(largePath, width: 4000, height: 3000);
+        var service = CreateService();
+
+        var path = await service.GetOrCreateDerivativePathAsync("largehash", largePath, orientation: 1, DerivativeSize.Thumbnail);
+
+        using var stream = File.OpenRead(path!);
+        using var resultBitmap = SKBitmap.Decode(stream);
+        resultBitmap.Width.Should().Be(300);
+        resultBitmap.Height.Should().Be(225);
+    }
+
+    [Fact]
+    public async Task GetOrCreateDerivativePathAsync_OrientationSixPlusRotation_CombinesBothTurns()
+    {
+        var service = CreateService();
+
+        // 400x200 landscape: orientation 6 makes it portrait, a further 90 makes it landscape again.
+        var path = await service.GetOrCreateDerivativePathAsync("rot6plus90", _sourcePath, orientation: 6, DerivativeSize.Thumbnail, rotation: 90);
+
+        using var stream = File.OpenRead(path!);
+        using var resultBitmap = SKBitmap.Decode(stream);
+        resultBitmap.Width.Should().Be(300);
+        resultBitmap.Height.Should().Be(150);
+    }
+
+    [Fact]
+    public async Task GetOrCreateDerivativePathAsync_ManyConcurrentRequests_AllProduceTheirFile()
+    {
+        var service = new SkiaSharpThumbnailService(
+            new ThumbnailCacheOptions { RootPath = _cacheRoot, MaxConcurrentGenerations = 2 });
+
+        var paths = await Task.WhenAll(Enumerable.Range(0, 12).Select(i =>
+            service.GetOrCreateDerivativePathAsync($"conc{i:D4}", _sourcePath, orientation: 1, DerivativeSize.Thumbnail)));
+
+        paths.Should().OnlyContain(p => p != null && File.Exists(p));
+    }
+
+    [Fact]
     public async Task GetOrCreateDerivativePathAsync_CacheHit_DoesNotRewriteTheFile()
     {
         var service = CreateService();

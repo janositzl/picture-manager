@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
+using PictureManager.Application.Thumbnails;
 using PictureManager.Model;
 
 namespace PictureManager.Application.Scanning;
@@ -18,11 +19,13 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
     private readonly IPerceptualHasher _perceptualHasher;
     private readonly IClock _clock;
     private readonly ILogger<ImageEnrichmentService> _logger;
+    private readonly IThumbnailService _thumbnailService;
 
     public ImageEnrichmentService(
         IImageRepository imageRepository, IContentHasher contentHasher, IExifReader exifReader, IImageValidator imageValidator,
-        IPerceptualHasher perceptualHasher, IClock clock, ILogger<ImageEnrichmentService> logger)
+        IPerceptualHasher perceptualHasher, IClock clock, ILogger<ImageEnrichmentService> logger, IThumbnailService thumbnailService)
     {
+        _thumbnailService = thumbnailService;
         _imageRepository = imageRepository;
         _contentHasher = contentHasher;
         _exifReader = exifReader;
@@ -100,5 +103,20 @@ public sealed class ImageEnrichmentService : IImageEnrichmentService
         image.UpdatedAt = _clock.UtcNow;
 
         await _imageRepository.UpdateAsync(image, cancellationToken);
+
+        // Warm the grid thumbnail now (one image at a time, on the enrichment worker) so opening the folder
+        // later is all cache hits. A failure here only means the thumbnail is made on demand instead.
+        if (isValid && !string.IsNullOrEmpty(hash))
+        {
+            try
+            {
+                await _thumbnailService.GetOrCreateDerivativePathAsync(
+                    hash, physicalPath, exif.Orientation, DerivativeSize.Thumbnail, cancellationToken, image.ThumbnailRotation);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Thumbnail pre-generation failed for image {ImageId}", image.Id);
+            }
+        }
     }
 }

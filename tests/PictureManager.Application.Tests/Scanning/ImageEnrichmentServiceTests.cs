@@ -9,6 +9,7 @@ using NSubstitute;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Scanning;
+using PictureManager.Application.Thumbnails;
 using PictureManager.Model;
 using Xunit;
 
@@ -53,7 +54,7 @@ public class ImageEnrichmentServiceTests
             var imageValidator = Substitute.For<IImageValidator>();
             imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance, Substitute.For<IThumbnailService>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(
@@ -103,7 +104,7 @@ public class ImageEnrichmentServiceTests
             var clock = Substitute.For<IClock>();
             clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance, Substitute.For<IThumbnailService>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(
@@ -134,7 +135,7 @@ public class ImageEnrichmentServiceTests
         clock.UtcNow.Returns(new DateTime(2026, 9, 22, 0, 0, 0, DateTimeKind.Utc));
 
         var service = new ImageEnrichmentService(
-            imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(), Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance);
+            imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(), Substitute.For<IPerceptualHasher>(), clock, NullLogger<ImageEnrichmentService>.Instance, Substitute.For<IThumbnailService>());
         await service.EnrichAsync(2);
 
         await imageRepository.Received(1).UpdateAsync(
@@ -157,7 +158,7 @@ public class ImageEnrichmentServiceTests
 
         var service = new ImageEnrichmentService(
             imageRepository, Substitute.For<IContentHasher>(), Substitute.For<IExifReader>(), Substitute.For<IImageValidator>(),
-            Substitute.For<IPerceptualHasher>(), Substitute.For<IClock>(), NullLogger<ImageEnrichmentService>.Instance);
+            Substitute.For<IPerceptualHasher>(), Substitute.For<IClock>(), NullLogger<ImageEnrichmentService>.Instance, Substitute.For<IThumbnailService>());
         await service.EnrichAsync(2);
 
         await imageRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
@@ -200,7 +201,7 @@ public class ImageEnrichmentServiceTests
             var imageValidator = Substitute.For<IImageValidator>();
             imageValidator.IsValidAsync(tempFile, Arg.Any<CancellationToken>()).Returns(true);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), Substitute.For<IClock>(), NullLogger<ImageEnrichmentService>.Instance);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, Substitute.For<IPerceptualHasher>(), Substitute.For<IClock>(), NullLogger<ImageEnrichmentService>.Instance, Substitute.For<IThumbnailService>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).DeleteAsync(staleMissingImage, Arg.Any<CancellationToken>());
@@ -212,7 +213,8 @@ public class ImageEnrichmentServiceTests
     }
 
     private static async Task<(Image Image, IPerceptualHasher Hasher)> EnrichWithHasherAsync(
-        bool isValid, Action<IPerceptualHasher, string> configureHasher, ILogger<ImageEnrichmentService>? logger = null)
+        bool isValid, Action<IPerceptualHasher, string> configureHasher, ILogger<ImageEnrichmentService>? logger = null,
+        IThumbnailService? thumbnailService = null)
     {
         var tempFile = Path.GetTempFileName();
         try
@@ -240,7 +242,7 @@ public class ImageEnrichmentServiceTests
             var hasher = Substitute.For<IPerceptualHasher>();
             configureHasher(hasher, tempFile);
 
-            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, hasher, Substitute.For<IClock>(), logger ?? NullLogger<ImageEnrichmentService>.Instance);
+            var service = new ImageEnrichmentService(imageRepository, contentHasher, exifReader, imageValidator, hasher, Substitute.For<IClock>(), logger ?? NullLogger<ImageEnrichmentService>.Instance, thumbnailService ?? Substitute.For<IThumbnailService>());
             await service.EnrichAsync(1);
 
             await imageRepository.Received(1).UpdateAsync(image, Arg.Any<CancellationToken>());
@@ -302,6 +304,40 @@ public class ImageEnrichmentServiceTests
                 .Returns<string?>(_ => throw new InvalidDataException("bad pixels")), logger);
 
         logger.Received(1).Log(LogLevel.Warning, Arg.Any<EventId>(), Arg.Any<object>(), Arg.Any<Exception?>(), Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task EnrichAsync_ValidImage_PreGeneratesTheThumbnail()
+    {
+        var thumbnails = Substitute.For<IThumbnailService>();
+
+        await EnrichWithHasherAsync(true, (_, _) => { }, thumbnailService: thumbnails);
+
+        await thumbnails.Received(1).GetOrCreateDerivativePathAsync(
+            "hash-abc", Arg.Any<string>(), Arg.Any<int?>(), DerivativeSize.Thumbnail, Arg.Any<CancellationToken>(), Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task EnrichAsync_InvalidImage_DoesNotPreGenerateTheThumbnail()
+    {
+        var thumbnails = Substitute.For<IThumbnailService>();
+
+        await EnrichWithHasherAsync(false, (_, _) => { }, thumbnailService: thumbnails);
+
+        await thumbnails.DidNotReceiveWithAnyArgs().GetOrCreateDerivativePathAsync(default!, default!, default, default, default, default);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_ThumbnailServiceThrows_StillSavesTheRow()
+    {
+        var thumbnails = Substitute.For<IThumbnailService>();
+        thumbnails.GetOrCreateDerivativePathAsync(default!, default!, default, default, default, default)
+            .ReturnsForAnyArgs<string?>(_ => throw new IOException("disk full"));
+
+        // The helper itself asserts the row was updated exactly once.
+        var (image, _) = await EnrichWithHasherAsync(true, (_, _) => { }, thumbnailService: thumbnails);
+
+        image.IndexState.Should().Be(IndexState.Indexed);
     }
 
     [Fact]
