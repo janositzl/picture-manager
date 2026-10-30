@@ -186,6 +186,7 @@ export function ImageBrowser({
       {image !== null && viewerEnabled && (
         <PhotoViewer
           faceReview={faceReview}
+          hideable={hideable}
           list={{
             items,
             hasNextPage: images.hasNextPage,

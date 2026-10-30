@@ -7,6 +7,8 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import RotateRightIcon from '@mui/icons-material/RotateRight'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import {
   Box,
   Button,
@@ -29,6 +31,7 @@ import { usePermissions } from '../api/auth'
 import { isNotFound, withBase } from '../api/client'
 import { useRemoveImagesFromAlbum } from '../api/albums'
 import { useSetFavorite } from '../api/favorites'
+import { useSetHidden } from '../api/hidden'
 import { albumsQuery, useImage } from '../api/queries'
 import { useRotateThumbnails } from '../api/rotation'
 import type { AlbumRef, ImageListItem } from '../api/types'
@@ -77,7 +80,10 @@ export function PhotoViewer({
   list,
   onRemoveFromAlbum,
   faceReview: openedFor,
+  hideable = false,
 }: {
+  /** Folder view (admin): offers Hide / Unhide for the current photo. */
+  hideable?: boolean
   /** Set when opened from a person: shows the detected faces and lets the user decide about them. */
   faceReview?: { personId: number }
   list: ViewerList
@@ -91,6 +97,7 @@ export function PhotoViewer({
   const detail = useImage(imageId)
   const setFavorite = useSetFavorite()
   const rotate = useRotateThumbnails()
+  const setHidden = useSetHidden()
   const { isAdmin } = usePermissions()
   // Any viewer can switch to face review (for photos no person's grid leads to); opened from a person it starts on.
   const [reviewing, setReviewing] = useState(false)
@@ -218,6 +225,23 @@ export function PhotoViewer({
       setFavorite.mutate({ id: current.id, isFavorite: !current.isFavorite })
   }
 
+  // H: hide the photo and move on to its neighbour (or close); unhiding stays put.
+  const toggleHidden = () => {
+    if (!hideable || current === undefined || !canAdd || setHidden.isPending) return
+    const hiding = current.isHidden !== true
+    const neighbour = next ?? prev
+    setHidden.mutate(
+      { imageIds: [current.id], isHidden: hiding },
+      {
+        onSuccess: () => {
+          if (!hiding) return
+          if (neighbour !== undefined) show(neighbour.id)
+          else close()
+        },
+      },
+    )
+  }
+
   const rotateRight = () => {
     if (isAdmin && current !== undefined && canAdd && !rotate.isPending)
       rotate.mutate({ imageIds: [current.id], degrees: 90 })
@@ -267,6 +291,10 @@ export function PhotoViewer({
       case 'i':
       case 'I':
         toggleInfo()
+        break
+      case 'h':
+      case 'H':
+        toggleHidden()
         break
       case 'r':
       case 'R':
@@ -432,6 +460,24 @@ export function PhotoViewer({
                     }}
                   >
                     {current.isFavorite ? <StarIcon /> : <StarBorderIcon />}
+                  </IconButton>
+                </Tooltip>
+              )}
+              {canAdd && hideable && current !== undefined && (
+                <Tooltip title={current.isHidden === true ? 'Unhide (H)' : 'Hide (H)'}>
+                  <IconButton
+                    aria-label={current.isHidden === true ? 'Unhide photo' : 'Hide photo'}
+                    disabled={setHidden.isPending}
+                    onClick={toggleHidden}
+                    className="transition-all duration-200 ease-in-out hover:scale-[1.08]"
+                    sx={{
+                      color: 'common.white',
+                      bgcolor: 'rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(4px)',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
+                    }}
+                  >
+                    {current.isHidden === true ? <VisibilityIcon /> : <VisibilityOffIcon />}
                   </IconButton>
                 </Tooltip>
               )}
