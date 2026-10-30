@@ -92,6 +92,35 @@ public class ImageQueryServiceTests
     }
 
     [Fact]
+    public async Task ListDaysAsync_PassesTheRequestedDirection_AndReturnsTheDays()
+    {
+        var days = new[] { new ImageDay(new DateOnly(2025, 8, 14), 2), new ImageDay(new DateOnly(2025, 8, 15), 1) };
+        _images.ListDaysAsync(1, Arg.Any<ImageListFilter>(), SortDirection.Asc, Arg.Any<CancellationToken>()).Returns(days);
+
+        var result = await CreateService().ListDaysAsync(new ImageListRequest(FolderId: 7, Sort: "date", Order: "asc"));
+
+        result.Value.Should().Equal(days);
+    }
+
+    [Fact]
+    public async Task ListDaysAsync_UnknownFolder_IsNotFound()
+    {
+        _folders.IsVisibleAsync(9, Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await CreateService().ListDaysAsync(new ImageListRequest(FolderId: 9));
+
+        result.Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public void ListItem_From_CarriesTheSortDate()
+    {
+        var row = Row(3);
+
+        ImageListItem.From(row).SortDate.Should().Be(row.SortDate);
+    }
+
+    [Fact]
     public async Task ListAsync_Defaults_AreDateDescLimit100_AndAskForOneExtraRow()
     {
         var result = await CreateService().ListAsync(new ImageListRequest());

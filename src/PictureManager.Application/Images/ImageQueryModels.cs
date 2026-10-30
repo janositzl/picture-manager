@@ -36,6 +36,9 @@ public sealed record ImageListFilter(
 /// <summary>Ids of every photo matching a listing filter, up to a cap; Truncated = there were more.</summary>
 public sealed record ImageIdsResult(IReadOnlyList<int> Ids, bool Truncated);
 
+/// <summary>One calendar day (the UTC date of SortDate, i.e. the photo's wall-clock day) and how many matching photos fall on it.</summary>
+public sealed record ImageDay(DateOnly Day, int Count);
+
 /// <summary>"Continue after this row". Date sorts use SortDate; name sorts use SortName (the DB's lower(FileName)).</summary>
 public sealed record ImageKeyset(DateTime? SortDate, string? SortName, int Id);
 

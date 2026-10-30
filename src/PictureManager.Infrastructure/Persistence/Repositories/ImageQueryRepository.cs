@@ -44,6 +44,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
         return await query.Take(take).Select(i => i.Id).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ImageDay>> ListDaysAsync(
+        int userId, ImageListFilter filter, SortDirection direction, CancellationToken cancellationToken = default)
+    {
+        // Grouped here, not in SQL: SortDate is a timestamptz, so date_trunc would follow the session time zone.
+        var dates = await Filtered(userId, filter).Select(i => i.SortDate).ToListAsync(cancellationToken);
+        var days = dates
+            .GroupBy(date => DateOnly.FromDateTime(date.ToUniversalTime()))
+            .Select(group => new ImageDay(group.Key, group.Count()));
+        return (direction == SortDirection.Desc ? days.OrderByDescending(d => d.Day) : days.OrderBy(d => d.Day)).ToList();
+    }
+
     private IQueryable<Image> Filtered(int userId, ImageListFilter filter)
     {
         // Hidden images are listed only for one folder's "Show hidden" view.

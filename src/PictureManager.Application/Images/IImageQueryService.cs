@@ -12,6 +12,9 @@ public interface IImageQueryService
     /// <summary>Ids of all photos matching the request's filters (sort applies; cursor and limit are ignored), capped at 5000.</summary>
     Task<Result<ImageIdsResult>> ListIdsAsync(ImageListRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>The days the matching photos fall on, with counts, in the request's order (cursor and limit are ignored).</summary>
+    Task<Result<IReadOnlyList<ImageDay>>> ListDaysAsync(ImageListRequest request, CancellationToken cancellationToken = default);
+
     Task<Result<ImageDetail>> GetDetailAsync(int id, CancellationToken cancellationToken = default);
 
     Task<Result<HiddenResult>> SetHiddenAsync(IReadOnlyCollection<int> imageIds, bool isHidden, CancellationToken cancellationToken = default);

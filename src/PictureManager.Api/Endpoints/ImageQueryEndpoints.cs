@@ -14,6 +14,7 @@ public static class ImageQueryEndpoints
     {
         user.MapGet("/images", ListAsync);
         user.MapGet("/images/ids", ListIdsAsync);
+        user.MapGet("/images/days", ListDaysAsync);
         admin.MapPut("/images/hidden", SetHiddenAsync);
         admin.MapPut("/images/thumbnail-rotation", RotateThumbnailsAsync);
         user.MapGet("/images/{id:int}", GetAsync);
@@ -37,6 +38,14 @@ public static class ImageQueryEndpoints
     {
         var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, null, null, personId, personState, faces, (includeHidden ?? false) && currentUser.IsAdmin, withPersonId);
         return (await service.ListIdsAsync(request, cancellationToken)).ToOk();
+    }
+
+    public static async Task<Results<Ok<IReadOnlyList<ImageDay>>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> ListDaysAsync(
+        int? folderId, string? folder, string? fileName, bool? favoritesOnly, int? personId, string? personState, string? faces, bool? includeHidden, string? sort, string? order,
+        IImageQueryService service, ICurrentUser currentUser, CancellationToken cancellationToken, [FromQuery] int[]? withPersonId = null)
+    {
+        var request = new ImageListRequest(folderId, folder, fileName, favoritesOnly ?? false, sort, order, null, null, personId, personState, faces, (includeHidden ?? false) && currentUser.IsAdmin, withPersonId);
+        return (await service.ListDaysAsync(request, cancellationToken)).ToOk();
     }
 
     public sealed record SetHiddenRequest(IReadOnlyList<int>? ImageIds, bool IsHidden);

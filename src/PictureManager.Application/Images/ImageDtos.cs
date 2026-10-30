@@ -21,12 +21,13 @@ public sealed record ImageListItem(
     string FolderPath,
     bool IsInvalid,
     int? FaceId = null,
-    bool IsHidden = false)
+    bool IsHidden = false,
+    DateTime SortDate = default)
 {
     public static ImageListItem From(ImageRow row) => new(
         row.Id, row.FolderId, row.FileName, row.Extension, row.Width, row.Height, row.DateTaken, row.IsFavorite,
         ImageUrls.Thumbnail(row.Id, row.ContentHash, row.ThumbnailRotation), ImageUrls.Preview(row.Id, row.ContentHash, row.ThumbnailRotation),
-        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId, row.IsHidden);
+        FolderDisplayPath.For(row.RootName, row.RelativePath), row.IndexState == IndexState.Invalid, row.FaceId, row.IsHidden, row.SortDate);
 }
 
 public sealed record ImageDetail(

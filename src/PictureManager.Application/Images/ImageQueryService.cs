@@ -82,6 +82,17 @@ public sealed class ImageQueryService : IImageQueryService
         return Result<ImageIdsResult>.Ok(new ImageIdsResult(ids.Take(MaxIds).ToList(), ids.Count > MaxIds));
     }
 
+    public async Task<Result<IReadOnlyList<ImageDay>>> ListDaysAsync(ImageListRequest request, CancellationToken cancellationToken = default)
+    {
+        var (parsed, failure) = await ParseAsync(request, cancellationToken);
+        if (failure is not null)
+            return failure;
+        var (_, _, _, direction, filter) = parsed!;
+
+        var days = await _images.ListDaysAsync(_currentUser.UserId, filter, direction, cancellationToken);
+        return Result<IReadOnlyList<ImageDay>>.Ok(days);
+    }
+
     private sealed record ParsedQuery(string SortToken, ImageSort Sort, string OrderToken, SortDirection Direction, ImageListFilter Filter);
 
     /// <summary>Validates the sort, order and filter parameters shared by the paged list and the ids list.</summary>
