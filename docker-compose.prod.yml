@@ -58,6 +58,13 @@ services:
       - api-logs:/app/logs
     networks:
       - picturemanager
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'       # Limits the app to 2 out of your 8 CPU threads
+          memory: 8G        # Hard ceiling to protect your 16GB host RAM
+        reservations:
+          memory: 4G        # Soft limit (guaranteed RAM for the app)
 
 volumes:
   pgdata:
