@@ -128,7 +128,7 @@ public sealed class ImageQueryRepository : IImageQueryRepository
                 new ImageRow(i.Id, i.FolderId, i.FileName, i.Extension, i.Width, i.Height, i.DateTaken, i.Favorites.Any(f => f.UserId == userId),
                     i.ContentHash, i.SortDate, i.FileName.ToLower(), i.Folder!.Root!.Name, i.Folder.RelativePath, i.IndexState, null, i.IsHidden, i.ThumbnailRotation),
                 i.FileSize, i.FileModified, i.Orientation, i.CameraMake, i.CameraModel, i.LensModel,
-                i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath))
+                i.Latitude, i.Longitude, i.RawMetadata, i.Folder!.Root!.Name, i.Folder.RelativePath, i.Note, i.LocationName))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -155,6 +155,17 @@ public sealed class ImageQueryRepository : IImageQueryRepository
                 .SetProperty(i => i.IsHidden, isHidden)
                 .SetProperty(i => i.UpdatedAt, updatedAtUtc),
                 cancellationToken);
+    }
+
+    public async Task<bool> SetNoteAsync(int id, string? note, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
+    {
+        var affected = await _dbContext.Images.WhereExisting()
+            .Where(i => i.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.Note, note)
+                .SetProperty(i => i.UpdatedAt, updatedAtUtc),
+                cancellationToken);
+        return affected > 0;
     }
 
     public async Task<int> RotateThumbnailsAsync(IReadOnlyCollection<int> ids, int degrees, DateTime updatedAtUtc, CancellationToken cancellationToken = default)

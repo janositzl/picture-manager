@@ -52,7 +52,9 @@ public sealed record ImageDetail(
     string FolderPath,
     IReadOnlyList<AlbumRef> Albums,
     bool IsInvalid,
-    bool IsHidden);
+    bool IsHidden,
+    string? Note = null,
+    string? LocationName = null);
 
 public sealed record HiddenResult(int Affected);
 

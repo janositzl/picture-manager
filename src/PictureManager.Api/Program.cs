@@ -176,7 +176,7 @@ try
     auth.MapAuthEndpoints();
 
     user.MapImageEndpoints();
-    user.MapImageQueryEndpoints(admin);
+    user.MapImageQueryEndpoints(folderActions, admin);
     user.MapFolderEndpoints(folderActions, admin);
     user.MapAlbumEndpoints();
     user.MapDuplicateEndpoints();

@@ -20,6 +20,7 @@ public sealed record FolderDetail(
     string RelativePath,
     int ImageCount,
     bool IsMissing,
-    IReadOnlyList<BreadcrumbItem> Breadcrumb);
+    IReadOnlyList<BreadcrumbItem> Breadcrumb,
+    string? Note = null);
 
 public sealed record RemovedFolder(int Id, string Name, string RootName, string RelativePath);

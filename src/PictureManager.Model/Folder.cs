@@ -32,6 +32,11 @@ public class Folder
     /// <summary>Excludes this folder (and, since walks never descend into it, its whole subtree) from future scans and discovery.</summary>
     public bool IsExcluded { get; set; }
 
+    public const int NoteMaxLength = 1024;
+
+    /// <summary>Free-text user note about this folder; null = none.</summary>
+    public string? Note { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime ModifiedUtc { get; set; }
 

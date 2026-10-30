@@ -71,7 +71,9 @@ public sealed record ImageDetailRow(
     double? Longitude,
     string? RawMetadata,
     string RootName,
-    string RelativePath);
+    string RelativePath,
+    string? Note = null,
+    string? LocationName = null);
 
 /// <summary>An album containing an image, as the caller sees it. Access is "Owner", "Editor" or "Viewer".</summary>
 public sealed record AlbumRef(int Id, string Name, string Access);

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using PictureManager.Application.Common;
 using PictureManager.Application.Repositories;
 using PictureManager.Application.Thumbnails;
+using PictureManager.Model;
 
 namespace PictureManager.Application.Folders;
 
@@ -107,6 +108,26 @@ public sealed class FolderService : IFolderService
             return Result.Invalid("id", "A parent folder is excluded; include it first.");
 
         folder.IsExcluded = isExcluded;
+        folder.ModifiedUtc = _clock.UtcNow;
+        await _folders.UpdateAsync(folder, cancellationToken);
+        return Result.Ok();
+    }
+
+    public async Task<Result> SetNoteAsync(int id, string? note, CancellationToken cancellationToken = default)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        if (trimmed is { Length: > Folder.NoteMaxLength })
+            return Result.Invalid("note", $"Must not be longer than {Folder.NoteMaxLength} characters.");
+
+        var folder = await _folders.GetByIdAsync(id, cancellationToken);
+        if (folder is null || !folder.IsActive)
+            return Result.NotFound();
+
+        // Same hazard as SetExcludedAsync: a running scan writes whole Folder rows back and would revert the note.
+        if (await _scanJobs.HasActiveJobAsync(cancellationToken))
+            return Result.Conflict("A scan is running; change the note after it finishes.");
+
+        folder.Note = trimmed;
         folder.ModifiedUtc = _clock.UtcNow;
         await _folders.UpdateAsync(folder, cancellationToken);
         return Result.Ok();

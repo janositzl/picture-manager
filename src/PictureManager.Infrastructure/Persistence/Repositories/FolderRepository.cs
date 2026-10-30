@@ -79,7 +79,8 @@ public sealed class FolderRepository : IFolderRepository
                 RootName = f.Root!.Name,
                 f.RelativePath,
                 ImageCount = f.Images.Count(i => i.MissingSinceUtc == null && !i.IsHidden),
-                IsMissing = f.MissingSinceUtc != null
+                IsMissing = f.MissingSinceUtc != null,
+                f.Note
             })
             .FirstOrDefaultAsync(cancellationToken);
         if (folder is null)
@@ -97,7 +98,7 @@ public sealed class FolderRepository : IFolderRepository
             .ToList();
 
         return new FolderDetail(folder.Id, folder.Name, folder.RootId, folder.RootName, folder.RelativePath,
-            folder.ImageCount, folder.IsMissing, breadcrumb);
+            folder.ImageCount, folder.IsMissing, breadcrumb, folder.Note);
     }
 
     public async Task<IReadOnlyList<RemovedFolder>> GetRemovedAsync(CancellationToken cancellationToken = default)

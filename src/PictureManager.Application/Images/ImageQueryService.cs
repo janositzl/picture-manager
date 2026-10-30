@@ -162,7 +162,18 @@ public sealed class ImageQueryService : IImageQueryService
             image.IsFavorite, ImageUrls.Thumbnail(image.Id, image.ContentHash, image.ThumbnailRotation), ImageUrls.Preview(image.Id, image.ContentHash, image.ThumbnailRotation),
             row.FileSize, row.FileModified, row.Orientation, row.CameraMake, row.CameraModel, row.LensModel,
             row.Latitude, row.Longitude, ParseJson(row.RawMetadata), FolderDisplayPath.For(row.RootName, row.RelativePath),
-            albums, image.IndexState == IndexState.Invalid, image.IsHidden));
+            albums, image.IndexState == IndexState.Invalid, image.IsHidden, row.Note, row.LocationName));
+    }
+
+    public async Task<Result> SetNoteAsync(int id, string? note, CancellationToken cancellationToken = default)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        if (trimmed is { Length: > Image.NoteMaxLength })
+            return Result.Invalid("note", $"Must not be longer than {Image.NoteMaxLength} characters.");
+
+        return await _images.SetNoteAsync(id, trimmed, _clock.UtcNow, cancellationToken)
+            ? Result.Ok()
+            : Result.NotFound();
     }
 
     private const int MaxHideBatch = 5000;

@@ -1,6 +1,7 @@
 import AutorenewIcon from '@mui/icons-material/Autorenew'
 import CheckIcon from '@mui/icons-material/Check'
 import CreateNewFolderOutlinedIcon from '@mui/icons-material/CreateNewFolderOutlined'
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
 import {
@@ -29,6 +30,10 @@ type Props = {
   reanalyseDisabled: boolean
   onReanalyse: () => void
   onAddToAlbum: () => void
+  /** Editing the folder's note needs the folder-actions permission. */
+  canEditNote: boolean
+  hasNote: boolean
+  onEditNote: () => void
 }
 
 /** The folder header's "more" menu; the Show hidden choice lives in ?hidden=1 so it survives reloads. */
@@ -40,6 +45,9 @@ export function FolderMenu({
   reanalyseDisabled,
   onReanalyse,
   onAddToAlbum,
+  canEditNote,
+  hasNote,
+  onEditNote,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
@@ -50,7 +58,7 @@ export function FolderMenu({
   }
   const showReanalyse = hasPhotos && canReanalyse
   const showAddToAlbum = hasPhotos
-  if (!canShowHidden && !showReanalyse && !showAddToAlbum) return null
+  if (!canShowHidden && !showReanalyse && !showAddToAlbum && !canEditNote) return null
 
   return (
     <>
@@ -103,7 +111,15 @@ export function FolderMenu({
             {showHidden && <CheckIcon fontSize="small" color="primary" />}
           </MenuItem>
         )}
-        {canShowHidden && (showReanalyse || showAddToAlbum) && <Divider />}
+        {canShowHidden && (showReanalyse || showAddToAlbum || canEditNote) && <Divider />}
+        {canEditNote && (
+          <MenuItem onClick={run(onEditNote)}>
+            <ListItemIcon>
+              <EditNoteOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>{hasNote ? 'Edit Note' : 'Add Note'}</ListItemText>
+          </MenuItem>
+        )}
         {showReanalyse && (
           <MenuItem disabled={reanalyseDisabled} onClick={run(onReanalyse)}>
             <ListItemIcon>

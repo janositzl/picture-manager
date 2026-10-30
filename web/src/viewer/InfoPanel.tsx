@@ -1,8 +1,10 @@
 import { Alert, Box, Button, Chip, CircularProgress, Link, Stack, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router'
+import { usePermissions } from '../api/auth'
 import type { ImageDetail } from '../api/types'
 import { formatBytes, formatDateTaken, openStreetMapUrl } from './format'
+import { InlineNote } from './InlineNote'
 
 type Props = {
   detail: ImageDetail | undefined
@@ -56,6 +58,7 @@ export function InfoPanel({ detail, isLoading, isError, onRetry, peopleSlot }: P
 }
 
 function Details({ detail }: { detail: ImageDetail }) {
+  const { canRunFolderActions } = usePermissions()
   const camera = [detail.cameraMake, detail.cameraModel].filter(Boolean).join(' ')
   const rows: Array<[string, ReactNode]> = [
     ['Date taken', detail.dateTaken === null ? 'Unknown' : formatDateTaken(detail.dateTaken)],
@@ -118,6 +121,12 @@ function Details({ detail }: { detail: ImageDetail }) {
           </Box>
         ))}
       </Box>
+      <InlineNote
+        key={detail.id}
+        imageId={detail.id}
+        note={detail.note}
+        canEdit={canRunFolderActions}
+      />
       <div>
         <Typography variant="caption" sx={{ color: 'grey.400' }}>
           Albums

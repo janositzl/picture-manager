@@ -10,13 +10,14 @@ namespace PictureManager.Api.Endpoints;
 
 public static class ImageQueryEndpoints
 {
-    public static IEndpointRouteBuilder MapImageQueryEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder admin)
+    public static IEndpointRouteBuilder MapImageQueryEndpoints(this IEndpointRouteBuilder user, IEndpointRouteBuilder folderActions, IEndpointRouteBuilder admin)
     {
         user.MapGet("/images", ListAsync);
         user.MapGet("/images/ids", ListIdsAsync);
         admin.MapPut("/images/hidden", SetHiddenAsync);
         admin.MapPut("/images/thumbnail-rotation", RotateThumbnailsAsync);
         user.MapGet("/images/{id:int}", GetAsync);
+        folderActions.MapPut("/images/{id:int}/note", SetNoteAsync);
         user.MapPut("/images/{id:int}/favorite", SetFavoriteAsync);
         user.MapDelete("/images/{id:int}/favorite", ClearFavoriteAsync);
         return user;
@@ -53,6 +54,10 @@ public static class ImageQueryEndpoints
     public static async Task<Results<Ok<ImageDetail>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> GetAsync(
         int id, IImageQueryService service, CancellationToken cancellationToken) =>
         (await service.GetDetailAsync(id, cancellationToken)).ToOk();
+
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetNoteAsync(
+        int id, NoteRequest request, IImageQueryService service, CancellationToken cancellationToken) =>
+        (await service.SetNoteAsync(id, request.Note, cancellationToken)).ToNoContent();
 
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetFavoriteAsync(
         int id, IImageQueryService service, CancellationToken cancellationToken) =>

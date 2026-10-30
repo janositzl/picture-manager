@@ -29,6 +29,9 @@ public class Image
     public string? LensModel { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+
+    /// <summary>Human-readable name of where the photo was taken; null = unknown.</summary>
+    public string? LocationName { get; set; }
     public string? RawMetadata { get; set; }
 
     /// <summary>User-hidden: out of every view and out of face recognition; only the folder view's "Show hidden" lists it.</summary>
@@ -36,6 +39,12 @@ public class Image
 
     /// <summary>Clockwise degrees (0, 90, 180 or 270) applied to the thumbnail on top of the EXIF orientation, for photos whose EXIF is wrong. The original file is never touched.</summary>
     public int ThumbnailRotation { get; set; }
+
+    public const int NoteMaxLength = 1024;
+    public const int LocationNameMaxLength = 256;
+
+    /// <summary>Free-text user note about this photo; null = none.</summary>
+    public string? Note { get; set; }
 
     public IndexState IndexState { get; set; } = IndexState.Pending;
     public DateTime FirstSeenUtc { get; set; }

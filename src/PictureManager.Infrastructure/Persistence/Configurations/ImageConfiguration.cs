@@ -36,6 +36,12 @@ public class ImageConfiguration : IEntityTypeConfiguration<Image>
         builder.Property(x => x.LensModel)
             .HasMaxLength(200);
 
+        builder.Property(x => x.LocationName)
+            .HasMaxLength(Image.LocationNameMaxLength);
+
+        builder.Property(x => x.Note)
+            .HasMaxLength(Image.NoteMaxLength);
+
         builder.Property(x => x.RawMetadata)
             .HasColumnType("jsonb");
 

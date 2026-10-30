@@ -1,3 +1,4 @@
+import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined'
 import { Alert, Box, Link, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router'
@@ -15,6 +16,7 @@ import { EmptyMessage } from '../shared/EmptyMessage'
 import { FacesFilterToggle } from './FacesFilterToggle'
 import { GridSkeleton } from './GridSkeleton'
 import { FolderMenu } from './FolderMenu'
+import { FolderNoteDialog } from './FolderNoteDialog'
 import { ImageBrowser } from './ImageBrowser'
 import { writeLastFolderId } from './preferences'
 
@@ -30,6 +32,7 @@ export function FolderView() {
   const folder = useFolder(folderId)
   const [pickerTarget, setPickerTarget] = useState<AddTarget | null>(null)
   const [confirmingReanalyse, setConfirmingReanalyse] = useState(false)
+  const [editingNote, setEditingNote] = useState(false)
   const { activeJob, recognizeFaces } = useFolderJobs()
 
   // Only once the folder is confirmed to exist, so a dead/typo'd id in the URL isn't remembered.
@@ -75,6 +78,39 @@ export function FolderView() {
     )
   }
 
+  const noteBanner = detail.note ? (
+    <Box
+      title={detail.note}
+      sx={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 0.75,
+        px: 2.5,
+        py: 0.5,
+        borderBottom: 1,
+        borderColor: 'divider',
+        color: 'text.secondary',
+      }}
+    >
+      <StickyNote2OutlinedIcon sx={{ fontSize: 15, mt: '2px', flexShrink: 0, color: 'info.main' }} />
+      <Typography
+        variant="caption"
+        sx={{
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          lineHeight: 1.4,
+          // Long notes fold to three lines; the full text is in the tooltip and the edit dialog.
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
+      >
+        {detail.note}
+      </Typography>
+    </Box>
+  ) : null
+
   return (
     <>
       <ImageBrowser
@@ -111,12 +147,24 @@ export function FolderView() {
                   reanalyseDisabled={activeJob !== null}
                   onReanalyse={() => setConfirmingReanalyse(true)}
                   onAddToAlbum={() => setPickerTarget({ folderId })}
+                  canEditNote={canRunFolderActions}
+                  hasNote={!!detail.note}
+                  onEditNote={() => setEditingNote(true)}
                 />
               ) : undefined
             }
           />
         }
-        banner={banner}
+        banner={
+          noteBanner === null ? (
+            banner
+          ) : (
+            <>
+              {noteBanner}
+              {banner}
+            </>
+          )
+        }
         emptyState={
           faces === undefined ? null : (
             <EmptyMessage>
@@ -134,6 +182,14 @@ export function FolderView() {
             recognizeFaces(folderId, { isRecursive: false, reanalyze: true, preset })
           }}
           onClose={() => setConfirmingReanalyse(false)}
+        />
+      )}
+      {editingNote && (
+        <FolderNoteDialog
+          folderId={folderId}
+          folderName={detail.name}
+          note={detail.note}
+          onClose={() => setEditingNote(false)}
         />
       )}
       {pickerTarget !== null && (

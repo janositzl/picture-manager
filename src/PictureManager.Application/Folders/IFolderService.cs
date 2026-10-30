@@ -22,4 +22,7 @@ public interface IFolderService
     Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
     Task<Result> SetExcludedAsync(int id, bool isExcluded, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the folder's note; null or whitespace clears it.</summary>
+    Task<Result> SetNoteAsync(int id, string? note, CancellationToken cancellationToken = default);
 }

@@ -20,6 +20,7 @@ public static class FolderEndpoints
         admin.MapPost("/folders/{id:int}/restore", RestoreAsync);
         admin.MapDelete("/folders/{id:int}/removed", DeleteAsync);
         folderActions.MapPut("/folders/{id:int}/exclusion", SetExcludedAsync);
+        folderActions.MapPut("/folders/{id:int}/note", SetNoteAsync);
     }
 
     public static async Task<Ok<IReadOnlyList<FolderNode>>> GetRootsAsync(IFolderService service, CancellationToken cancellationToken) =>
@@ -51,6 +52,12 @@ public static class FolderEndpoints
     public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetExcludedAsync(
         int id, FolderExclusionRequest request, IFolderService service, CancellationToken cancellationToken) =>
         (await service.SetExcludedAsync(id, request.IsExcluded, cancellationToken)).ToNoContent();
+
+    public static async Task<Results<NoContent, NotFound, ValidationProblem, Conflict<ProblemDetails>>> SetNoteAsync(
+        int id, NoteRequest request, IFolderService service, CancellationToken cancellationToken) =>
+        (await service.SetNoteAsync(id, request.Note, cancellationToken)).ToNoContent();
 }
 
 public sealed record FolderExclusionRequest(bool IsExcluded);
+
+public sealed record NoteRequest(string? Note);

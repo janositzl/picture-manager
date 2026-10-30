@@ -31,6 +31,7 @@ export type FolderDetail = {
   imageCount: number
   isMissing: boolean
   breadcrumb: BreadcrumbItem[]
+  note?: string | null
 }
 
 export type ImageListItem = {
@@ -73,6 +74,8 @@ export type ImageDetail = ImageListItem & {
   longitude: number | null
   rawMetadata: unknown
   albums: AlbumRef[]
+  note?: string | null
+  locationName?: string | null
 }
 
 export type Page<T> = { items: T[]; nextCursor: string | null }

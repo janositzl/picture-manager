@@ -20,6 +20,9 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
             .IsRequired()
             .HasMaxLength(2000);
 
+        builder.Property(x => x.Note)
+            .HasMaxLength(Folder.NoteMaxLength);
+
         builder.Property(x => x.CreatedUtc)
             .HasColumnType("timestamp with time zone")
             .IsRequired();

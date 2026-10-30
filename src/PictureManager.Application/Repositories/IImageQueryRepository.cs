@@ -28,6 +28,9 @@ public interface IImageQueryRepository
     /// <summary>Sets IsHidden on every existing image in `ids`; unknown or missing ids are skipped. Returns the rows changed.</summary>
     Task<int> SetHiddenAsync(IReadOnlyCollection<int> ids, bool isHidden, DateTime updatedAtUtc, CancellationToken cancellationToken = default);
 
+    /// <summary>Sets (or, with null, clears) the note of an existing image. False when no such image exists.</summary>
+    Task<bool> SetNoteAsync(int id, string? note, DateTime updatedAtUtc, CancellationToken cancellationToken = default);
+
     /// <summary>Adds `degrees` (clockwise, a multiple of 90) to ThumbnailRotation, modulo 360, on every existing image in `ids`. Returns the rows changed.</summary>
     Task<int> RotateThumbnailsAsync(IReadOnlyCollection<int> ids, int degrees, DateTime updatedAtUtc, CancellationToken cancellationToken = default);
 

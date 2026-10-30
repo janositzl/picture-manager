@@ -405,6 +405,10 @@ namespace PictureManager.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<int?>("ParentId")
                         .HasColumnType("integer");
 
@@ -499,11 +503,19 @@ namespace PictureManager.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("LocationName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<double?>("Longitude")
                         .HasColumnType("double precision");
 
                     b.Property<DateTime?>("MissingSinceUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<int?>("Orientation")
                         .HasColumnType("integer");
