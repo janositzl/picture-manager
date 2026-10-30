@@ -16,6 +16,8 @@ type Props = {
   count?: number
   sort: Sort
   order: Order
+  /** The sort is fixed by the view (e.g. By day always sorts by date); the order can still flip. */
+  sortLocked?: boolean
   actions?: ReactNode
   /** Pinned to the far right, after sort (e.g. a "more" menu). */
   menu?: ReactNode
@@ -29,6 +31,7 @@ export function GridHeader({
   count,
   sort,
   order,
+  sortLocked = false,
   actions,
   menu,
   titleAdornment,
@@ -117,6 +120,7 @@ export function GridHeader({
           select
           size="small"
           variant="standard"
+          disabled={sortLocked}
           value={sort}
           onChange={(event) =>
             setSearchParams(withParams(searchParams, { sort: event.target.value, order: null }))

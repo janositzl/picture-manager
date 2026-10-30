@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { Typography } from '@mui/material'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { AlbumPicker } from '../albums/AlbumPicker'
 import type { AddTarget } from '../api/albums'
@@ -6,17 +7,20 @@ import { useSetFavorite } from '../api/favorites'
 import { useSetHidden } from '../api/hidden'
 import type { ImageFilter } from '../api/imageFilter'
 import { faceThumbnailUrl } from '../api/people'
-import { fetchImageIds, useImages } from '../api/queries'
+import { fetchImageIds, useImageDays, useImages } from '../api/queries'
 import { useRotateThumbnails } from '../api/rotation'
 import type { ImageListItem } from '../api/types'
 import { useNotify } from '../app/notify'
-import { PhotoGrid } from '../grid/PhotoGrid'
+import { PhotoGrid, type PhotoGridHandle } from '../grid/PhotoGrid'
 import { PhotoTile } from '../grid/PhotoTile'
+import { dayOf } from '../grid/rows'
 import { SelectionBar } from '../grid/SelectionBar'
 import { useSelection } from '../grid/useSelection'
 import { parseGridParams, withParams } from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { PhotoViewer } from '../viewer/PhotoViewer'
+import { DayBar } from './DayBar'
+import { formatDay } from './dayFormat'
 import { GridSkeleton } from './GridSkeleton'
 
 type Props = {
@@ -41,6 +45,8 @@ type Props = {
   hideable?: boolean
   /** Folder view only: the selection bar offers Rotate right (thumbnails only). */
   rotatable?: boolean
+  /** Folder view only: one continuous grid with a section per day and a day bar (the filter must sort by date). */
+  groupByDay?: boolean
 }
 
 /** Header (or selection bar), banner and virtualized grid for one image filter. */
@@ -58,6 +64,7 @@ export function ImageBrowser({
   viewerEnabled = true,
   hideable = false,
   rotatable = false,
+  groupByDay = false,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { image } = parseGridParams(searchParams)
@@ -66,6 +73,35 @@ export function ImageBrowser({
   const items = useMemo(() => images.data?.pages.flatMap((page) => page.items) ?? [], [images.data])
   const ids = useMemo(() => items.map((item) => item.id), [items])
   const filterKey = JSON.stringify(filter)
+
+  const days = useImageDays(filter, groupByDay)
+  const dayCounts = useMemo(
+    () => new Map(days.data?.map((entry) => [entry.day, entry.count])),
+    [days.data],
+  )
+  const gridRef = useRef<PhotoGridHandle>(null)
+  const [topDay, setTopDay] = useState<string | null>(null)
+  // A day picked in the day bar that may not be loaded yet: load pages until its header exists, then scroll.
+  const pendingDay = useRef<string | null>(null)
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = images
+  const advancePendingDay = useCallback(() => {
+    const day = pendingDay.current
+    if (day === null) return
+    if (gridRef.current?.scrollToGroup(day)) pendingDay.current = null
+    else if (hasNextPage && !isFetchingNextPage) void fetchNextPage({ cancelRefetch: false })
+    else if (!hasNextPage) pendingDay.current = null
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+  useEffect(() => {
+    advancePendingDay()
+  }, [advancePendingDay, items])
+  const jumpToDay = useCallback(
+    (day: string) => {
+      setTopDay(day)
+      pendingDay.current = day
+      advancePendingDay()
+    },
+    [advancePendingDay],
+  )
   const notify = useNotify()
   const [selectingAll, setSelectingAll] = useState(false)
   // "Select all" covers every matching photo; the loaded pages are only part of them while more pages remain.
@@ -132,9 +168,20 @@ export function ImageBrowser({
   } else {
     body = (
       <PhotoGrid
-        // A new filter (folder, sort, query) starts a new grid at the top.
-        key={filterKey}
+        // A new filter (folder, sort, query) or grouping starts a new grid at the top.
+        key={`${filterKey}|${groupByDay}`}
+        ref={gridRef}
         items={items}
+        groupKey={groupByDay ? dayOf : undefined}
+        onTopGroupChange={groupByDay ? setTopDay : undefined}
+        renderGroupHeader={(day) => (
+          <Typography component="h2" sx={{ fontWeight: 600, fontSize: 15 }}>
+            {formatDay(day)}
+            <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              {dayCounts.get(day) ?? ''}
+            </Typography>
+          </Typography>
+        )}
         hasNextPage={images.hasNextPage}
         isFetchingNextPage={images.isFetchingNextPage}
         fetchNextPage={() => void images.fetchNextPage({ cancelRefetch: false })}
@@ -182,6 +229,14 @@ export function ImageBrowser({
         header
       )}
       {banner}
+      {groupByDay && days.data !== undefined && (
+        <DayBar
+          days={days.data}
+          current={topDay ?? days.data[0]?.day ?? null}
+          loading={isFetchingNextPage}
+          onSelect={jumpToDay}
+        />
+      )}
       {body}
       {image !== null && viewerEnabled && (
         <PhotoViewer

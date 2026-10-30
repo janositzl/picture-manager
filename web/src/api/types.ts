@@ -43,6 +43,8 @@ export type ImageListItem = {
   height: number | null
   /** Local-naive camera time without an offset, e.g. "2025-08-14T18:32:05". */
   dateTaken: string | null
+  /** The instant photos are ordered by (date taken read as UTC, else file modified), e.g. "2025-08-14T18:32:05Z". Its first 10 characters are the photo's day. */
+  sortDate: string
   isFavorite: boolean
   thumbnailUrl: string | null
   previewUrl: string | null
@@ -58,7 +60,10 @@ export type ImageListItem = {
   fileSize?: number
 }
 
-export type AlbumAccess = 'Owner' | 'Editor' | 'Viewer'
+/** One calendar day ("YYYY-MM-DD") of a photo list and how many photos fall on it. */
+export type ImageDay = { day: string; count: number }
+
+export type AlbumAccess ='Owner' | 'Editor' | 'Viewer'
 export type SharePermission = 'Viewer' | 'Editor'
 
 export type AlbumRef = { id: number; name: string; access: AlbumAccess }

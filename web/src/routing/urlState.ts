@@ -30,6 +30,12 @@ export function parseFacesParam(params: URLSearchParams): 'with' | 'without' | u
   return value === 'with' || value === 'without' ? value : undefined
 }
 
+/** The folder view's grouping (?group=day|all); undefined when the URL doesn't say. */
+export function parseGroupParam(params: URLSearchParams): 'day' | 'all' | undefined {
+  const value = params.get('group')
+  return value === 'day' || value === 'all' ? value : undefined
+}
+
 /** The folder view's "Show hidden" switch (?hidden=1). */
 export function parseHiddenParam(params: URLSearchParams): boolean {
   return params.get('hidden') === '1'

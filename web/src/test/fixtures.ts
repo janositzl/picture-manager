@@ -140,6 +140,7 @@ export function image(
     width: 1200,
     height: 800,
     dateTaken: '2025-08-14T18:32:05',
+    sortDate: '2025-08-14T18:32:05Z',
     isFavorite: false,
     thumbnailUrl: `/api/images/${id}/thumbnail?v=H${id}`,
     previewUrl: `/api/images/${id}/preview?v=H${id}`,

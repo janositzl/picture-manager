@@ -7,7 +7,13 @@ import type { AddTarget } from '../api/albums'
 import { isNotFound } from '../api/client'
 import { usePermissions } from '../api/auth'
 import { useFolder } from '../api/queries'
-import { parseFacesParam, parseGridParams, parseHiddenParam, parseId } from '../routing/urlState'
+import {
+  parseFacesParam,
+  parseGridParams,
+  parseGroupParam,
+  parseHiddenParam,
+  parseId,
+} from '../routing/urlState'
 import { QueryErrorAlert } from '../shared/QueryErrorAlert'
 import { useFolderJobs } from '../tree/FolderJobsContext'
 import { ReanalyseFacesConfirm } from '../tree/ReanalyseFacesConfirm'
@@ -18,13 +24,18 @@ import { GridSkeleton } from './GridSkeleton'
 import { FolderMenu } from './FolderMenu'
 import { FolderNoteDialog } from './FolderNoteDialog'
 import { ImageBrowser } from './ImageBrowser'
-import { writeLastFolderId } from './preferences'
+import { GroupModeToggle } from './GroupModeToggle'
+import { readGroupMode, writeLastFolderId } from './preferences'
 
 export function FolderView() {
   const params = useParams()
   const folderId = parseId(params.folderId ?? null)
   const [searchParams] = useSearchParams()
-  const { sort, order } = parseGridParams(searchParams)
+  const { sort: urlSort, order } = parseGridParams(searchParams)
+  const groupMode = parseGroupParam(searchParams) ?? readGroupMode()
+  const byDay = groupMode === 'day'
+  // Day sections only make sense in date order, whatever ?sort= says.
+  const sort = byDay ? 'date' : urlSort
   const faces = parseFacesParam(searchParams)
   const { isAdmin, canRunFolderActions } = usePermissions()
   // Hidden photos are admin-only; a pasted ?hidden=1 must not reveal them to anyone else.
@@ -116,6 +127,7 @@ export function FolderView() {
       <ImageBrowser
         hideable={isAdmin}
         rotatable={isAdmin}
+        groupByDay={byDay}
         filter={{
           kind: 'folder',
           folderId,
@@ -132,9 +144,13 @@ export function FolderView() {
             count={detail.isMissing ? undefined : detail.imageCount}
             sort={sort}
             order={order}
+            sortLocked={byDay}
             actions={
               !detail.isMissing && detail.imageCount > 0 ? (
-                <FacesFilterToggle value={faces} />
+                <>
+                  <GroupModeToggle value={groupMode} />
+                  <FacesFilterToggle value={faces} />
+                </>
               ) : undefined
             }
             menu={

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseGridParams,
+  parseGroupParam,
   parseHiddenParam,
   parseId,
   parseSearchState,
@@ -9,6 +10,17 @@ import {
 } from './urlState'
 
 const params = (search: string) => new URLSearchParams(search)
+
+describe('parseGroupParam', () => {
+  it.each([
+    ['?group=day', 'day'],
+    ['?group=all', 'all'],
+  ])('accepts %s', (search, expected) => expect(parseGroupParam(params(search))).toBe(expected))
+
+  it.each(['', '?group=', '?group=week', '?group=DAY'])('ignores %s', (search) =>
+    expect(parseGroupParam(params(search))).toBeUndefined(),
+  )
+})
 
 describe('parseId', () => {
   it.each([

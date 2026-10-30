@@ -18,6 +18,7 @@ import type {
   SimilarGroup,
   FolderDetail,
   FolderNode,
+  ImageDay,
   ImageDetail,
   ImageListItem,
   Page,
@@ -35,6 +36,8 @@ export const queryKeys = {
   imageLists: () => ['images', 'list'] as const,
   images: (filter: ImageFilter) => ['images', 'list', filter] as const,
   image: (id: number) => ['images', 'detail', id] as const,
+  // Not under 'list' (patchFavorite patches those as paged photo lists), but under 'images' so hide/unhide refreshes it.
+  imageDays: (filter: ImageFilter) => ['images', 'days', filter] as const,
   albums: () => ['albums', 'list'] as const,
   album: (id: number) => ['albums', id, 'detail'] as const,
   albumExport: (id: number, prefix: string) => ['albums', id, 'export', prefix] as const,
@@ -116,6 +119,17 @@ export function useImages(filter: ImageFilter, options: UseImagesOptions = {}) {
     refetchOnMount: options.refetchOnMount ?? true,
     // Keeps the previous folder/filter's photos on screen while the new ones load, instead of
     // blanking the grid to a skeleton on every navigation.
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** The days the filter's photos fall on, in the filter's order, with counts (for the By day bar). */
+export function useImageDays(filter: ImageFilter, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.imageDays(filter),
+    queryFn: ({ signal }) =>
+      apiFetch<ImageDay[]>(`/api/images/days?${toImageIdsQuery(filter)}`, { signal }),
+    enabled,
     placeholderData: keepPreviousData,
   })
 }

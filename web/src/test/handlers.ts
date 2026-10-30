@@ -55,6 +55,19 @@ export const handlers = [
     if (fileName) items = items.filter((i) => i.fileName.toLowerCase().includes(fileName))
     return HttpResponse.json({ items, nextCursor: null })
   }),
+  // Before /api/images/:id, which would read "days" as an id.
+  http.get('/api/images/days', ({ request }) => {
+    const query = new URL(request.url).searchParams
+    const folderId = query.get('folderId')
+    const counts = new Map<string, number>()
+    for (const item of allImages()) {
+      if (folderId !== null && item.folderId !== Number(folderId)) continue
+      const day = item.sortDate.slice(0, 10)
+      counts.set(day, (counts.get(day) ?? 0) + 1)
+    }
+    const days = [...counts].map(([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day))
+    return HttpResponse.json(query.get('order') === 'desc' ? days.reverse() : days)
+  }),
   http.get('/api/images/:id/faces', () => HttpResponse.json([])),
   http.get('/api/images/:id', ({ params }) => {
     const item = allImages().find((i) => i.id === Number(params.id))
